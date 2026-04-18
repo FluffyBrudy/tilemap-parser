@@ -16,10 +16,17 @@ class LayerRenderStats:
 
 
 class TileLayerRenderer:
-    def __init__(self, data: TilemapData, *, include_hidden_layers: bool = False) -> None:
+    def __init__(
+        self, data: TilemapData, *, include_hidden_layers: bool = False
+    ) -> None:
         self.data = data
-        self.tile_layers = data.get_tile_layers_dict(include_hidden=include_hidden_layers)
-        self._sorted_layer_ids = sorted(self.tile_layers.keys(), key=lambda lid: (self.tile_layers[lid].z_index, lid))
+        self.tile_layers = data.get_tile_layers_dict(
+            include_hidden=include_hidden_layers
+        )
+        self._sorted_layer_ids = sorted(
+            self.tile_layers.keys(),
+            key=lambda lid: (self.tile_layers[lid].z_index, lid),
+        )
         self._variant_cache: Dict[Tuple[int, int], Optional[Surface]] = {}
         self._tile_w, self._tile_h = data.tile_size
 
@@ -29,7 +36,9 @@ class TileLayerRenderer:
     def _get_cached_variant(self, ttype: int, variant: int) -> Optional[Surface]:
         key = (ttype, variant)
         if key not in self._variant_cache:
-            self._variant_cache[key] = self.data.get_tile_surface(ttype, variant, copy_surface=True)
+            self._variant_cache[key] = self.data.get_tile_surface(
+                ttype, variant, copy_surface=True
+            )
         return self._variant_cache[key]
 
     def warm_cache(self) -> None:
@@ -38,6 +47,7 @@ class TileLayerRenderer:
             for tile in layer.tiles.values():
                 if isinstance(tile.ttype, int):
                     self._get_cached_variant(tile.ttype, tile.variant)
+        self.data = None
 
     def render(
         self,
@@ -79,4 +89,6 @@ class TileLayerRenderer:
                 target.blit(cell, (x * self._tile_w - cam_x, y * self._tile_h - cam_y))
                 drawn += 1
 
-        return LayerRenderStats(drawn_tiles=drawn, skipped_tiles=skipped, visible_layers=visible_layers)
+        return LayerRenderStats(
+            drawn_tiles=drawn, skipped_tiles=skipped, visible_layers=visible_layers
+        )

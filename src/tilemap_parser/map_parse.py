@@ -81,7 +81,9 @@ def _optional_dict(value: Any, path: str) -> Optional[JsonDict]:
 def _parse_point(text: str, path: str) -> Point:
     if not isinstance(text, str):
         raise MapParseError(_ctx(path, "expected point string"))
-    matched = re.search(rf"(-?\d+)[{re.escape(string.punctuation)}](-?\d+)$", text.strip())
+    matched = re.search(
+        rf"(-?\d+)[{re.escape(string.punctuation)}](-?\d+)$", text.strip()
+    )
     if matched is None:
         raise MapParseError(_ctx(path, f"invalid point {text!r}"))
     return int(matched.group(1)), int(matched.group(2))
@@ -224,7 +226,9 @@ def _parse_objects(objs_obj: JsonDict, ctx: str) -> Dict[int, ParsedObject]:
         area_dict = _require_dict(obj_dict.get("area"), f"{ctx}.{key}.area")
         area = _parse_object_area(area_dict, f"{ctx}.{key}.area")
         ttype = _coerce_int(obj_dict.get("ttype"), f"{ctx}.{key}.ttype")
-        tileset_type = _require_str(obj_dict.get("tileset_type", "object"), f"{ctx}.{key}.tileset_type")
+        tileset_type = _require_str(
+            obj_dict.get("tileset_type", "object"), f"{ctx}.{key}.tileset_type"
+        )
         variant = _coerce_int(obj_dict.get("variant"), f"{ctx}.{key}.variant")
         props = _optional_dict(obj_dict.get("properties"), f"{ctx}.{key}.properties")
         result[oid] = ParsedObject(
@@ -246,14 +250,22 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
         locked=_coerce_bool(layer_obj.get("locked", False), f"{ctx}.locked"),
         opacity=_coerce_float(layer_obj.get("opacity", 1.0), f"{ctx}.opacity"),
         z_index=_coerce_int(layer_obj.get("z_index", layer_id), f"{ctx}.z_index"),
-        properties=_optional_dict(layer_obj.get("properties"), f"{ctx}.properties") or {},
+        properties=_optional_dict(layer_obj.get("properties"), f"{ctx}.properties")
+        or {},
     )
-    layer.tiles = _parse_tiles(_require_dict(layer_obj.get("tiles", {}), f"{ctx}.tiles"), f"{ctx}.tiles")
+    layer.tiles = _parse_tiles(
+        _require_dict(layer_obj.get("tiles", {}), f"{ctx}.tiles"), f"{ctx}.tiles"
+    )
 
     if layer.layer_type == "object":
-        layer.objects = _parse_objects(_require_dict(layer_obj.get("objects", {}), f"{ctx}.objects"), f"{ctx}.objects")
+        layer.objects = _parse_objects(
+            _require_dict(layer_obj.get("objects", {}), f"{ctx}.objects"),
+            f"{ctx}.objects",
+        )
         if "next_object_id" in layer_obj and layer_obj["next_object_id"] is not None:
-            layer.next_object_id = _coerce_int(layer_obj["next_object_id"], f"{ctx}.next_object_id")
+            layer.next_object_id = _coerce_int(
+                layer_obj["next_object_id"], f"{ctx}.next_object_id"
+            )
     return layer
 
 
@@ -264,13 +276,24 @@ def _parse_rule(rule_obj: JsonDict, ctx: str) -> ParsedAutotileRule:
         pair_list = _require_list(pair, f"{ctx}.neighbors[{idx}]")
         if len(pair_list) != 2:
             raise MapParseError(_ctx(f"{ctx}.neighbors[{idx}]", "expected [x, y]"))
-        neighbors.append((_coerce_int(pair_list[0], f"{ctx}.neighbors[{idx}][0]"), _coerce_int(pair_list[1], f"{ctx}.neighbors[{idx}][1]")))
+        neighbors.append(
+            (
+                _coerce_int(pair_list[0], f"{ctx}.neighbors[{idx}][0]"),
+                _coerce_int(pair_list[1], f"{ctx}.neighbors[{idx}][1]"),
+            )
+        )
 
     variants_raw = _require_list(rule_obj.get("variant_ids", []), f"{ctx}.variant_ids")
-    variant_ids = [_coerce_int(v, f"{ctx}.variant_ids[{i}]") for i, v in enumerate(variants_raw)]
+    variant_ids = [
+        _coerce_int(v, f"{ctx}.variant_ids[{i}]") for i, v in enumerate(variants_raw)
+    ]
     tileset_path = _require_str(rule_obj.get("tileset_path", ""), f"{ctx}.tileset_path")
     tileset_index_raw = rule_obj.get("tileset_index")
-    tileset_index = _coerce_int(tileset_index_raw, f"{ctx}.tileset_index") if tileset_index_raw is not None else None
+    tileset_index = (
+        _coerce_int(tileset_index_raw, f"{ctx}.tileset_index")
+        if tileset_index_raw is not None
+        else None
+    )
     return ParsedAutotileRule(
         name=_require_str(rule_obj.get("name"), f"{ctx}.name"),
         neighbors=neighbors,
@@ -284,8 +307,13 @@ def _parse_rule(rule_obj: JsonDict, ctx: str) -> ParsedAutotileRule:
 
 def _parse_group(group_obj: JsonDict, ctx: str) -> ParsedAutotileGroup:
     rules_raw = _require_list(group_obj.get("rules", []), f"{ctx}.rules")
-    rules = [_parse_rule(_require_dict(r, f"{ctx}.rules[{i}]"), f"{ctx}.rules[{i}]") for i, r in enumerate(rules_raw)]
-    return ParsedAutotileGroup(name=_require_str(group_obj.get("name"), f"{ctx}.name"), rules=rules)
+    rules = [
+        _parse_rule(_require_dict(r, f"{ctx}.rules[{i}]"), f"{ctx}.rules[{i}]")
+        for i, r in enumerate(rules_raw)
+    ]
+    return ParsedAutotileGroup(
+        name=_require_str(group_obj.get("name"), f"{ctx}.name"), rules=rules
+    )
 
 
 def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTileset]:
@@ -303,8 +331,14 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
         if raw_tile_props is not None:
             tp_obj = _require_dict(raw_tile_props, f"{ctx}[{i}].tile_properties")
             for k, v in tp_obj.items():
-                tile_props[str(k)] = _require_dict(v, f"{ctx}[{i}].tile_properties[{k!r}]")
-        out.append(ParsedTileset(path=path, type=ts_type, properties=props, tile_properties=tile_props))
+                tile_props[str(k)] = _require_dict(
+                    v, f"{ctx}[{i}].tile_properties[{k!r}]"
+                )
+        out.append(
+            ParsedTileset(
+                path=path, type=ts_type, properties=props, tile_properties=tile_props
+            )
+        )
     return out
 
 
@@ -341,9 +375,17 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
     root = _require_dict(root, "root")
     meta_obj = _require_dict(root.get("meta"), "meta")
     tile_size = _parse_point_field(meta_obj.get("tile_size"), "meta.tile_size")
-    map_size = _parse_point_field(meta_obj.get("map_size"), "meta.map_size", default=f"{tile_size[0]};{tile_size[1]}")
+    map_size = _parse_point_field(
+        meta_obj.get("map_size"),
+        "meta.map_size",
+        default=f"{tile_size[0]};{tile_size[1]}",
+    )
     init_raw = meta_obj.get("initial_map_size")
-    initial_map_size = map_size if init_raw is None else _parse_point_field(init_raw, "meta.initial_map_size")
+    initial_map_size = (
+        map_size
+        if init_raw is None
+        else _parse_point_field(init_raw, "meta.initial_map_size")
+    )
 
     meta = ParsedMeta(
         tile_size=tile_size,
@@ -360,7 +402,9 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
         layers: List[ParsedLayer] = []
     else:
         layers = [
-            _parse_layer(_require_dict(layer, f"data.layers[{i}]"), i, f"data.layers[{i}]")
+            _parse_layer(
+                _require_dict(layer, f"data.layers[{i}]"), i, f"data.layers[{i}]"
+            )
             for i, layer in enumerate(_require_list(layers_raw, "data.layers"))
         ]
     if not layers:
@@ -368,17 +412,35 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
 
     project_obj = _require_dict(root.get("project_state", {}), "project_state")
     rules = [
-        _parse_rule(_require_dict(rule, f"project_state.rules[{i}]"), f"project_state.rules[{i}]")
-        for i, rule in enumerate(_require_list(project_obj.get("rules", []), "project_state.rules"))
+        _parse_rule(
+            _require_dict(rule, f"project_state.rules[{i}]"),
+            f"project_state.rules[{i}]",
+        )
+        for i, rule in enumerate(
+            _require_list(project_obj.get("rules", []), "project_state.rules")
+        )
     ]
     groups = [
-        _parse_group(_require_dict(group, f"project_state.groups[{i}]"), f"project_state.groups[{i}]")
-        for i, group in enumerate(_require_list(project_obj.get("groups", []), "project_state.groups"))
+        _parse_group(
+            _require_dict(group, f"project_state.groups[{i}]"),
+            f"project_state.groups[{i}]",
+        )
+        for i, group in enumerate(
+            _require_list(project_obj.get("groups", []), "project_state.groups")
+        )
     ]
-    project_state = ParsedProjectState(rules=rules, groups=groups, automap_rules=project_obj.get("automap_rules"))
+    project_state = ParsedProjectState(
+        rules=rules, groups=groups, automap_rules=project_obj.get("automap_rules")
+    )
 
     tilesets = _parse_resources(root.get("resources", {}), "resources")
-    return ParsedMap(meta=meta, layers=layers, tilesets=tilesets, project_state=project_state, raw=root)
+    return ParsedMap(
+        meta=meta,
+        layers=layers,
+        tilesets=tilesets,
+        project_state=project_state,
+        raw=root,
+    )
 
 
 def parse_map_json(text: str) -> ParsedMap:
