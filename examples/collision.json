@@ -1,0 +1,205 @@
+{
+  "meta": {
+    "tile_size": "16;16",
+    "map_size": "30;20",
+    "zoom_level": 2.8000000000000016,
+    "scroll": "0;0",
+    "initial_map_size": "30;20",
+    "version": "1.1"
+  },
+  "resources": {
+    "tilesets": [
+      {
+        "path": "/home/rudy/Documents/games/void-world/assets/terrains/forest.png",
+        "type": "tile"
+      }
+    ]
+  },
+  "project_state": {
+    "rules": [],
+    "groups": [
+      {
+        "name": "Default",
+        "rules": []
+      }
+    ],
+    "automap_rules": []
+  },
+  "data": {
+    "ongrid": {
+      "5;7": {
+        "pos": "5;7",
+        "ttype": 0,
+        "variant": 8
+      },
+      "6;7": {
+        "pos": "6;7",
+        "ttype": 0,
+        "variant": 8
+      },
+      "7;7": {
+        "pos": "7;7",
+        "ttype": 0,
+        "variant": 8
+      },
+      "9;8": {
+        "pos": "9;8",
+        "ttype": 0,
+        "variant": 8
+      },
+      "13;9": {
+        "pos": "13;9",
+        "ttype": 0,
+        "variant": 26
+      },
+      "13;11": {
+        "pos": "13;11",
+        "ttype": 0,
+        "variant": 26
+      },
+      "14;11": {
+        "pos": "14;11",
+        "ttype": 0,
+        "variant": 26
+      },
+      "14;10": {
+        "pos": "14;10",
+        "ttype": 0,
+        "variant": 26
+      },
+      "15;10": {
+        "pos": "15;10",
+        "ttype": 0,
+        "variant": 26
+      },
+      "16;9": {
+        "pos": "16;9",
+        "ttype": 0,
+        "variant": 26
+      },
+      "16;10": {
+        "pos": "16;10",
+        "ttype": 0,
+        "variant": 26
+      },
+      "16;11": {
+        "pos": "16;11",
+        "ttype": 0,
+        "variant": 26
+      },
+      "15;11": {
+        "pos": "15;11",
+        "ttype": 0,
+        "variant": 26
+      },
+      "13;10": {
+        "pos": "13;10",
+        "ttype": 0,
+        "variant": 26
+      },
+      "15;9": {
+        "pos": "15;9",
+        "ttype": 0,
+        "variant": 26
+      },
+      "14;9": {
+        "pos": "14;9",
+        "ttype": 0,
+        "variant": 26
+      }
+    },
+    "layers": [
+      {
+        "name": "Layer 1",
+        "type": "tile",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "z_index": 0,
+        "tiles": {
+          "5;7": {
+            "pos": "5;7",
+            "ttype": 0,
+            "variant": 8
+          },
+          "6;7": {
+            "pos": "6;7",
+            "ttype": 0,
+            "variant": 8
+          },
+          "7;7": {
+            "pos": "7;7",
+            "ttype": 0,
+            "variant": 8
+          },
+          "9;8": {
+            "pos": "9;8",
+            "ttype": 0,
+            "variant": 8
+          },
+          "13;9": {
+            "pos": "13;9",
+            "ttype": 0,
+            "variant": 26
+          },
+          "13;11": {
+            "pos": "13;11",
+            "ttype": 0,
+            "variant": 26
+          },
+          "14;11": {
+            "pos": "14;11",
+            "ttype": 0,
+            "variant": 26
+          },
+          "14;10": {
+            "pos": "14;10",
+            "ttype": 0,
+            "variant": 26
+          },
+          "15;10": {
+            "pos": "15;10",
+            "ttype": 0,
+            "variant": 26
+          },
+          "16;9": {
+            "pos": "16;9",
+            "ttype": 0,
+            "variant": 26
+          },
+          "16;10": {
+            "pos": "16;10",
+            "ttype": 0,
+            "variant": 26
+          },
+          "16;11": {
+            "pos": "16;11",
+            "ttype": 0,
+            "variant": 26
+          },
+          "15;11": {
+            "pos": "15;11",
+            "ttype": 0,
+            "variant": 26
+          },
+          "13;10": {
+            "pos": "13;10",
+            "ttype": 0,
+            "variant": 26
+          },
+          "15;9": {
+            "pos": "15;9",
+            "ttype": 0,
+            "variant": 26
+          },
+          "14;9": {
+            "pos": "14;9",
+            "ttype": 0,
+            "variant": 26
+          }
+        },
+        "properties": {}
+      }
+    ]
+  }
+}
