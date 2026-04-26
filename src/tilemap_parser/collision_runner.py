@@ -221,6 +221,9 @@ class CollisionRunner:
         """
         Initialize collision runner.
 
+        For most use cases, prefer using CollisionRunner.from_game_type() instead,
+        which provides preset configurations for common game types.
+
         Args:
             collision_cache: Cache with preloaded collision data
             tile_size: Size of tiles in pixels (width, height)
@@ -237,6 +240,9 @@ class CollisionRunner:
         self.slide_friction = 0.1
 
         self.rpg_snap_to_grid = False
+
+        self._game_type: Optional[str] = None
+        self._strict: bool = False
 
     def get_tile_at(self, world_x: float, world_y: float) -> Tuple[int, int]:
         """Convert world position to tile coordinates"""
@@ -302,6 +308,7 @@ class CollisionRunner:
         tile_map: dict,
         delta_x: float,
         delta_y: float,
+        slope_slide: bool = False,
     ) -> CollisionResult:
         """
         Move sprite with sliding collision response.
@@ -314,6 +321,7 @@ class CollisionRunner:
             tile_map: Dictionary mapping (tile_x, tile_y) to tile_id
             delta_x: X movement amount
             delta_y: Y movement amount
+            slope_slide: If True, allows sliding along slopes instead of blocking
 
         Returns:
             CollisionResult with final position and collision info
@@ -324,6 +332,60 @@ class CollisionRunner:
             return result
 
         old_x, old_y = sprite.x, sprite.y
+
+        if slope_slide:
+            max_slides = 4
+            motion_x, motion_y = delta_x, delta_y
+
+            for i in range(max_slides):
+                if abs(motion_x) < 0.01 and abs(motion_y) < 0.01:
+                    break
+
+                sprite.x = old_x + motion_x
+                sprite.y = old_y + motion_y
+
+                shapes = self.get_nearby_tile_shapes(
+                    tileset_collision, tile_map, sprite
+                )
+
+                colliding_shape = None
+                for shape in shapes:
+                    if check_sprite_polygon_collision(sprite, shape):
+                        colliding_shape = shape
+                        break
+
+                if not colliding_shape:
+
+                    result.final_x = sprite.x
+                    result.final_y = sprite.y
+                    return result
+
+                sprite.x = old_x
+                sprite.y = old_y
+                result.collided = True
+
+                normal = self._get_collision_normal_from_motion(
+                    sprite, colliding_shape, motion_x, motion_y
+                )
+
+                if normal:
+
+                    dot = motion_x * normal[0] + motion_y * normal[1]
+
+                    if dot < 0:
+                        motion_x = motion_x - normal[0] * dot
+                        motion_y = motion_y - normal[1] * dot
+                    else:
+
+                        break
+                else:
+
+                    break
+
+            result.final_x = sprite.x
+            result.final_y = sprite.y
+            return result
+
         sprite.x += delta_x
         sprite.y += delta_y
 
@@ -376,6 +438,63 @@ class CollisionRunner:
             result.slide_vector = (delta_x, 0)
 
         return result
+
+    def _get_collision_normal_from_motion(
+        self,
+        sprite: ICollidableSprite,
+        polygon: CollisionPolygon,
+        motion_x: float,
+        motion_y: float,
+    ) -> Optional[Tuple[float, float]]:
+        """
+        Calculate the collision normal from a polygon based on motion direction.
+        Returns the normal of the edge that the sprite is moving into.
+        """
+
+        bounds = get_shape_bounds(sprite)
+        center_x = (bounds[0] + bounds[2]) / 2
+        center_y = (bounds[1] + bounds[3]) / 2
+
+        vertices = polygon.vertices
+        if len(vertices) < 2:
+            return None
+
+        best_edge = None
+        best_alignment = -1
+
+        for i in range(len(vertices)):
+            v1 = vertices[i]
+            v2 = vertices[(i + 1) % len(vertices)]
+
+            edge_x = v2[0] - v1[0]
+            edge_y = v2[1] - v1[1]
+            edge_len = math.sqrt(edge_x * edge_x + edge_y * edge_y)
+
+            if edge_len < 0.01:
+                continue
+
+            normal_x = -edge_y / edge_len
+            normal_y = edge_x / edge_len
+
+            poly_center_x = sum(v[0] for v in vertices) / len(vertices)
+            poly_center_y = sum(v[1] for v in vertices) / len(vertices)
+            edge_mid_x = (v1[0] + v2[0]) / 2
+            edge_mid_y = (v1[1] + v2[1]) / 2
+
+            to_outside_x = edge_mid_x - poly_center_x
+            to_outside_y = edge_mid_y - poly_center_y
+
+            if normal_x * to_outside_x + normal_y * to_outside_y < 0:
+                normal_x = -normal_x
+                normal_y = -normal_y
+
+            alignment = -(motion_x * normal_x + motion_y * normal_y)
+
+            if alignment > best_alignment and alignment > 0:
+                best_alignment = alignment
+                best_edge = (normal_x, normal_y)
+
+        return best_edge
 
     def move_platformer(
         self,
@@ -555,3 +674,245 @@ class CollisionRunner:
             return self.move_rpg(sprite, tileset_collision, tile_map, delta_x, delta_y)
 
         return CollisionResult(final_x=sprite.x, final_y=sprite.y)
+
+    @classmethod
+    def from_game_type(
+        cls,
+        game_type: str,
+        collision_cache: CollisionCache,
+        tile_size: Tuple[int, int] = (32, 32),
+        strict: bool = False,
+    ) -> "CollisionRunner":
+        """
+        Create a collision runner with preset configuration for a specific game type.
+
+        This is the recommended way to create a collision runner for common game types.
+        Provides sensible defaults that can be customized after creation.
+
+        Game Types:
+            'platformer': Side-scrolling platformer with gravity and jumping
+                - Gravity: 800 px/s²
+                - Max fall speed: 600 px/s
+                - Jump strength: -400 px/s (negative = upward)
+                - Mode: PLATFORMER
+                - Requires sprite attributes: x, y, vx, vy, on_ground, collision_shape
+
+            'topdown': Overhead view with free 8-directional movement
+                - No gravity (gravity = 0)
+                - Slides along walls smoothly
+                - Mode: SLIDE
+                - Requires sprite attributes: x, y, collision_shape
+
+            'rpg': Grid-based or free movement with full blocking
+                - No gravity (gravity = 0)
+                - Stops at walls (no sliding)
+                - Mode: RPG
+                - Requires sprite attributes: x, y, collision_shape
+
+        Args:
+            game_type: Type of game ('platformer', 'topdown', or 'rpg')
+            collision_cache: Cache with preloaded collision data
+            tile_size: Size of tiles in pixels (width, height)
+            strict: If True, raises exceptions on warnings. If False, only warns.
+
+        Returns:
+            CollisionRunner configured for the specified game type
+
+        Raises:
+            ValueError: If game_type is not recognized
+
+        Examples:
+            >>>
+            >>> runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
+            >>> result = runner.move(player, tileset, tile_map, dt=0.016)
+
+            >>>
+            >>> runner = CollisionRunner.from_game_type('topdown', cache, (16, 16))
+            >>> runner.slide_friction = 0.2
+            >>> result = runner.move(player, tileset, tile_map, delta_x=dx, delta_y=dy)
+
+            >>>
+            >>> runner = CollisionRunner.from_game_type('rpg', cache, (32, 32), strict=True)
+            >>> runner.validate_config()
+        """
+        game_type = game_type.lower()
+
+        if game_type == "platformer":
+            runner = cls(collision_cache, tile_size, mode=MovementMode.PLATFORMER)
+            runner.gravity = 800.0
+            runner.max_fall_speed = 600.0
+            runner.jump_strength = -400.0
+            runner.slide_friction = 0.1
+            runner._game_type = "platformer"
+            runner._strict = strict
+
+        elif game_type == "topdown":
+            runner = cls(collision_cache, tile_size, mode=MovementMode.SLIDE)
+            runner.gravity = 0.0
+            runner.max_fall_speed = 0.0
+            runner.jump_strength = 0.0
+            runner.slide_friction = 0.1
+            runner._game_type = "topdown"
+            runner._strict = strict
+
+        elif game_type == "rpg":
+            runner = cls(collision_cache, tile_size, mode=MovementMode.RPG)
+            runner.gravity = 0.0
+            runner.max_fall_speed = 0.0
+            runner.jump_strength = 0.0
+            runner.slide_friction = 0.0
+            runner.rpg_snap_to_grid = False
+            runner._game_type = "rpg"
+            runner._strict = strict
+
+        else:
+            raise ValueError(
+                f"Unknown game_type: '{game_type}'. "
+                f"Valid options are: 'platformer', 'topdown', 'rpg'"
+            )
+
+        runner.validate_config()
+
+        return runner
+
+    def validate_config(self, strict: Optional[bool] = None) -> None:
+        """
+        Validate the current configuration for consistency and correctness.
+
+        This method checks for common configuration mistakes and inconsistencies.
+        Called automatically when using from_game_type(), but can also be called
+        manually after changing configuration properties.
+
+        Validation Rules:
+            - Platformer mode requires gravity > 0
+            - Top-down and RPG modes should have gravity = 0
+            - Physics values must be in valid ranges
+            - Mode must match game_type expectations
+
+        Args:
+            strict: If True, raises exceptions on warnings. If False, only warns.
+                   If None, uses the strict setting from initialization.
+
+        Raises:
+            ValueError: If critical configuration errors are found
+            Warning: If suspicious but valid configurations are detected (strict=False)
+
+        Examples:
+            >>> runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
+            >>> runner.gravity = 0.0
+            >>> runner.validate_config()
+
+            >>> runner = CollisionRunner.from_game_type('topdown', cache, (32, 32))
+            >>> runner.gravity = 800.0
+            >>> runner.validate_config(strict=False)
+        """
+        import warnings
+
+        if strict is None:
+            strict = getattr(self, "_strict", False)
+
+        game_type = getattr(self, "_game_type", None)
+        errors = []
+        warnings_list = []
+
+        if self.gravity < 0:
+            errors.append("gravity must be >= 0 (negative gravity not supported)")
+
+        if self.max_fall_speed < 0:
+            errors.append("max_fall_speed must be >= 0")
+
+        if self.jump_strength > 0:
+            warnings_list.append(
+                "jump_strength is positive (upward force should be negative). "
+                "Did you mean a negative value?"
+            )
+
+        if not (0.0 <= self.slide_friction <= 1.0):
+            warnings_list.append(
+                f"slide_friction={self.slide_friction} is outside typical range [0.0, 1.0]"
+            )
+
+        if self.mode == MovementMode.PLATFORMER:
+            if self.gravity == 0:
+                errors.append(
+                    "PLATFORMER mode requires gravity > 0 for jumping mechanics.\n"
+                    "  Fix: Set runner.gravity = 800.0 (or another positive value)\n"
+                    "  Or: Use game_type='topdown' or 'rpg' instead"
+                )
+
+            if self.max_fall_speed == 0 and self.gravity > 0:
+                warnings_list.append(
+                    "PLATFORMER mode with gravity > 0 but max_fall_speed = 0. "
+                    "Falling speed will be unlimited."
+                )
+
+        elif self.mode == MovementMode.SLIDE:
+            if self.gravity > 0:
+                warnings_list.append(
+                    "SLIDE mode (top-down) typically uses gravity = 0. "
+                    f"Current gravity = {self.gravity} will be ignored in move_and_slide()."
+                )
+
+        elif self.mode == MovementMode.RPG:
+            if self.gravity > 0:
+                errors.append(
+                    "RPG mode should not use gravity (set gravity = 0).\n"
+                    "  Fix: Set runner.gravity = 0.0\n"
+                    "  Or: Use game_type='platformer' if you need gravity"
+                )
+
+        if game_type:
+            if game_type == "platformer" and self.mode != MovementMode.PLATFORMER:
+                warnings_list.append(
+                    f"game_type='platformer' but mode={self.mode.value}. "
+                    "This may cause unexpected behavior."
+                )
+
+            if game_type == "topdown" and self.mode != MovementMode.SLIDE:
+                warnings_list.append(
+                    f"game_type='topdown' but mode={self.mode.value}. "
+                    "This may cause unexpected behavior."
+                )
+
+            if game_type == "rpg" and self.mode != MovementMode.RPG:
+                warnings_list.append(
+                    f"game_type='rpg' but mode={self.mode.value}. "
+                    "This may cause unexpected behavior."
+                )
+
+            if game_type in ["topdown", "rpg"] and self.gravity > 0:
+                warnings_list.append(
+                    f"game_type='{game_type}' typically uses gravity=0, "
+                    f"but current gravity={self.gravity}"
+                )
+
+        if errors:
+            error_msg = "Configuration validation failed:\n\n"
+            for i, err in enumerate(errors, 1):
+                error_msg += f"{i}. {err}\n"
+
+            if game_type:
+                error_msg += f"\nCurrent configuration:\n"
+                error_msg += f"  game_type: {game_type}\n"
+                error_msg += f"  mode: {self.mode.value}\n"
+                error_msg += f"  gravity: {self.gravity}\n"
+                error_msg += f"  max_fall_speed: {self.max_fall_speed}\n"
+                error_msg += f"  jump_strength: {self.jump_strength}\n"
+
+            raise ValueError(error_msg)
+
+        if warnings_list:
+            warning_msg = "Configuration warnings detected:\n\n"
+            for i, warn in enumerate(warnings_list, 1):
+                warning_msg += f"{i}. {warn}\n"
+
+            if game_type:
+                warning_msg += f"\nCurrent configuration:\n"
+                warning_msg += f"  game_type: {game_type}\n"
+                warning_msg += f"  mode: {self.mode.value}\n"
+                warning_msg += f"  gravity: {self.gravity}\n"
+
+            if strict:
+                raise ValueError(warning_msg)
+            else:
+                warnings.warn(warning_msg, UserWarning, stacklevel=2)
