@@ -26,4 +26,5 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["tilemap_parser*"]
+exclude = ["webdocs*", "tests*"]
 namespaces = false
