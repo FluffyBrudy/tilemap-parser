@@ -55,6 +55,8 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     { path: "/api", name: "API Reference", type: "section", description: "Complete API documentation" },
     { path: "/collision", name: "Collision", type: "section", description: "Tile and character collision" },
     { path: "/collision-runner", name: "Collision Runner", type: "section", description: "Ready-to-use collision system" },
+    { path: "/json-formats", name: "JSON Formats", type: "section", description: "JSON format specifications" },
+    { path: "/technical", name: "Technical Docs", type: "section", description: "Architecture and internals" },
     ...allFunctions.map(f => ({ path: "/api", name: f.name, type: "function" as const, description: f.description })),
     ...allClasses.map(c => ({ path: "/api", name: c.name, type: "class" as const, description: c.description })),
   ];

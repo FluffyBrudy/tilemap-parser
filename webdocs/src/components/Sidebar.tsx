@@ -7,24 +7,26 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { path: "/", label: "Home", icon: "→" },
-  { path: "/installation", label: "Installation", icon: "↓" },
-  { path: "/quickstart", label: "Quick Start", icon: "▶" },
-  { path: "/api", label: "API Reference", icon: "⚡" },
-  { path: "/collision", label: "Collision", icon: "◆", children: [
+  { path: "/", label: "Home" },
+  { path: "/installation", label: "Installation" },
+  { path: "/quickstart", label: "Quick Start" },
+  { path: "/api", label: "API Reference" },
+  { path: "/collision", label: "Collision", children: [
     { id: "overview", label: "Overview" },
     { id: "functions", label: "Functions" },
     { id: "data", label: "Data Classes" },
     { id: "shapes", label: "Shapes" },
     { id: "cache", label: "CollisionCache" },
   ]},
-  { path: "/collision-runner", label: "Collision Runner", icon: "▶", children: [
+  { path: "/collision-runner", label: "Collision Runner", children: [
     { id: "overview", label: "Overview" },
     { id: "movement", label: "MovementMode" },
     { id: "result", label: "CollisionResult" },
     { id: "runner", label: "CollisionRunner" },
     { id: "setup", label: "Setup" },
   ]},
+  { path: "/json-formats", label: "JSON Formats" },
+  { path: "/technical", label: "Technical Docs" },
 ];
 
 export function Sidebar({ onSearchOpen }: SidebarProps) {
@@ -74,7 +76,6 @@ export function Sidebar({ onSearchOpen }: SidebarProps) {
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900"
               }`}
             >
-              <span className="text-zinc-600">{item.icon}</span>
               {item.label}
             </button>
             {item.children && isActive(item.path) && (

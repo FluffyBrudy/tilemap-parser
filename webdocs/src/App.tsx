@@ -7,6 +7,8 @@ import { QuickStart } from "./pages/QuickStart";
 import { ApiReference } from "./pages/ApiReference";
 import { CollisionPage } from "./pages/CollisionPage";
 import { CollisionRunnerPage } from "./pages/CollisionRunnerPage";
+import { JsonFormatsPage } from "./pages/JsonFormatsPage";
+import { TechnicalPage } from "./pages/TechnicalPage";
 
 function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -41,6 +43,8 @@ function App() {
             <Route path="/collision/:section" element={<CollisionPage />} />
             <Route path="/collision-runner" element={<CollisionRunnerPage />} />
             <Route path="/collision-runner/:section" element={<CollisionRunnerPage />} />
+            <Route path="/json-formats" element={<JsonFormatsPage />} />
+            <Route path="/technical" element={<TechnicalPage />} />
           </Routes>
         </main>
       </div>
