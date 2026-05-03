@@ -15,25 +15,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from tilemap_parser.collision import (
     RectangleShape, CircleShape, CapsuleShape,
     CharacterCollision, parse_character_collision,
-    load_character_collision
+    load_character_collision,
 )
 
 
 def main():
-    script_dir = Path(__file__).parent.parent.parent / "examples"
-    
-    # Method 1: Load from sidecar collision file
-    # sprite.png -> sprite.collision.json
-    sprite_path = script_dir / "hero.png"
-    character_collision = load_character_collision(str(sprite_path))
-    
+    # The editor stores character collision files at:
+    #   <data_root>/character_collision/<character_name>.collision.json
+    #
+    # For this example we use the bundled fixture directly.
+    examples_dir = Path(__file__).parent.parent.parent / "examples"
+    fixtures_dir = examples_dir / "fixtures" / "character_collision"
+
+    hero_collision_path = fixtures_dir / "hero.collision.json"
+    character_collision = load_character_collision(hero_collision_path)
+
     if character_collision:
         print(f"Character: {character_collision.name}")
         print(f"Properties: {character_collision.properties}")
-        
+
         shape = character_collision.shape
         print(f"\nShape type: {type(shape).__name__}")
-        
+
         if isinstance(shape, RectangleShape):
             print(f"  Size: {shape.width} x {shape.height}")
             print(f"  Offset: {shape.offset}")
@@ -50,22 +53,24 @@ def main():
             top = shape.get_top_center(x=100, y=200)
             bottom = shape.get_bottom_center(x=100, y=200)
             print(f"  Top center: {top}, Bottom center: {bottom}")
-    
-    # Method 2: Parse from dict
+    else:
+        print(f"No collision file found at: {hero_collision_path}")
+
+    # Method 2: Parse from dict (no file needed)
     collision_data = {
         "name": "CustomCharacter",
         "shape": {
             "type": "rectangle",
             "width": 24.0,
             "height": 32.0,
-            "offset": [0.0, 0.0]
+            "offset": [0.0, 0.0],
         },
         "properties": {
             "speed": 150,
-            "jump_strength": -400
-        }
+            "jump_strength": -400,
+        },
     }
-    
+
     custom = parse_character_collision(collision_data)
     print(f"\nCustom character: {custom.name}")
     print(f"Shape: {type(custom.shape).__name__}")

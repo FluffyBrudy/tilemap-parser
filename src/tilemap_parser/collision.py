@@ -217,22 +217,24 @@ def parse_character_collision(data: JsonDict) -> CharacterCollision:
 
 
 def load_tileset_collision(
-    tileset_path: Union[str, Path],
+    collision_path: Union[str, Path],
 ) -> Optional[TilesetCollision]:
     """
-    Load tileset collision data from file.
+    Load tileset collision data from a collision JSON file.
+
+    The editor stores tileset collision files at:
+        <data_root>/collision/<tileset_stem>.collision.json
 
     Args:
-        tileset_path: Path to tileset image file
+        collision_path: Direct path to the .collision.json file.
 
     Returns:
-        TilesetCollision object or None if collision file doesn't exist
+        TilesetCollision object, or None if the file does not exist.
 
     Raises:
-        CollisionParseError: If collision file exists but is invalid
+        CollisionParseError: If the file exists but cannot be parsed.
     """
-    tileset_path = Path(tileset_path)
-    collision_path = tileset_path.with_suffix(".collision.json")
+    collision_path = Path(collision_path)
 
     if not collision_path.exists():
         return None
@@ -241,27 +243,29 @@ def load_tileset_collision(
         with open(collision_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return parse_tileset_collision(data)
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         raise CollisionParseError(f"Cannot load {collision_path}: {e}") from e
 
 
 def load_character_collision(
-    sprite_path: Union[str, Path],
+    collision_path: Union[str, Path],
 ) -> Optional[CharacterCollision]:
     """
-    Load character collision data from file.
+    Load character collision data from a collision JSON file.
+
+    The editor stores character collision files at:
+        <data_root>/character_collision/<character_name>.collision.json
 
     Args:
-        sprite_path: Path to character sprite image file
+        collision_path: Direct path to the .collision.json file.
 
     Returns:
-        CharacterCollision object or None if collision file doesn't exist
+        CharacterCollision object, or None if the file does not exist.
 
     Raises:
-        CollisionParseError: If collision file exists but is invalid
+        CollisionParseError: If the file exists but cannot be parsed.
     """
-    sprite_path = Path(sprite_path)
-    collision_path = sprite_path.with_suffix(".collision.json")
+    collision_path = Path(collision_path)
 
     if not collision_path.exists():
         return None
@@ -270,7 +274,7 @@ def load_character_collision(
         with open(collision_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return parse_character_collision(data)
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         raise CollisionParseError(f"Cannot load {collision_path}: {e}") from e
 
 
@@ -280,6 +284,12 @@ class CollisionCache:
 
     Caches parsed collision data to avoid repeated file I/O and parsing.
     Useful for runtime performance in game engines.
+
+    All methods accept the direct path to the .collision.json file.
+
+    Typical paths produced by the editor:
+        Tileset:   <data_root>/collision/<stem>.collision.json
+        Character: <data_root>/character_collision/<name>.collision.json
     """
 
     def __init__(self):
@@ -287,24 +297,32 @@ class CollisionCache:
         self._character_cache: Dict[str, Optional[CharacterCollision]] = {}
 
     def get_tileset_collision(
-        self, tileset_path: Union[str, Path]
+        self, collision_path: Union[str, Path]
     ) -> Optional[TilesetCollision]:
-        """Get tileset collision data (cached)"""
-        key = str(Path(tileset_path).resolve())
+        """Get tileset collision data (cached).
+
+        Args:
+            collision_path: Direct path to the .collision.json file.
+        """
+        key = str(Path(collision_path).resolve())
 
         if key not in self._tileset_cache:
-            self._tileset_cache[key] = load_tileset_collision(tileset_path)
+            self._tileset_cache[key] = load_tileset_collision(collision_path)
 
         return self._tileset_cache[key]
 
     def get_character_collision(
-        self, sprite_path: Union[str, Path]
+        self, collision_path: Union[str, Path]
     ) -> Optional[CharacterCollision]:
-        """Get character collision data (cached)"""
-        key = str(Path(sprite_path).resolve())
+        """Get character collision data (cached).
+
+        Args:
+            collision_path: Direct path to the .collision.json file.
+        """
+        key = str(Path(collision_path).resolve())
 
         if key not in self._character_cache:
-            self._character_cache[key] = load_character_collision(sprite_path)
+            self._character_cache[key] = load_character_collision(collision_path)
 
         return self._character_cache[key]
 
@@ -313,30 +331,46 @@ class CollisionCache:
         self._tileset_cache.clear()
         self._character_cache.clear()
 
-    def preload_tileset(self, tileset_path: Union[str, Path]):
-        """Preload tileset collision data into cache"""
-        self.get_tileset_collision(tileset_path)
+    def preload_tileset(self, collision_path: Union[str, Path]):
+        """Preload tileset collision data into cache.
 
-    def preload_character(self, sprite_path: Union[str, Path]):
-        """Preload character collision data into cache"""
-        self.get_character_collision(sprite_path)
+        Args:
+            collision_path: Direct path to the .collision.json file.
+        """
+        self.get_tileset_collision(collision_path)
+
+    def preload_character(self, collision_path: Union[str, Path]):
+        """Preload character collision data into cache.
+
+        Args:
+            collision_path: Direct path to the .collision.json file.
+        """
+        self.get_character_collision(collision_path)
 
 
 _global_cache = CollisionCache()
 
 
 def get_cached_tileset_collision(
-    tileset_path: Union[str, Path],
+    collision_path: Union[str, Path],
 ) -> Optional[TilesetCollision]:
-    """Get tileset collision using global cache"""
-    return _global_cache.get_tileset_collision(tileset_path)
+    """Get tileset collision using global cache.
+
+    Args:
+        collision_path: Direct path to the .collision.json file.
+    """
+    return _global_cache.get_tileset_collision(collision_path)
 
 
 def get_cached_character_collision(
-    sprite_path: Union[str, Path],
+    collision_path: Union[str, Path],
 ) -> Optional[CharacterCollision]:
-    """Get character collision using global cache"""
-    return _global_cache.get_character_collision(sprite_path)
+    """Get character collision using global cache.
+
+    Args:
+        collision_path: Direct path to the .collision.json file.
+    """
+    return _global_cache.get_character_collision(collision_path)
 
 
 def clear_collision_cache():
