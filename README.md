@@ -5,7 +5,7 @@ Standalone parser/loader package for map JSON produced by `tilemap-editor` plus 
 ## Install
 
 ```bash
-pip install -e .
+pip install tilemap-parser
 ```
 
 ## Load map + inspect layers
