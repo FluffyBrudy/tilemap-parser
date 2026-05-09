@@ -1,0 +1,12 @@
+{
+  "name": "player-capsul-ref",
+  "shape": {
+    "type": "circle",
+    "radius": 16,
+    "offset": [
+      16,
+      16
+    ]
+  },
+  "properties": {}
+}

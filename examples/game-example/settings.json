@@ -1,0 +1,19 @@
+{
+    "base_path": ".",
+    "data_path": "data",
+    "collision_paths": {
+        "tileset": "collision",
+        "character": "character_collision"
+    },
+    "error_handler": {
+        "log_path": "errors.log",
+        "max_recent_errors": 50,
+        "console_output": true,
+        "file_logging": true,
+        "severity_levels": [
+            "error",
+            "warning",
+            "info"
+        ]
+    }
+}
