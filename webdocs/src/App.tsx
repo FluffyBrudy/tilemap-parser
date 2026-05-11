@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { SearchModal } from "./components/SearchModal";
+import { Seo } from "./components/Seo";
+import { Home } from "./pages/Home";
 import { Installation } from "./pages/Installation";
 import { QuickStart } from "./pages/QuickStart";
 import { Examples } from "./pages/Examples";
@@ -28,11 +30,12 @@ function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-zinc-900 text-zinc-100 font-sans">
+        <Seo />
         <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
         <Sidebar onSearchOpen={() => setSearchOpen(true)} />
         <main className="ml-64 p-8 lg:p-12">
           <Routes>
-            <Route path="/" element={<Installation />} />
+            <Route path="/" element={<Home />} />
             <Route path="/installation" element={<Installation />} />
             <Route path="/quickstart" element={<QuickStart />} />
             <Route path="/examples" element={<Examples />} />

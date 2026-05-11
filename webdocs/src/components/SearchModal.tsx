@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { allClasses, allFunctions } from "../config";
@@ -15,17 +15,52 @@ type SearchResult = {
   description: string;
 };
 
+const baseSearchItems: SearchResult[] = [
+  { path: "/", name: "Home", type: "section", description: "Documentation home" },
+  { path: "/installation", name: "Installation", type: "section", description: "How to install tilemap-parser" },
+  { path: "/quickstart", name: "Quick Start", type: "section", description: "Basic usage examples" },
+  { path: "/examples", name: "Examples", type: "section", description: "Runnable examples and demo downloads" },
+  { path: "/examples/full-game", name: "Full Game Demo", type: "section", description: "Complete pygame demo with rendering, animation, and collision" },
+  { path: "/examples/animation", name: "Animation Example", type: "section", description: "Focused sprite animation example" },
+  { path: "/examples/collision", name: "Collision Example", type: "section", description: "Focused tile collision example" },
+  { path: "/api", name: "API Reference", type: "section", description: "Complete API documentation" },
+  { path: "/collision", name: "Collision", type: "section", description: "Tile and character collision" },
+  { path: "/collision-runner", name: "Collision Runner", type: "section", description: "Ready-to-use collision system" },
+  { path: "/json-formats", name: "JSON Formats", type: "section", description: "JSON format specifications" },
+  { path: "/technical", name: "Technical Docs", type: "section", description: "Architecture and internals" },
+  ...allFunctions.map(f => ({ path: "/api", name: f.name, type: "function" as const, description: f.description })),
+  ...allClasses.map(c => ({ path: "/api", name: c.name, type: "class" as const, description: c.description })),
+];
+
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
+  const results = useMemo(() => {
+    if (query.length < 2) return [];
+
+    const normalizedQuery = query.toLowerCase();
+    return baseSearchItems.filter(item =>
+      item.name.toLowerCase().includes(normalizedQuery) ||
+      item.description.toLowerCase().includes(normalizedQuery)
+    ).slice(0, 12);
+  }, [query]);
+
+  const handleSelect = useCallback((result: SearchResult) => {
+    navigate(result.path);
+    onClose();
+  }, [navigate, onClose]);
+
   useEffect(() => {
     if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const timer = window.setTimeout(() => {
+        setQuery("");
+        setSelectedIndex(0);
+        inputRef.current?.focus();
+      }, 50);
+      return () => window.clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -46,32 +81,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose, selectedIndex, query]);
-
-  const allItems: SearchResult[] = [
-    { path: "/", name: "Home", type: "section", description: "Documentation home" },
-    { path: "/installation", name: "Installation", type: "section", description: "How to install tilemap-parser" },
-    { path: "/quickstart", name: "Quick Start", type: "section", description: "Basic usage examples" },
-    { path: "/api", name: "API Reference", type: "section", description: "Complete API documentation" },
-    { path: "/collision", name: "Collision", type: "section", description: "Tile and character collision" },
-    { path: "/collision-runner", name: "Collision Runner", type: "section", description: "Ready-to-use collision system" },
-    { path: "/json-formats", name: "JSON Formats", type: "section", description: "JSON format specifications" },
-    { path: "/technical", name: "Technical Docs", type: "section", description: "Architecture and internals" },
-    ...allFunctions.map(f => ({ path: "/api", name: f.name, type: "function" as const, description: f.description })),
-    ...allClasses.map(c => ({ path: "/api", name: c.name, type: "class" as const, description: c.description })),
-  ];
-
-  const results = query.length < 2
-    ? []
-    : allItems.filter(item => 
-        item.name.toLowerCase().includes(query.toLowerCase()) ||
-        item.description.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 12);
-
-  const handleSelect = (result: SearchResult) => {
-    navigate(result.path);
-    onClose();
-  };
+  }, [handleSelect, onClose, results, selectedIndex]);
 
   if (!isOpen) return null;
 

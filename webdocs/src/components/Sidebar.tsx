@@ -82,6 +82,11 @@ const navItems = [
         />
       </svg>
     ),
+    children: [
+      { id: "full-game", label: "Full game demo" },
+      { id: "animation", label: "Animation" },
+      { id: "collision", label: "Collision" },
+    ],
   },
   {
     path: "/api",

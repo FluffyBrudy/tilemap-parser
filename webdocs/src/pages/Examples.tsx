@@ -1,63 +1,36 @@
 import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
 import { CodeBlock } from "../components/CodeBlock";
+import fullGameSource from "../../../examples/game-example/src/game.py?raw";
 
 const examples = [
   {
     id: "full-game",
-    title: "Full Game Example",
+    title: "Complete pygame demo",
     description:
-      "A complete game demonstrating all features of tilemap-parser including map loading, sprite animations, collision detection, and rendering.",
+      "The full examples/game-example project: map loading, tile rendering, sprite animation, camera tracking, top-down movement, collision response, and debug overlay.",
     difficulty: "Advanced",
-    features: [
-      "Player movement with collision",
-      "Sprite animation system",
-      "Tile layer rendering",
-      "Debug visualization",
-      "Camera system",
-      "Input handling",
+    projectPath: "examples/game-example",
+    runCommand: "python src/game.py",
+    highlights: [
+      "Loads data/map.json and renders visible map tiles with TileLayerRenderer",
+      "Loads player animation clips from the animation JSON file",
+      "Builds a tile collision lookup from every tile layer in the map",
+      "Moves a player shape with CollisionRunner.move_and_slide",
+      "Centers the camera on the player and draws a small debug HUD",
     ],
-    code: `# Main game file
-from tilemap_parser import (
-    load_map, SpriteAnimationSet, AnimationPlayer,
-    TileLayerRenderer, CollisionRunner, CollisionCache
-)
-
-# Load all game resources
-game_data = load_map("data/map.json")
-anim_set = SpriteAnimationSet.load("data/RACCOONSPRITESHEET.anim.json")
-renderer = TileLayerRenderer(game_data)
-collision_cache = CollisionCache()
-tileset_collision = collision_cache.get_tileset_collision(
-    "data/collision/HiddenJungle_PNG.collision.json"
-)
-collision_runner = CollisionRunner.from_game_type(
-    'topdown', collision_cache, game_data.tile_size
-)
-
-# Game loop
-while running:
-    dt = clock.tick(60) / 1000.0
-    
-    # Handle input
-    keys = pygame.key.get_pressed()
-    dx = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * speed * dt
-    dy = (keys[pygame.K_DOWN] - keys[pygame.K_UP]) * speed * dt
-    
-    # Update animation
-    anim_player.update(dt * 1000)
-    
-    # Move with collision
-    result = collision_runner.move_and_slide(
-        player, tileset_collision, tile_map, dx, dy, slope_slide=True
-    )
-    
-    # Render
-    renderer.render(screen, camera_offset)
-    screen.blit(anim_player.get_current_image(), player.position)`,
+    features: [
+      "Complete pygame loop",
+      "Camera-follow tile rendering",
+      "Top-down collision response",
+      "Animation clip switching",
+      "Debug overlay and controls",
+      "Downloadable project assets",
+    ],
+    code: fullGameSource,
     downloadUrl: "/examples/full-game-example.zip",
     sourceUrl:
-      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/full-game-example",
+      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/game-example",
   },
   {
     id: "animation",
@@ -65,6 +38,13 @@ while running:
     description:
       "Learn how to load and play sprite animations without any game logic or collision detection. Perfect for understanding the animation system.",
     difficulty: "Beginner",
+    projectPath: "examples/animation-example",
+    runCommand: "python main.py",
+    highlights: [
+      "Loads a sprite animation JSON file",
+      "Creates an AnimationPlayer with a starting clip",
+      "Switches animation clips from keyboard input",
+    ],
     features: [
       "SpriteAnimationSet loading",
       "AnimationPlayer usage",
@@ -120,6 +100,13 @@ while running:
     description:
       "Focus on the collision system alone. Learn how to implement collision detection and response without animations or complex rendering.",
     difficulty: "Intermediate",
+    projectPath: "examples/collision-example",
+    runCommand: "python main.py",
+    highlights: [
+      "Loads tileset collision data through CollisionCache",
+      "Builds the tile map used by the collision runner",
+      "Draws collision tiles for debugging while the player moves",
+    ],
     features: [
       "CollisionCache and CollisionRunner",
       "Tile-based collision detection",
@@ -220,26 +207,53 @@ export function Examples() {
           <span className="text-zinc-300">{selectedExample.title}</span>
         </div>
 
-        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <h1 className="text-3xl font-bold text-zinc-100">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold text-zinc-100">
               {selectedExample.title}
             </h1>
             <span
-              className={`px-3 py-1 text-xs font-medium rounded-full border ${getDifficultyColor(selectedExample.difficulty)}`}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${getDifficultyColor(selectedExample.difficulty)}`}
             >
               {selectedExample.difficulty}
             </span>
           </div>
-          <p className="text-lg text-zinc-400">{selectedExample.description}</p>
+          <p className="max-w-3xl text-lg leading-8 text-zinc-400">
+            {selectedExample.description}
+          </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 mb-8">
+        <div className="mb-8 grid gap-4 rounded-lg border border-zinc-800 bg-zinc-950 p-5 md:grid-cols-3">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+              Project
+            </div>
+            <div className="mt-2 font-mono text-sm text-zinc-200">
+              {selectedExample.projectPath}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+              Run
+            </div>
+            <div className="mt-2 font-mono text-sm text-zinc-200">
+              {selectedExample.runCommand}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+              Includes
+            </div>
+            <div className="mt-2 text-sm text-zinc-300">
+              Source, JSON data, and image assets
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-8 flex flex-wrap gap-3">
           <a
             href={selectedExample.downloadUrl}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-blue-600/20"
+            className="flex items-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 font-medium text-zinc-950 shadow-lg shadow-cyan-500/10 transition-colors hover:bg-cyan-400"
           >
             <svg
               className="w-5 h-5"
@@ -260,7 +274,7 @@ export function Examples() {
             href={selectedExample.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-lg font-medium transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-2.5 font-medium text-zinc-100 transition-colors hover:bg-zinc-700"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -269,16 +283,15 @@ export function Examples() {
           </a>
         </div>
 
-        {/* Features */}
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold text-zinc-100 mb-4">
-            What You'll Learn
+        <div className="mb-8 rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+          <h2 className="mb-4 text-xl font-semibold text-zinc-100">
+            What this demonstrates
           </h2>
-          <div className="grid md:grid-cols-2 gap-3">
-            {selectedExample.features.map((feature, idx) => (
+          <div className="grid gap-3 md:grid-cols-2">
+            {selectedExample.highlights.map((feature, idx) => (
               <div key={idx} className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0"
+                  className="mt-0.5 h-5 w-5 flex-shrink-0 text-cyan-300"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -296,15 +309,16 @@ export function Examples() {
           </div>
         </div>
 
-        {/* Code Preview */}
         <div className="mb-8">
-          <h2 className="text-xl font-semibold text-zinc-100 mb-4">
-            Code Preview
+          <h2 className="mb-4 text-xl font-semibold text-zinc-100">
+            {selectedExample.id === "full-game" ? "Full game.py" : "Code preview"}
           </h2>
-          <CodeBlock code={selectedExample.code} />
+          <CodeBlock
+            code={selectedExample.code}
+            title={selectedExample.id === "full-game" ? "examples/game-example/src/game.py" : undefined}
+          />
         </div>
 
-        {/* Navigation */}
         <div className="flex justify-between items-center pt-8 border-t border-zinc-800">
           <button
             onClick={() => navigate("/examples")}
@@ -336,17 +350,18 @@ export function Examples() {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl"
     >
-      {/* Header */}
       <section className="mb-12">
-        <h1 className="text-4xl font-bold text-zinc-100 mb-4">Examples</h1>
-        <p className="text-lg text-zinc-400">
-          Explore practical examples to learn tilemap-parser. Each example is
-          self-contained and focuses on specific features, from basic animations
-          to complete games.
+        <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">
+          Learn by running code
+        </p>
+        <h1 className="mb-4 text-4xl font-semibold text-zinc-100">Examples</h1>
+        <p className="max-w-3xl text-lg leading-8 text-zinc-400">
+          Start with a focused sample when you need one system, or open the
+          complete pygame demo to see map loading, rendering, animation, camera
+          movement, and collision working together.
         </p>
       </section>
 
-      {/* Examples Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {examples.map((example, idx) => (
           <motion.div
@@ -355,14 +370,14 @@ export function Examples() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
             onClick={() => navigate(`/examples/${example.id}`)}
-            className="group bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 rounded-xl p-6 cursor-pointer transition-all hover:shadow-xl hover:shadow-blue-500/5"
+            className="group cursor-pointer rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 transition-all hover:border-cyan-700/60 hover:bg-zinc-900"
           >
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-xl font-semibold text-zinc-100 group-hover:text-blue-400 transition-colors">
+              <h3 className="text-xl font-semibold text-zinc-100 transition-colors group-hover:text-cyan-300">
                 {example.title}
               </h3>
               <span
-                className={`px-2.5 py-1 text-xs font-medium rounded-full border ${getDifficultyColor(example.difficulty)}`}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${getDifficultyColor(example.difficulty)}`}
               >
                 {example.difficulty}
               </span>
@@ -372,7 +387,7 @@ export function Examples() {
               {example.description}
             </p>
 
-            <div className="space-y-2 mb-6">
+            <div className="mb-6 space-y-2">
               {example.features.slice(0, 3).map((feature, idx) => (
                 <div
                   key={idx}
@@ -401,7 +416,7 @@ export function Examples() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-blue-400 group-hover:text-blue-300 font-medium">
+            <div className="flex items-center gap-2 text-sm font-medium text-cyan-300 group-hover:text-cyan-200">
               <span>View Example</span>
               <svg
                 className="w-4 h-4 group-hover:translate-x-1 transition-transform"
@@ -421,14 +436,13 @@ export function Examples() {
         ))}
       </div>
 
-      {/* Getting Started Section */}
-      <section className="mt-16 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-800/30 rounded-xl p-8">
-        <h2 className="text-2xl font-semibold text-zinc-100 mb-4">
-          Getting Started with Examples
+      <section className="mt-16 rounded-lg border border-zinc-800 bg-zinc-950 p-8">
+        <h2 className="mb-4 text-2xl font-semibold text-zinc-100">
+          Run an example locally
         </h2>
         <div className="space-y-4 text-zinc-300">
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-sm font-bold text-zinc-950">
               1
             </div>
             <div>
@@ -440,7 +454,7 @@ export function Examples() {
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-sm font-bold text-zinc-950">
               2
             </div>
             <div>
@@ -448,14 +462,14 @@ export function Examples() {
               <p className="text-sm text-zinc-400">
                 Run{" "}
                 <code className="px-2 py-0.5 bg-zinc-800 rounded text-blue-300">
-                  pip install tilemap-parser pygame
+                  pip install tilemap-parser pygame-ce
                 </code>{" "}
                 in your terminal.
               </p>
             </div>
           </div>
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-sm font-bold text-zinc-950">
               3
             </div>
             <div>
@@ -463,9 +477,9 @@ export function Examples() {
               <p className="text-sm text-zinc-400">
                 Extract the zip file and run{" "}
                 <code className="px-2 py-0.5 bg-zinc-800 rounded text-blue-300">
-                  python main.py
+                  python src/game.py
                 </code>{" "}
-                to see it in action.
+                for the full demo, or follow the README in the focused examples.
               </p>
             </div>
           </div>

@@ -11,7 +11,7 @@ export function QuickStart() {
       <section>
         <h2 className="text-2xl font-semibold text-zinc-100 mb-4">Quick Start</h2>
         <p className="text-zinc-400 mb-6">
-          Load a tilemap and access its layers and tiles.
+          Load a tilemap-editor map JSON file and access its layers and tiles.
         </p>
         <CodeBlock code={`from tilemap_parser import load_map
 
@@ -20,6 +20,27 @@ data = load_map("assets/maps/level_1.json")
 layers = data.get_layers(sort_by_zindex=True)
 for layer in layers:
     print(layer.id, layer.name, layer.layer_type, layer.z_index)`} />
+      </section>
+
+      <section>
+        <h3 className="text-lg font-medium text-zinc-200 mb-3">What it parses</h3>
+        <p className="text-zinc-400 mb-4">
+          tilemap-parser reads the runtime files exported by tilemap-editor: map
+          JSON, sprite animation JSON, and collision JSON. It keeps parsed data
+          available for inspection and also provides helpers for pygame surfaces,
+          rendering, animation playback, and collision movement.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            "Tile and object layers",
+            "Spritesheet animations",
+            "Tile and character collision",
+          ].map((item) => (
+            <div key={item} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 text-sm text-zinc-300">
+              {item}
+            </div>
+          ))}
+        </div>
       </section>
 
       <section>
