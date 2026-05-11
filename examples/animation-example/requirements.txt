@@ -1,0 +1,7 @@
+# Requirements for the animation example
+
+# Core dependency
+pygame>=2.0.0
+
+# The tilemap-parser package itself
+# Install from repository root with: pip install -e .
