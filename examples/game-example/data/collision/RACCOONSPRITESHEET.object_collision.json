@@ -1,0 +1,110 @@
+{
+  "tileset_name": "RACCOONSPRITESHEET",
+  "regions": {
+    "region_eb51c74c": {
+      "region_id": "region_eb51c74c",
+      "region_rect": [
+        26,
+        10,
+        54,
+        19
+      ],
+      "name": "Region",
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              27.5,
+              4.25
+            ],
+            [
+              28.0,
+              17.25
+            ],
+            [
+              13.5,
+              17.25
+            ],
+            [
+              13.0,
+              2.25
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    },
+    "region_66d54d26": {
+      "region_id": "region_66d54d26",
+      "region_rect": [
+        72,
+        36,
+        19,
+        20
+      ],
+      "name": "Region 2",
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              13.5,
+              9.25
+            ],
+            [
+              13.5,
+              19.25
+            ],
+            [
+              4.0,
+              14.75
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    },
+    "region_d35c47d2": {
+      "region_id": "region_d35c47d2",
+      "region_rect": [
+        100,
+        10,
+        26,
+        22
+      ],
+      "name": "Region 3",
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              18.5,
+              12.75
+            ],
+            [
+              15.0,
+              9.25
+            ],
+            [
+              7.5,
+              10.25
+            ],
+            [
+              3.5,
+              18.25
+            ],
+            [
+              21.5,
+              21.25
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    }
+  }
+}

@@ -13,18 +13,17 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from tilemap_parser.collision import (
-    CollisionCache,
+from tilemap_parser.parser.collision import (
     CollisionPolygon,
     RectangleShape,
     CircleShape,
     CapsuleShape,
     TileCollisionData,
     TilesetCollision,
-    load_tileset_collision,
 )
+from tilemap_parser.runtime.collision_cache import load_tileset_collision
 
-from tilemap_parser.collision_runner import (
+from tilemap_parser.runtime.tile_collision import (
     CollisionRunner,
     MovementMode,
     point_in_polygon,
@@ -180,8 +179,7 @@ def make_tilemap_with_one_way():
 
 class TestMoveAndSlide:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("topdown", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("topdown", (32, 32))
         self.tileset = make_tileset_with_floor()
 
     def test_move_through_empty_space(self):
@@ -216,8 +214,7 @@ class TestMoveAndSlide:
 
 class TestMovePlatformer:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("platformer", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("platformer", (32, 32))
         self.tileset = make_tileset_with_floor()
 
     def test_gravity_applied(self):
@@ -233,8 +230,7 @@ class TestMovePlatformer:
 
 class TestMoveRpg:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("rpg", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("rpg", (32, 32))
         self.tileset = make_tileset_with_floor()
 
     def test_move_blocked_by_wall(self):
@@ -252,8 +248,7 @@ class TestMoveRpg:
 
 class TestOneWayPlatforms:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("platformer", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("platformer", (32, 32))
         self.tileset = make_tileset_with_floor()
 
     def test_pass_through_from_below(self):
@@ -269,8 +264,7 @@ class TestOneWayPlatforms:
 
 class TestSlopeSlide:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("topdown", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("topdown", (32, 32))
         tiles = {2: TileCollisionData(tile_id=2, shapes=[CollisionPolygon(vertices=SLOPE_POLY)])}
         self.tileset = TilesetCollision(tileset_name="slope_test", tile_size=(32, 32), tiles=tiles)
 
@@ -289,8 +283,7 @@ class TestSlopeSlide:
 
 class TestRealisticMap:
     def setup_method(self):
-        self.cache = CollisionCache()
-        self.runner = CollisionRunner.from_game_type("topdown", self.cache, (32, 32))
+        self.runner = CollisionRunner.from_game_type("topdown", (32, 32))
         self.tileset = load_tileset_collision(TILESET_COLLISION)
 
     def test_load_fixture_tileset(self):

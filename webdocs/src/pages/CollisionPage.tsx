@@ -181,6 +181,74 @@ for name in ["terrain", "objects"]:
 cache.clear()`}
         />
       </section>
+
+      <section id="object-collision">
+        <h3 className="text-lg font-medium text-zinc-200 mb-4">
+          Object-to-Object Collision
+        </h3>
+        <p className="text-zinc-400 mb-4">
+          Detect collisions between dynamic game objects (players, enemies, items)
+          using mixed shapes with layer filtering. All 10 shape pairs supported
+          (rect, circle, capsule, polygon vs everything).
+        </p>
+
+        <div className="space-y-6">
+          <div className="border-l-2 border-zinc-800 pl-4">
+            <code className="font-mono text-sm text-zinc-200">ICollidableObject</code>
+            <p className="text-zinc-500 text-xs font-mono mt-1">Protocol</p>
+            <p className="text-zinc-400 text-sm mt-1">
+              Any object with <code className="text-amber-400 font-mono">x</code>, <code className="text-amber-400 font-mono">y</code>, and <code className="text-amber-400 font-mono">collision_shape</code> (RectangleShape, CircleShape, CapsuleShape, or CollisionPolygon). Optional <code className="text-amber-400 font-mono">collision_layer</code> and <code className="text-amber-400 font-mono">collision_mask</code> default to layer&nbsp;1 and collide-with-all.
+            </p>
+          </div>
+
+          <FnCard
+            name="should_collide"
+            sig="should_collide(obj_a: ICollidableObject, obj_b: ICollidableObject) -> bool"
+            desc="Check if two objects should collide based on layer/mask mutual agreement (AND logic)."
+          />
+          <FnCard
+            name="check_collision"
+            sig="check_collision(obj_a: ICollidableObject, obj_b: ICollidableObject) -> CollisionHit | None"
+            desc="Full collision check: layer filter → broadphase AABB → narrowphase shape dispatch. Returns a CollisionHit or None."
+          />
+        </div>
+
+        <h4 className="text-sm font-medium text-zinc-200 mt-6 mb-3">CollisionHit</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-6">
+          <ResultProp name="object_a" type="ICollidableObject" />
+          <ResultProp name="object_b" type="ICollidableObject" />
+          <ResultProp name="normal" type="tuple[float, float]" />
+          <ResultProp name="depth" type="float" />
+          <ResultProp name="resolve()" type="None" />
+          <ResultProp name="involves(obj)" type="bool" />
+          <ResultProp name="other(obj)" type="ICollidableObject" />
+        </div>
+
+        <h4 className="text-sm font-medium text-zinc-200 mb-3">ObjectCollisionManager</h4>
+        <p className="text-zinc-400 text-sm mb-3">
+          Multi-object collision system with add/remove and all-vs-all queries.
+        </p>
+        <CodeBlock
+          code={`from tilemap_parser import ObjectCollisionManager, CircleShape
+
+class Ball:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.collision_shape = CircleShape(radius=16)
+
+manager = ObjectCollisionManager()
+ball_a = Ball(100, 100)
+ball_b = Ball(130, 100)
+manager.add_object(ball_a)
+manager.add_object(ball_b)
+
+# Game loop
+for hit in manager.check_all_collisions():
+    hit.resolve()  # separate both
+    # hit.normal, hit.depth available for custom response`}
+        />
+      </section>
     </motion.div>
   );
 }
@@ -235,6 +303,15 @@ function ClassCard({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ResultProp({ name, type }: { name: string; type: string }) {
+  return (
+    <div className="bg-zinc-900 rounded px-2 py-1.5 flex justify-between">
+      <span className="text-zinc-300">{name}</span>
+      <span className="text-zinc-500">{type}</span>
     </div>
   );
 }

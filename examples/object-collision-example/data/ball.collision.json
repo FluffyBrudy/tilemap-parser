@@ -1,0 +1,12 @@
+{
+  "name": "bouncing_ball",
+  "shape": {
+    "type": "circle",
+    "radius": 16,
+    "offset": [0, 0]
+  },
+  "properties": {
+    "collision_layer": 1,
+    "collision_mask": 1
+  }
+}

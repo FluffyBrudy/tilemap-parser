@@ -20,7 +20,7 @@ export const collisionModules: ModuleEntry[] = [
     ],
   },
   {
-    name: "collision_runner",
+    name: "tile_collision",
     description: "Ready-to-use collision runners",
     items: [
       "CollisionRunner",
@@ -417,11 +417,6 @@ export const collisionRunnerClasses: ClassEntry[] = [
       "Ready-to-use collision runner with multiple movement modes. Handles collision detection and response for common game types.",
     properties: [
       {
-        name: "cache",
-        type: "CollisionCache",
-        description: "Collision data cache",
-      },
-      {
         name: "tile_size",
         type: "IntPoint",
         description: "(width, height) of tiles in pixels",
@@ -456,13 +451,13 @@ export const collisionRunnerClasses: ClassEntry[] = [
       {
         name: "__init__",
         signature:
-          "__init__(collision_cache: CollisionCache, tile_size?: tuple, mode?: MovementMode)",
+          "__init__(tile_size?: tuple, mode?: MovementMode)",
         description: "Initialize collision runner.",
       },
       {
         name: "from_game_type",
         signature:
-          "from_game_type(game_type: str, collision_cache: CollisionCache, tile_size?: tuple, strict?: bool) -> CollisionRunner",
+          "from_game_type(game_type: str, tile_size?: tuple, strict?: bool) -> CollisionRunner",
         description:
           "Factory method to create a preset collision runner. Recommended way to create runners.",
         parameters: [
@@ -522,11 +517,9 @@ export const collisionRunnerClasses: ClassEntry[] = [
     ],
     examples: [
       {
-        code: `from tilemap_parser import CollisionRunner, CollisionCache
+        code: `from tilemap_parser import CollisionRunner
 
-# Create cache and runner
-cache = CollisionCache()
-runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
+runner = CollisionRunner.from_game_type('platformer', (32, 32))
 
 # In game loop
 result = runner.move(
@@ -540,10 +533,9 @@ result = runner.move(
         description: "Basic platformer setup",
       },
       {
-        code: `from tilemap_parser import CollisionRunner, CollisionCache
+        code: `from tilemap_parser import CollisionRunner
 
-cache = CollisionCache()
-runner = CollisionRunner.from_game_type('topdown', cache, (32, 32))
+runner = CollisionRunner.from_game_type('topdown', (32, 32))
 
 # In game loop
 result = runner.move(player, tileset_collision, tile_map, dx, dy)`,

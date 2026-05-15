@@ -1,95 +1,37 @@
 import { motion } from "framer-motion";
 import { CodeBlock } from "../components/CodeBlock";
+import demoSrc from "../../../examples/demo/main.py?raw";
 
 export function QuickStart() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-2xl space-y-12"
+      className="max-w-5xl"
     >
-      <section>
+      <section className="mb-8">
         <h2 className="text-2xl font-semibold text-zinc-100 mb-4">Quick Start</h2>
-        <p className="text-zinc-400 mb-6">
-          Load a tilemap-editor map JSON file and access its layers and tiles.
+        <p className="text-zinc-400 mb-4 max-w-3xl leading-relaxed">
+          This single-file demo uses every major feature of{" "}
+          <code className="text-cyan-300">tilemap-parser</code> — tile map
+          parsing, tile rendering with viewport culling, tile-vs-player collision,
+          object-to-object collision (circle, capsule, rect), and sprite animation.
+          All data is inlined so it runs with just{" "}
+          <code className="px-1.5 py-0.5 rounded bg-zinc-800 text-cyan-200 text-sm">
+            pip install tilemap-parser pygame-ce
+          </code>
+          .
         </p>
-        <CodeBlock code={`from tilemap_parser import load_map
-
-data = load_map("assets/maps/level_1.json")
-
-layers = data.get_layers(sort_by_zindex=True)
-for layer in layers:
-    print(layer.id, layer.name, layer.layer_type, layer.z_index)`} />
+        <p className="text-zinc-500 text-sm mb-6">
+          You can also{" "}
+          <a href="/examples" className="text-cyan-400 hover:text-cyan-300 underline">
+            browse the examples page
+          </a>{" "}
+          to download the source as a zip.
+        </p>
       </section>
 
-      <section>
-        <h3 className="text-lg font-medium text-zinc-200 mb-3">What it parses</h3>
-        <p className="text-zinc-400 mb-4">
-          tilemap-parser reads the runtime files exported by tilemap-editor: map
-          JSON, sprite animation JSON, and collision JSON. It keeps parsed data
-          available for inspection and also provides helpers for pygame surfaces,
-          rendering, animation playback, and collision movement.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            "Tile and object layers",
-            "Spritesheet animations",
-            "Tile and character collision",
-          ].map((item) => (
-            <div key={item} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 text-sm text-zinc-300">
-              {item}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-medium text-zinc-200 mb-3">Get tile surfaces</h3>
-        <p className="text-zinc-400 mb-3">
-          Extract individual tile images from a tileset for rendering.
-        </p>
-        <CodeBlock code={`# By variant index and tileset
-tile_surface = data.get_image(variant=12, ttype=0)
-
-# Same as above
-tile_surface2 = data.get_tile_surface(0, 12)
-
-# At specific grid position in a layer
-cell_surface = data.get_tile_surface_at("Ground", 10, 4)`} />
-      </section>
-
-      <section>
-        <h3 className="text-lg font-medium text-zinc-200 mb-3">Animation playback</h3>
-        <p className="text-zinc-400 mb-3">
-          Load sprite animations and play them in your game loop.
-        </p>
-        <CodeBlock code={`from tilemap_parser import SpriteAnimationSet, AnimationPlayer
-
-anim_set = SpriteAnimationSet.load("assets/anims/hero.anim.json")
-player = AnimationPlayer(anim_set, "idle")
-
-# In your game loop
-player.update(16.67)  # delta time in ms
-frame_surface = player.get_current_image()`} />
-      </section>
-
-      <section>
-        <h3 className="text-lg font-medium text-zinc-200 mb-3">Tile layer renderer</h3>
-        <p className="text-zinc-400 mb-3">
-          Render tile layers with automatic viewport culling.
-        </p>
-        <CodeBlock code={`import pygame
-from tilemap_parser import TileLayerRenderer, load_map
-
-data = load_map("assets/maps/level_1.json")
-renderer = TileLayerRenderer(data)
-renderer.warm_cache()
-
-screen = pygame.display.set_mode((1280, 720))
-
-# In game loop
-stats = renderer.render(screen, camera_xy=(camera_x, camera_y))`} />
-      </section>
+      <CodeBlock code={demoSrc} title="examples/demo/main.py" />
     </motion.div>
   );
 }

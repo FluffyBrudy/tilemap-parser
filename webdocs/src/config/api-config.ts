@@ -55,9 +55,9 @@ export interface ApiConfig {
 
 export const apiConfig: ApiConfig = {
   packageName: "tilemap-parser",
-  version: "2.0.0",
+  version: "3.0.0",
   description:
-    "Standalone parser/loader for tilemap-editor JSON maps and sprite animation JSON",
+    "Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and collision detection runtime",
   modules: [
     {
       name: "tilemap_parser",
@@ -71,6 +71,11 @@ export const apiConfig: ApiConfig = {
         "SpriteAnimationSet",
         "AnimationPlayer",
         "TileLayerRenderer",
+        "CollisionRunner",
+        "CollisionCache",
+        "ObjectCollisionManager",
+        "CollisionHit",
+        "check_collision",
       ],
     },
   ],
@@ -705,6 +710,36 @@ while running:
       name: "AnimationParseError",
       signature: "class AnimationParseError(Exception)",
       description: "Raised when animation JSON parsing fails.",
+    },
+    {
+      name: "CollisionHit",
+      signature: "class CollisionHit",
+      description: "Result of a collision detection between two objects.",
+      properties: [
+        { name: "object_a", type: "ICollidableObject", description: "First object in the pair" },
+        { name: "object_b", type: "ICollidableObject", description: "Second object in the pair" },
+        { name: "normal", type: "tuple[float, float]", description: "Separation direction (from A to B)" },
+        { name: "depth", type: "float", description: "Penetration depth" },
+      ],
+      methods: [
+        { name: "resolve", signature: "resolve()", description: "Separate both objects by half the depth along the collision normal.", parameters: [], returns: "None" },
+        { name: "involves", signature: "involves(obj) -> bool", description: "Check if this hit involves the given object.", parameters: [], returns: "bool" },
+        { name: "other", signature: "other(obj) -> ICollidableObject", description: "Get the other object in the pair. Raises ValueError if obj is not part of this hit.", parameters: [], returns: "ICollidableObject" },
+      ],
+    },
+    {
+      name: "ObjectCollisionManager",
+      signature: "class ObjectCollisionManager",
+      description: "Manages collision detection for multiple objects. Supports add/remove, all-vs-all, and one-vs-all queries with layer filtering.",
+      properties: [
+        { name: "objects", type: "List[ICollidableObject]", description: "All managed objects" },
+      ],
+      methods: [
+        { name: "add_object", signature: "add_object(obj: ICollidableObject)", description: "Add an object to the collision system.", parameters: [], returns: "None" },
+        { name: "remove_object", signature: "remove_object(obj: ICollidableObject)", description: "Remove an object from the collision system.", parameters: [], returns: "None" },
+        { name: "check_all_collisions", signature: "check_all_collisions() -> List[CollisionHit]", description: "Check every unique pair (brute-force O(n²)).", parameters: [], returns: "List[CollisionHit]" },
+        { name: "check_object", signature: "check_object(obj: ICollidableObject) -> List[CollisionHit]", description: "Check one object against all others.", parameters: [], returns: "List[CollisionHit]" },
+      ],
     },
   ],
 };

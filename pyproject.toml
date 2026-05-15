@@ -4,20 +4,32 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tilemap-parser"
-version = "2.0.4"
-description = "Standalone parser/loader for tilemap-editor JSON maps and sprite animation JSON."
+version = "3.0.0"
+description = "Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and collision detection runtime."
 readme = "README.md"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
 authors = [{ name = "tilemap parser contributors" }]
 dependencies = [
   "pygame-ce>=2.5",
 ]
 classifiers = [
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Games/Entertainment",
   "Topic :: Software Development",
+  "Topic :: Software Development :: Libraries",
 ]
+
+[project.urls]
+Homepage = "https://tilemap-parser.vercel.app/"
+Repository = "https://github.com/FluffyBrudy/tilemap-parser"
+Documentation = "https://tilemap-parser.vercel.app/"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

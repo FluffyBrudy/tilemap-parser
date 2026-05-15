@@ -10,11 +10,11 @@
   "resources": {
     "tilesets": [
       {
-        "path": "../assets/HiddenJungle_PNG.png",
+        "path": "assets/HiddenJungle_PNG.png",
         "type": "tile"
       },
       {
-        "path": "../assets/RACCOONSPRITESHEET.png",
+        "path": "assets/RACCOONSPRITESHEET.png",
         "type": "object"
       }
     ]

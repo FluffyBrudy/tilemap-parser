@@ -53,8 +53,7 @@ def main():
     
     # Create collision runner for top-down movement
     collision_runner = CollisionRunner.from_game_type(
-        'topdown', 
-        collision_cache, 
+        'topdown',
         game_data.tile_size
     )
     print("Collision runner initialized for top-down movement")

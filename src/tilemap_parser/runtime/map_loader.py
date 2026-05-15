@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import pygame
 from pygame import Rect, Surface
 
-from .map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedTile, parse_map_file
+from ..parser.map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedTile, parse_map_file
 
 PathLike = Union[str, Path]
 

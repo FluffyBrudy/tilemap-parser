@@ -12,7 +12,7 @@ const capabilities = [
   },
   {
     title: "Ship collision data",
-    text: "Pair tile maps with polygon, rectangle, circle, and capsule collision shapes for top-down or platformer movement.",
+    text: "Pair tile maps with collision shapes for top-down or platformer movement. Also detect object-to-object collisions between dynamic entities with mixed shapes and layer filtering.",
   },
   {
     title: "Play sprite animations",

@@ -6,13 +6,13 @@ export type { ApiConfig, ApiEntry, ClassEntry, ModuleEntry, ApiParameter, ApiExa
 
 export const apiConfig: ApiConfig = {
   packageName: "tilemap-parser",
-  version: "0.1.0",
-  description: "Standalone parser/loader for tilemap-editor JSON maps and sprite animation JSON",
+  version: "3.0.0",
+  description: "Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and collision detection runtime",
   modules: [
     {
       name: "tilemap_parser",
       description: "Main module with all public exports",
-      items: ["load_map", "TilemapData", "parse_map_dict", "parse_map_file", "parse_map_json", "SpriteAnimationSet", "AnimationPlayer", "TileLayerRenderer"],
+      items: ["load_map", "TilemapData", "parse_map_dict", "parse_map_file", "parse_map_json", "SpriteAnimationSet", "AnimationPlayer", "TileLayerRenderer", "CollisionRunner", "CollisionCache", "ObjectCollisionManager", "CollisionHit", "check_collision"],
     },
     ...collisionModules,
   ],

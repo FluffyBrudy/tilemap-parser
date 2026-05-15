@@ -16,10 +16,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Protocol, Tuple, Union
 
-from .collision import (
+from ..parser.collision import (
     CapsuleShape,
     CircleShape,
-    CollisionCache,
     CollisionPolygon,
     RectangleShape,
     TilesetCollision,
@@ -303,7 +302,6 @@ class CollisionRunner:
 
     def __init__(
         self,
-        collision_cache: CollisionCache,
         tile_size: Tuple[int, int] = (32, 32),
         mode: MovementMode = MovementMode.SLIDE,
     ):
@@ -314,11 +312,9 @@ class CollisionRunner:
         which provides preset configurations for common game types.
 
         Args:
-            collision_cache: Cache with preloaded collision data
             tile_size: Size of tiles in pixels (width, height)
             mode: Movement mode (slide, platformer, rpg)
         """
-        self.cache = collision_cache
         self.tile_size = tile_size
         self.mode = mode
 
@@ -601,14 +597,14 @@ class CollisionRunner:
         if n < 2:
             return None
 
-        # Compute polygon center once (tile-local, offset applied)
-        poly_cx = ox
-        poly_cy = oy
+        # Compute polygon centroid, then translate to world space
+        poly_cx = 0.0
+        poly_cy = 0.0
         for vx, vy in vertices:
             poly_cx += vx
             poly_cy += vy
-        poly_cx /= n
-        poly_cy /= n
+        poly_cx = ox + poly_cx / n
+        poly_cy = oy + poly_cy / n
 
         best_edge = None
         best_alignment = -1.0
@@ -857,7 +853,6 @@ class CollisionRunner:
     def from_game_type(
         cls,
         game_type: str,
-        collision_cache: CollisionCache,
         tile_size: Tuple[int, int] = (32, 32),
         strict: bool = False,
     ) -> "CollisionRunner":
@@ -889,7 +884,6 @@ class CollisionRunner:
 
         Args:
             game_type: Type of game ('platformer', 'topdown', or 'rpg')
-            collision_cache: Cache with preloaded collision data
             tile_size: Size of tiles in pixels (width, height)
             strict: If True, raises exceptions on warnings. If False, only warns.
 
@@ -901,22 +895,22 @@ class CollisionRunner:
 
         Examples:
             >>>
-            >>> runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
+            >>> runner = CollisionRunner.from_game_type('platformer', (32, 32))
             >>> result = runner.move(player, tileset, tile_map, dt=0.016)
 
             >>>
-            >>> runner = CollisionRunner.from_game_type('topdown', cache, (16, 16))
+            >>> runner = CollisionRunner.from_game_type('topdown', (16, 16))
             >>> runner.slide_friction = 0.2
             >>> result = runner.move(player, tileset, tile_map, delta_x=dx, delta_y=dy)
 
             >>>
-            >>> runner = CollisionRunner.from_game_type('rpg', cache, (32, 32), strict=True)
+            >>> runner = CollisionRunner.from_game_type('rpg', (32, 32), strict=True)
             >>> runner.validate_config()
         """
         game_type = game_type.lower()
 
         if game_type == "platformer":
-            runner = cls(collision_cache, tile_size, mode=MovementMode.PLATFORMER)
+            runner = cls(tile_size, mode=MovementMode.PLATFORMER)
             runner.gravity = 800.0
             runner.max_fall_speed = 600.0
             runner.jump_strength = -400.0
@@ -925,7 +919,7 @@ class CollisionRunner:
             runner._strict = strict
 
         elif game_type == "topdown":
-            runner = cls(collision_cache, tile_size, mode=MovementMode.SLIDE)
+            runner = cls(tile_size, mode=MovementMode.SLIDE)
             runner.gravity = 0.0
             runner.max_fall_speed = 0.0
             runner.jump_strength = 0.0
@@ -934,7 +928,7 @@ class CollisionRunner:
             runner._strict = strict
 
         elif game_type == "rpg":
-            runner = cls(collision_cache, tile_size, mode=MovementMode.RPG)
+            runner = cls(tile_size, mode=MovementMode.RPG)
             runner.gravity = 0.0
             runner.max_fall_speed = 0.0
             runner.jump_strength = 0.0

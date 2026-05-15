@@ -1,172 +1,40 @@
 import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
 import { CodeBlock } from "../components/CodeBlock";
-import fullGameSource from "../../../examples/game-example/src/game.py?raw";
+import demoSrc from "../../../examples/demo/main.py?raw";
 
 const examples = [
   {
-    id: "full-game",
-    title: "Complete pygame demo",
+    id: "demo",
+    title: "All features demo",
     description:
-      "The full examples/game-example project: map loading, tile rendering, sprite animation, camera tracking, top-down movement, collision response, and debug overlay.",
-    difficulty: "Advanced",
-    projectPath: "examples/game-example",
-    runCommand: "python src/game.py",
-    highlights: [
-      "Loads data/map.json and renders visible map tiles with TileLayerRenderer",
-      "Loads player animation clips from the animation JSON file",
-      "Builds a tile collision lookup from every tile layer in the map",
-      "Moves a player shape with CollisionRunner.move_and_slide",
-      "Centers the camera on the player and draws a small debug HUD",
-    ],
-    features: [
-      "Complete pygame loop",
-      "Camera-follow tile rendering",
-      "Top-down collision response",
-      "Animation clip switching",
-      "Debug overlay and controls",
-      "Downloadable project assets",
-    ],
-    code: fullGameSource,
-    downloadUrl: "/examples/full-game-example.zip",
-    sourceUrl:
-      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/game-example",
-  },
-  {
-    id: "animation",
-    title: "Animation Example",
-    description:
-      "Learn how to load and play sprite animations without any game logic or collision detection. Perfect for understanding the animation system.",
-    difficulty: "Beginner",
-    projectPath: "examples/animation-example",
-    runCommand: "python main.py",
-    highlights: [
-      "Loads a sprite animation JSON file",
-      "Creates an AnimationPlayer with a starting clip",
-      "Switches animation clips from keyboard input",
-    ],
-    features: [
-      "SpriteAnimationSet loading",
-      "AnimationPlayer usage",
-      "Simple pygame loop",
-      "Animation switching with keyboard",
-      "Frame-by-frame control",
-    ],
-    code: `# Animation focused code
-from tilemap_parser import SpriteAnimationSet, AnimationPlayer
-import pygame
-
-# Initialize pygame
-pygame.init()
-screen = pygame.display.set_mode((800, 600))
-clock = pygame.time.Clock()
-
-# Load animation set
-anim_set = SpriteAnimationSet.load("data/RACCOONSPRITESHEET.anim.json")
-
-# Create animation player
-anim_player = AnimationPlayer(anim_set, "idledown")
-
-# Game loop
-running = True
-while running:
-    dt = clock.tick(60) / 1000.0
-    
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            # Switch animations
-            if event.key == pygame.K_w:
-                anim_player.play("walkup")
-            elif event.key == pygame.K_s:
-                anim_player.play("walkdown")
-    
-    # Update animation
-    anim_player.update(dt * 1000)  # dt in milliseconds
-    
-    # Render
-    screen.fill((0, 0, 0))
-    frame = anim_player.get_current_image()
-    screen.blit(frame, (400 - frame.get_width()//2, 300 - frame.get_height()//2))
-    pygame.display.flip()`,
-    downloadUrl: "/examples/animation-example.zip",
-    sourceUrl:
-      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/animation-example",
-  },
-  {
-    id: "collision",
-    title: "Collision Example",
-    description:
-      "Focus on the collision system alone. Learn how to implement collision detection and response without animations or complex rendering.",
+      "A single-file pygame-ce demo that showcases tile map parsing, tile rendering, tile-vs-player collision, object-to-object collision with mixed shapes, and sprite animation — no external assets needed.",
     difficulty: "Intermediate",
-    projectPath: "examples/collision-example",
+    projectPath: "examples/demo",
     runCommand: "python main.py",
     highlights: [
-      "Loads tileset collision data through CollisionCache",
-      "Builds the tile map used by the collision runner",
-      "Draws collision tiles for debugging while the player moves",
+      "Inline map data parsed via parse_map_dict() — no JSON files required",
+      "Inline tileset collision via parse_tileset_collision()",
+      "Tile rendering with TileLayerRenderer and viewport culling",
+      "Tile-vs-player collision with CollisionRunner.move_and_slide()",
+      "Object-to-object collision with circle, capsule, and rectangle shapes",
+      "Sprite animation with AnimationPlayer and programmatic spritesheet",
+      "pygame-ce shape drawing for collision debug visualization",
+      "Camera follow, collision tile highlights, and HUD overlay",
     ],
     features: [
-      "CollisionCache and CollisionRunner",
-      "Tile-based collision detection",
-      "Slope sliding support",
-      "Debug visualization of collision tiles",
-      "Multiple collision shapes",
+      "Inline data construction",
+      "Tile rendering and collision",
+      "Object-to-object collision",
+      "Animation playback",
+      "Camera-follow movement",
+      "Debug collision visualization",
+      "Single-file, zero external assets",
     ],
-    code: `# Collision focused code
-from tilemap_parser import (
-    load_map, TileLayerRenderer, 
-    CollisionRunner, CollisionCache, RectangleShape
-)
-import pygame
-
-# Load map and collision data
-game_data = load_map("data/map.json")
-renderer = TileLayerRenderer(game_data)
-collision_cache = CollisionCache()
-tileset_collision = collision_cache.get_tileset_collision(
-    "data/collision/HiddenJungle_PNG.collision.json"
-)
-
-# Setup collision runner
-collision_runner = CollisionRunner.from_game_type(
-    'topdown', collision_cache, game_data.tile_size
-)
-
-# Build tile map for collision detection
-tile_map = {}
-for layer in game_data.parsed.layers:
-    if layer.layer_type == "tile":
-        for (tile_x, tile_y), tile in layer.tiles.items():
-            if isinstance(tile.ttype, int):
-                tile_map[(tile_x, tile_y)] = tile.variant
-
-# Create player
-player = RectangleShape(x=100, y=100, width=32, height=32)
-
-# Game loop
-while running:
-    dt = clock.tick(60) / 1000.0
-    
-    # Get input
-    keys = pygame.key.get_pressed()
-    dx = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * 200 * dt
-    dy = (keys[pygame.K_DOWN] - keys[pygame.K_UP]) * 200 * dt
-    
-    # Move with collision
-    result = collision_runner.move_and_slide(
-        player, tileset_collision, tile_map, dx, dy, slope_slide=True
-    )
-    
-    # Debug: Draw collision tiles
-    for (tx, ty) in tile_map:
-        if tileset_collision.has_collision(tile_map[(tx, ty)]):
-            pygame.draw.rect(screen, (255, 0, 0, 100), 
-                           (tx * 32, ty * 32, 32, 32), 2)`,
-    downloadUrl: "/examples/collision-example.zip",
+    code: demoSrc,
+    downloadUrl: "/examples/demo.zip",
     sourceUrl:
-      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/collision-example",
+      "https://github.com/FluffyBrudy/tilemap-parser/tree/main/examples/demo",
   },
 ];
 
@@ -245,7 +113,7 @@ export function Examples() {
               Includes
             </div>
             <div className="mt-2 text-sm text-zinc-300">
-              Source, JSON data, and image assets
+              Single Python file, no external assets
             </div>
           </div>
         </div>
@@ -311,12 +179,9 @@ export function Examples() {
 
         <div className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-zinc-100">
-            {selectedExample.id === "full-game" ? "Full game.py" : "Code preview"}
+            Code preview
           </h2>
-          <CodeBlock
-            code={selectedExample.code}
-            title={selectedExample.id === "full-game" ? "examples/game-example/src/game.py" : undefined}
-          />
+          <CodeBlock code={selectedExample.code} title="examples/demo/main.py" />
         </div>
 
         <div className="flex justify-between items-center pt-8 border-t border-zinc-800">
@@ -356,9 +221,9 @@ export function Examples() {
         </p>
         <h1 className="mb-4 text-4xl font-semibold text-zinc-100">Examples</h1>
         <p className="max-w-3xl text-lg leading-8 text-zinc-400">
-          Start with a focused sample when you need one system, or open the
-          complete pygame demo to see map loading, rendering, animation, camera
-          movement, and collision working together.
+          A single-file demo you can download and run. All data is inlined — no
+          external JSON, images, or config files needed. Just
+          install and run.
         </p>
       </section>
 
@@ -438,7 +303,7 @@ export function Examples() {
 
       <section className="mt-16 rounded-lg border border-zinc-800 bg-zinc-950 p-8">
         <h2 className="mb-4 text-2xl font-semibold text-zinc-100">
-          Run an example locally
+          Run locally
         </h2>
         <div className="space-y-4 text-zinc-300">
           <div className="flex items-start gap-3">
@@ -446,10 +311,9 @@ export function Examples() {
               1
             </div>
             <div>
-              <h3 className="font-medium mb-1">Download an Example</h3>
+              <h3 className="font-medium mb-1">Get the file</h3>
               <p className="text-sm text-zinc-400">
-                Click on any example card to view details and download the
-                complete source code.
+                Download the zip above, or copy the code from the detail page.
               </p>
             </div>
           </div>
@@ -473,13 +337,10 @@ export function Examples() {
               3
             </div>
             <div>
-              <h3 className="font-medium mb-1">Run the Example</h3>
+              <h3 className="font-medium mb-1">Run it</h3>
               <p className="text-sm text-zinc-400">
-                Extract the zip file and run{" "}
-                <code className="px-2 py-0.5 bg-zinc-800 rounded text-blue-300">
-                  python src/game.py
-                </code>{" "}
-                for the full demo, or follow the README in the focused examples.
+                Extract <code className="px-2 py-0.5 bg-zinc-800 rounded text-blue-300">demo.zip</code> and run
+                <code className="px-2 py-0.5 bg-zinc-800 rounded text-blue-300"> python main.py</code>.
               </p>
             </div>
           </div>

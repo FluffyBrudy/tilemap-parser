@@ -65,7 +65,7 @@ export function CollisionRunnerPage() {
         <div className="space-y-4">
           <MethodCard 
             name="from_game_type"
-            sig="from_game_type(game_type, cache, tile_size?, strict?) -> CollisionRunner"
+            sig="from_game_type(game_type, tile_size?, strict?) -> CollisionRunner"
             desc="Factory method - recommended way to create runners. game_type: 'platformer', 'topdown', or 'rpg'"
           />
           <MethodCard 
@@ -100,10 +100,9 @@ export function CollisionRunnerPage() {
         <h3 className="text-lg font-medium text-zinc-200 mb-3">Setup Examples</h3>
         
         <h4 className="text-sm text-zinc-300 mb-2">Platformer</h4>
-        <CodeBlock code={`from tilemap_parser import CollisionRunner, CollisionCache, RectangleShape
+        <CodeBlock code={`from tilemap_parser import CollisionRunner, RectangleShape
 
-cache = CollisionCache()
-runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
+runner = CollisionRunner.from_game_type('platformer', (32, 32))
 
 # Sprite must have: x, y, vx, vy, on_ground, collision_shape
 player.collision_shape = RectangleShape(width=24, height=32)
@@ -119,7 +118,7 @@ result = runner.move(
 )`} />
 
         <h4 className="text-sm text-zinc-300 mb-2 mt-6">Top-Down</h4>
-        <CodeBlock code={`runner = CollisionRunner.from_game_type('topdown', cache, (32, 32))
+        <CodeBlock code={`runner = CollisionRunner.from_game_type('topdown', (32, 32))
 
 # Game loop
 result = runner.move(player, tileset_collision, tile_map, dx, dy)
@@ -130,7 +129,7 @@ if result.slide_vector:
     print(f"sliding: {result.slide_vector}")`} />
 
         <h4 className="text-sm text-zinc-300 mb-2 mt-6">RPG</h4>
-        <CodeBlock code={`runner = CollisionRunner.from_game_type('rpg', cache, (32, 32))
+        <CodeBlock code={`runner = CollisionRunner.from_game_type('rpg', (32, 32))
 
 # Grid-based movement
 result = runner.move(player, tileset_collision, tile_map, dx, dy)

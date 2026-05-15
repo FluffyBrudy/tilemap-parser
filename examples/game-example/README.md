@@ -98,12 +98,13 @@ class Player:
 
 3. **Collision System**
    ```python
-   collision_cache = CollisionCache()
-   tileset_collision = collision_cache.get_tileset_collision(
+   from tilemap_parser.runtime.collision_cache import load_tileset_collision
+
+   tileset_collision = load_tileset_collision(
        "data/collision/HiddenJungle_PNG.collision.json"
    )
    collision_runner = CollisionRunner.from_game_type(
-       'topdown', collision_cache, tile_size
+       'topdown', tile_size
    )
    ```
 
@@ -199,9 +200,8 @@ Check that:
 
 ## Learning Resources
 
-- [tilemap-parser Documentation](../../README.md)
-- [Collision System Guide](../../docs/collision.md)
-- [Animation System Guide](../../docs/animation.md)
+- [tilemap-parser Documentation](https://tilemap-parser.vercel.app/)
+- [Editor Repository](https://github.com/FluffyBrudy/tilemap-editor)
 
 ## License
 

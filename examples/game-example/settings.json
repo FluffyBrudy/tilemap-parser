@@ -1,5 +1,5 @@
 {
-    "base_path": ".",
+    "base_path": "/home/rudy/Documents/dev/tilemap-package/tilemap-parser/examples/game-example",
     "data_path": "data",
     "collision_paths": {
         "tileset": "collision",

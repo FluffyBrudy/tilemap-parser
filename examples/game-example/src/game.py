@@ -165,8 +165,7 @@ class Game:
         
         # Create collision runner for top-down movement
         self.collision_runner = CollisionRunner.from_game_type(
-            'topdown', 
-            self.collision_cache, 
+            'topdown',
             self.game_data.tile_size
         )
         print("Collision runner initialized for top-down movement")
