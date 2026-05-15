@@ -17,15 +17,20 @@ from .collision import (
     CollisionCache,
     CollisionParseError,
     CollisionPolygon,
+    ObjectCollisionData,
+    ObjectCollisionRegionData,
     RectangleShape,
     TileCollisionData,
     TilesetCollision,
     clear_collision_cache,
     get_cached_character_collision,
+    get_cached_object_collision,
     get_cached_tileset_collision,
     load_character_collision,
+    load_object_collision,
     load_tileset_collision,
     parse_character_collision,
+    parse_object_collision,
     parse_tileset_collision,
 )
 from .collision_runner import (
@@ -33,6 +38,11 @@ from .collision_runner import (
     CollisionRunner,
     ICollidableSprite,
     MovementMode,
+)
+from .geometry import (
+    CollisionInfo,
+    aabb_overlap,
+    get_shape_aabb,
 )
 from .map_loader import TilemapData, load_map
 from .map_parse import (
@@ -51,6 +61,12 @@ from .map_parse import (
     parse_map_file,
     parse_map_json,
 )
+from .object_collision import (
+    CollisionHit,
+    ICollidableObject,
+    ObjectCollisionManager,
+    check_collision,
+)
 from .renderer import LayerRenderStats, TileLayerRenderer
 
 __all__ = [
@@ -64,14 +80,20 @@ __all__ = [
     "CharacterCollision",
     "CircleShape",
     "CollisionCache",
+    "CollisionHit",
+    "CollisionInfo",
     "CollisionParseError",
     "CollisionPolygon",
     "CollisionResult",
     "CollisionRunner",
+    "ICollidableObject",
     "ICollidableSprite",
     "LayerRenderStats",
     "MapParseError",
     "MovementMode",
+    "ObjectCollisionData",
+    "ObjectCollisionManager",
+    "ObjectCollisionRegionData",
     "ParsedAutotileGroup",
     "ParsedAutotileRule",
     "ParsedLayer",
@@ -88,11 +110,16 @@ __all__ = [
     "TileLayerRenderer",
     "TilesetCollision",
     "TilemapData",
+    "aabb_overlap",
+    "check_collision",
     "clear_collision_cache",
     "get_cached_character_collision",
+    "get_cached_object_collision",
     "get_cached_tileset_collision",
+    "get_shape_aabb",
     "load_character_collision",
     "load_map",
+    "load_object_collision",
     "load_tileset_collision",
     "parse_animation_dict",
     "parse_animation_file",
@@ -101,5 +128,6 @@ __all__ = [
     "parse_map_dict",
     "parse_map_file",
     "parse_map_json",
+    "parse_object_collision",
     "parse_tileset_collision",
 ]

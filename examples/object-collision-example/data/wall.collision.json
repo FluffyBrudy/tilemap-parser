@@ -1,0 +1,13 @@
+{
+  "name": "boundary_wall",
+  "shape": {
+    "type": "rectangle",
+    "width": 800,
+    "height": 600,
+    "offset": [0, 0]
+  },
+  "properties": {
+    "collision_layer": 2,
+    "collision_mask": 1
+  }
+}

@@ -15,13 +15,16 @@ from tilemap_parser.collision import (
     # parsers
     parse_tileset_collision,
     parse_character_collision,
+    parse_object_collision,
     # loaders
     load_tileset_collision,
     load_character_collision,
+    load_object_collision,
     # cache
     CollisionCache,
     get_cached_tileset_collision,
     get_cached_character_collision,
+    get_cached_object_collision,
     clear_collision_cache,
     # data classes
     TilesetCollision,
@@ -31,6 +34,8 @@ from tilemap_parser.collision import (
     CapsuleShape,
     CollisionPolygon,
     CollisionParseError,
+    ObjectCollisionData,
+    ObjectCollisionRegionData,
 )
 
 # ---------------------------------------------------------------------------
@@ -385,3 +390,313 @@ class TestGlobalCacheHelpers:
         # After clear, a fresh load still works
         result = get_cached_tileset_collision(TILESET_COLLISION)
         assert result is not None
+
+
+# ===========================================================================
+# Character collision — polygon shape
+# ===========================================================================
+
+class TestCharacterCollisionPolygon:
+    def test_parse_polygon(self):
+        data = parse_character_collision({
+            "name": "test_poly",
+            "shape": {
+                "type": "polygon",
+                "vertices": [[0, 0], [10, 0], [10, 10], [0, 10]],
+                "one_way": False,
+            },
+            "properties": {},
+        })
+        assert data.name == "test_poly"
+        assert isinstance(data.shape, CollisionPolygon)
+        assert len(data.shape.vertices) == 4
+
+    def test_parse_polygon_with_layer_mask(self):
+        data = parse_character_collision({
+            "name": "poly_char",
+            "shape": {
+                "type": "polygon",
+                "vertices": [[0, 0], [5, 0], [5, 5], [0, 5]],
+            },
+            "properties": {
+                "collision_layer": 4,
+                "collision_mask": 15,
+            },
+        })
+        assert data.collision_layer == 4
+        assert data.collision_mask == 15
+
+    def test_parse_polygon_missing_vertices_raises(self):
+        with pytest.raises(CollisionParseError, match="missing"):
+            parse_character_collision({
+                "name": "bad",
+                "shape": {"type": "polygon"},
+            })
+
+    def test_parse_polygon_too_few_vertices_raises(self):
+        with pytest.raises(CollisionParseError, match="at least 3"):
+            parse_character_collision({
+                "name": "bad",
+                "shape": {
+                    "type": "polygon",
+                    "vertices": [[0, 0], [10, 10]],
+                },
+            })
+
+
+# ===========================================================================
+# Character collision — typed layer/mask extraction
+# ===========================================================================
+
+class TestCharacterCollisionLayerMask:
+    def test_defaults(self):
+        data = parse_character_collision({
+            "name": "test",
+            "shape": {"type": "circle", "radius": 10},
+        })
+        assert data.collision_layer == 1
+        assert data.collision_mask == 0xFFFFFFFF
+
+    def test_from_properties(self):
+        data = parse_character_collision({
+            "name": "test",
+            "shape": {"type": "circle", "radius": 10},
+            "properties": {
+                "collision_layer": 1024,
+                "collision_mask": 65527,
+            },
+        })
+        assert data.collision_layer == 1024
+        assert data.collision_mask == 65527
+
+    def test_string_coercion(self):
+        """Editor may serialize numbers as strings."""
+        data = parse_character_collision({
+            "name": "test",
+            "shape": {"type": "circle", "radius": 10},
+            "properties": {
+                "collision_layer": "2",
+                "collision_mask": "65535",
+            },
+        })
+        assert data.collision_layer == 2
+        assert data.collision_mask == 65535
+
+    def test_properties_dict_still_preserved(self):
+        data = parse_character_collision({
+            "name": "test",
+            "shape": {"type": "circle", "radius": 10},
+            "properties": {
+                "collision_layer": 1,
+                "collision_mask": 1,
+                "custom_field": "value",
+            },
+        })
+        assert data.properties["custom_field"] == "value"
+        assert data.properties["collision_layer"] == 1
+
+
+# ===========================================================================
+# Object collision parsing
+# ===========================================================================
+
+class TestParseObjectCollision:
+    def test_basic_parse(self):
+        data = parse_object_collision({
+            "tileset_name": "BaseSet",
+            "regions": {
+                "r1": {
+                    "region_id": "r1",
+                    "region_rect": [0, 0, 100, 100],
+                    "name": "Test",
+                    "shapes": [{
+                        "type": "polygon",
+                        "vertices": [[0, 0], [10, 0], [10, 10]],
+                        "one_way": False,
+                    }],
+                    "properties": {
+                        "collision_layer": 16,
+                        "collision_mask": 65535,
+                    },
+                },
+            },
+        })
+        assert isinstance(data, ObjectCollisionData)
+        assert data.tileset_name == "BaseSet"
+        assert len(data.regions) == 1
+        r = data.get_region("r1")
+        assert r is not None
+        assert r.name == "Test"
+        assert r.region_rect == (0, 0, 100, 100)
+        assert len(r.shapes) == 1
+        assert r.collision_layer == 16
+        assert r.collision_mask == 65535
+
+    def test_empty_regions(self):
+        data = parse_object_collision({
+            "tileset_name": "Empty",
+            "regions": {},
+        })
+        assert data.tileset_name == "Empty"
+        assert len(data.regions) == 0
+
+    def test_has_collision(self):
+        data = parse_object_collision({
+            "tileset_name": "Test",
+            "regions": {
+                "r1": {
+                    "region_id": "r1",
+                    "region_rect": [0, 0, 10, 10],
+                    "name": "Has",
+                    "shapes": [{"type": "polygon", "vertices": [[0,0],[1,0],[1,1]], "one_way": False}],
+                    "properties": {},
+                },
+                "r2": {
+                    "region_id": "r2",
+                    "region_rect": [0, 0, 10, 10],
+                    "name": "Empty",
+                    "shapes": [],
+                    "properties": {},
+                },
+            },
+        })
+        assert data.has_collision("r1") is True
+        assert data.has_collision("r2") is False
+        assert data.has_collision("missing") is False
+
+    def test_get_world_shapes(self):
+        data = parse_object_collision({
+            "tileset_name": "Test",
+            "regions": {
+                "r1": {
+                    "region_id": "r1",
+                    "region_rect": [100, 200, 50, 50],
+                    "name": "Test",
+                    "shapes": [{"type": "polygon", "vertices": [[0,0],[10,0],[10,10]], "one_way": False}],
+                    "properties": {},
+                },
+            },
+        })
+        r = data.get_region("r1")
+        world_shapes = r.get_world_shapes(0, 0)
+        assert len(world_shapes) == 1
+        # Vertices should be offset by region_rect
+        assert world_shapes[0].vertices[0] == (100.0, 200.0)
+
+    def test_string_layer_mask_coercion(self):
+        data = parse_object_collision({
+            "tileset_name": "Test",
+            "regions": {
+                "r1": {
+                    "region_id": "r1",
+                    "region_rect": [0, 0, 10, 10],
+                    "name": "Test",
+                    "shapes": [],
+                    "properties": {
+                        "collision_layer": "16",
+                        "collision_mask": "65535",
+                    },
+                },
+            },
+        })
+        r = data.get_region("r1")
+        assert r.collision_layer == 16
+        assert r.collision_mask == 65535
+
+    def test_missing_tileset_name_raises(self):
+        with pytest.raises(CollisionParseError):
+            parse_object_collision({"regions": {}})
+
+
+# ===========================================================================
+# Object collision loading
+# ===========================================================================
+
+class TestLoadObjectCollision:
+    def test_returns_none_for_missing_file(self):
+        result = load_object_collision("nonexistent.object_collision.json")
+        assert result is None
+
+    def test_raises_on_invalid_json(self, tmp_path):
+        bad_file = tmp_path / "bad.object_collision.json"
+        bad_file.write_text("not json")
+        with pytest.raises(CollisionParseError):
+            load_object_collision(bad_file)
+
+    def test_loads_valid_file(self, tmp_path):
+        valid_file = tmp_path / "test.object_collision.json"
+        valid_file.write_text(json.dumps({
+            "tileset_name": "TestSet",
+            "regions": {
+                "r1": {
+                    "region_id": "r1",
+                    "region_rect": [0, 0, 10, 10],
+                    "name": "Test",
+                    "shapes": [],
+                    "properties": {},
+                },
+            },
+        }))
+        result = load_object_collision(valid_file)
+        assert result is not None
+        assert result.tileset_name == "TestSet"
+
+
+# ===========================================================================
+# Object collision caching
+# ===========================================================================
+
+class TestObjectCollisionCache:
+    def setup_method(self):
+        self.cache = CollisionCache()
+        self.tmp = Path(__file__).parent.parent / "examples" / "game-example" / "data" / "collision"
+
+    def test_get_object_collision(self):
+        result = self.cache.get_object_collision(self.tmp / "RACCOONSPRITESHEET.object_collision.json")
+        assert result is not None
+        assert result.tileset_name == "RACCOONSPRITESHEET"
+
+    def test_caches_result(self, tmp_path):
+        f = tmp_path / "test.object_collision.json"
+        f.write_text(json.dumps({
+            "tileset_name": "Test",
+            "regions": {},
+        }))
+        r1 = self.cache.get_object_collision(f)
+        r2 = self.cache.get_object_collision(f)
+        assert r1 is r2
+
+    def test_clear_removes_cache(self, tmp_path):
+        f = tmp_path / "test.object_collision.json"
+        f.write_text(json.dumps({
+            "tileset_name": "Test",
+            "regions": {},
+        }))
+        r1 = self.cache.get_object_collision(f)
+        self.cache.clear()
+        r2 = self.cache.get_object_collision(f)
+        assert r1 is not r2
+
+    def test_preload_object(self, tmp_path):
+        f = tmp_path / "test.object_collision.json"
+        f.write_text(json.dumps({
+            "tileset_name": "Test",
+            "regions": {},
+        }))
+        self.cache.preload_object(f)
+        assert f.resolve().as_posix() in str(self.cache._object_cache)
+
+
+class TestGlobalObjectCacheHelper:
+    def setup_method(self):
+        clear_collision_cache()
+
+    def test_get_cached_object(self, tmp_path):
+        f = tmp_path / "test.object_collision.json"
+        f.write_text(json.dumps({
+            "tileset_name": "Test",
+            "regions": {},
+        }))
+        result = get_cached_object_collision(f)
+        assert result is not None
+        assert result.tileset_name == "Test"

@@ -173,14 +173,18 @@ def circle_vs_circle(
     
     Returns:
         CollisionInfo with normal pointing from c1 to c2, or None
+    
+    Note: Touching circles (depth=0) count as collision per spec policy.
+          This is consistent with aabb_overlap behavior.
     """
     dx = c2_center[0] - c1_center[0]
     dy = c2_center[1] - c1_center[1]
     dist_sq = dx * dx + dy * dy
     radius_sum = c1_radius + c2_radius
     
-    if dist_sq >= radius_sum * radius_sum:
-        return None  # No collision
+    # CRITICAL: Use > not >= to include touching (depth=0) as collision
+    if dist_sq > radius_sum * radius_sum:
+        return None  # Separated (no collision)
     
     dist = math.sqrt(dist_sq)
     if dist < 0.0001:  # Centers coincide
