@@ -29,9 +29,9 @@ class CollisionPolygon:
     vertices: List[Point]
     one_way: bool = False
 
-    def transform(self, tile_x: float, tile_y: float) -> "CollisionPolygon":
+    def transform(self, tile_x: float, tile_y: float, scale: float = 1.0) -> "CollisionPolygon":
         """Transform polygon to world space coordinates"""
-        world_vertices = [(tile_x + vx, tile_y + vy) for vx, vy in self.vertices]
+        world_vertices = [(tile_x + vx * scale, tile_y + vy * scale) for vx, vy in self.vertices]
         return CollisionPolygon(vertices=world_vertices, one_way=self.one_way)
 
     def is_valid(self) -> bool:
@@ -69,13 +69,13 @@ class TilesetCollision:
         return tile_data is not None and tile_data.has_collision()
 
     def get_world_shapes(
-        self, tile_id: int, tile_x: float, tile_y: float
+        self, tile_id: int, tile_x: float, tile_y: float, scale: float = 1.0
     ) -> List[CollisionPolygon]:
         """Get collision shapes transformed to world space"""
         tile_data = self.get_tile_collision(tile_id)
         if not tile_data:
             return []
-        return [shape.transform(tile_x, tile_y) for shape in tile_data.shapes]
+        return [shape.transform(tile_x, tile_y, scale) for shape in tile_data.shapes]
 
 
 @dataclass

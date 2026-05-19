@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 
-from pygame import Rect, Surface
+from pygame import Rect, Surface, transform
 
 from .map_loader import TilemapData
 
@@ -29,6 +29,11 @@ class TileLayerRenderer:
         )
         self._variant_cache: Dict[Tuple[int, int], Optional[Surface]] = {}
         self._tile_w, self._tile_h = data.tile_size
+        self._rs = data.render_scale
+        if self._rs <= 0:
+            raise ValueError(f"render_scale must be positive, got {self._rs}")
+        self._eff_w = int(self._tile_w * self._rs)
+        self._eff_h = int(self._tile_h * self._rs)
 
     def get_layer_dict(self) -> Dict[int, object]:
         return dict(self.tile_layers)
@@ -36,9 +41,12 @@ class TileLayerRenderer:
     def _get_cached_variant(self, ttype: int, variant: int) -> Optional[Surface]:
         key = (ttype, variant)
         if key not in self._variant_cache:
-            self._variant_cache[key] = self.data.get_tile_surface(
+            cell = self.data.get_tile_surface(
                 ttype, variant, copy_surface=True
             )
+            if cell is not None and self._rs != 1.0:
+                cell = transform.scale(cell, (self._eff_w, self._eff_h))
+            self._variant_cache[key] = cell
         return self._variant_cache[key]
 
     def warm_cache(self) -> None:
@@ -61,10 +69,10 @@ class TileLayerRenderer:
         else:
             viewport = Rect(0, 0, viewport_size[0], viewport_size[1])
 
-        min_x = int(cam_x // self._tile_w) - 1
-        max_x = int((cam_x + viewport.width) // self._tile_w) + 1
-        min_y = int(cam_y // self._tile_h) - 1
-        max_y = int((cam_y + viewport.height) // self._tile_h) + 1
+        min_x = int(cam_x // self._eff_w) - 1
+        max_x = int((cam_x + viewport.width) // self._eff_w) + 1
+        min_y = int(cam_y // self._eff_h) - 1
+        max_y = int((cam_y + viewport.height) // self._eff_h) + 1
 
         drawn = 0
         skipped = 0
@@ -86,7 +94,7 @@ class TileLayerRenderer:
                 if cell is None:
                     skipped += 1
                     continue
-                target.blit(cell, (x * self._tile_w - cam_x, y * self._tile_h - cam_y))
+                target.blit(cell, (x * self._eff_w - cam_x, y * self._eff_h - cam_y))
                 drawn += 1
 
         return LayerRenderStats(

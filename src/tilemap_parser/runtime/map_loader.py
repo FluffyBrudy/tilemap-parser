@@ -114,6 +114,10 @@ class TilemapData:
     def map_size(self) -> Tuple[int, int]:
         return self.parsed.meta.map_size
 
+    @property
+    def render_scale(self) -> float:
+        return self.parsed.meta.render_scale
+
     def get_raw(self) -> dict:
         return deepcopy(self.parsed.raw)
 

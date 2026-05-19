@@ -71,14 +71,14 @@ def point_in_polygon(point: Point, vertices: List[Point]) -> bool:
     return inside
 
 
-def _point_in_polygon_offset(px: float, py: float, vertices: List[Point], ox: float, oy: float) -> bool:
+def _point_in_polygon_offset(px: float, py: float, vertices: List[Point], ox: float, oy: float, scale: float = 1.0) -> bool:
     """Ray-cast with tile offset applied inline — no allocation."""
     n = len(vertices)
     inside = False
-    p1x, p1y = vertices[0][0] + ox, vertices[0][1] + oy
+    p1x, p1y = vertices[0][0] * scale + ox, vertices[0][1] * scale + oy
     for i in range(1, n + 1):
         vx, vy = vertices[i % n]
-        p2x, p2y = vx + ox, vy + oy
+        p2x, p2y = vx * scale + ox, vy * scale + oy
         if py > min(p1y, p2y):
             if py <= max(p1y, p2y):
                 if px <= max(p1x, p2x):
@@ -123,16 +123,16 @@ def rect_polygon_collision(
 
 def _rect_polygon_collision_offset(
     rect_x: float, rect_y: float, rect_w: float, rect_h: float,
-    vertices: List[Point], ox: float, oy: float,
+    vertices: List[Point], ox: float, oy: float, scale: float = 1.0,
 ) -> bool:
     """Rectangle vs polygon with tile offset applied inline — no allocation."""
     # AABB pre-reject with offset
     n = len(vertices)
-    v0x, v0y = vertices[0][0] + ox, vertices[0][1] + oy
+    v0x, v0y = vertices[0][0] * scale + ox, vertices[0][1] * scale + oy
     min_vx = max_vx = v0x
     min_vy = max_vy = v0y
     for i in range(1, n):
-        wx, wy = vertices[i][0] + ox, vertices[i][1] + oy
+        wx, wy = vertices[i][0] * scale + ox, vertices[i][1] * scale + oy
         if wx < min_vx: min_vx = wx
         elif wx > max_vx: max_vx = wx
         if wy < min_vy: min_vy = wy
@@ -142,14 +142,14 @@ def _rect_polygon_collision_offset(
 
     # Corner tests
     rx2, ry2 = rect_x + rect_w, rect_y + rect_h
-    if _point_in_polygon_offset(rect_x, rect_y,  vertices, ox, oy): return True
-    if _point_in_polygon_offset(rx2,    rect_y,  vertices, ox, oy): return True
-    if _point_in_polygon_offset(rect_x, ry2,     vertices, ox, oy): return True
-    if _point_in_polygon_offset(rx2,    ry2,     vertices, ox, oy): return True
+    if _point_in_polygon_offset(rect_x, rect_y,  vertices, ox, oy, scale): return True
+    if _point_in_polygon_offset(rx2,    rect_y,  vertices, ox, oy, scale): return True
+    if _point_in_polygon_offset(rect_x, ry2,     vertices, ox, oy, scale): return True
+    if _point_in_polygon_offset(rx2,    ry2,     vertices, ox, oy, scale): return True
 
     # Vertex-in-rect
     for vx, vy in vertices:
-        wx, wy = vx + ox, vy + oy
+        wx, wy = vx * scale + ox, vy * scale + oy
         if rect_x <= wx <= rx2 and rect_y <= wy <= ry2:
             return True
     return False
@@ -184,15 +184,15 @@ def circle_polygon_collision(
 
 
 def _circle_polygon_collision_offset(
-    cx: float, cy: float, radius: float, vertices: List[Point], ox: float, oy: float,
+    cx: float, cy: float, radius: float, vertices: List[Point], ox: float, oy: float, scale: float = 1.0,
 ) -> bool:
     """Circle vs polygon with tile offset applied inline — no allocation."""
-    if _point_in_polygon_offset(cx, cy, vertices, ox, oy):
+    if _point_in_polygon_offset(cx, cy, vertices, ox, oy, scale):
         return True
     n = len(vertices)
     for i in range(n):
-        x1, y1 = vertices[i][0] + ox, vertices[i][1] + oy
-        x2, y2 = vertices[(i + 1) % n][0] + ox, vertices[(i + 1) % n][1] + oy
+        x1, y1 = vertices[i][0] * scale + ox, vertices[i][1] * scale + oy
+        x2, y2 = vertices[(i + 1) % n][0] * scale + ox, vertices[(i + 1) % n][1] * scale + oy
         dx = x2 - x1
         dy = y2 - y1
         fx = cx - x1
@@ -246,7 +246,7 @@ def check_sprite_polygon_collision(
 
 
 def _check_sprite_polygon_offset(
-    sprite: ICollidableSprite, polygon: CollisionPolygon, ox: float, oy: float
+    sprite: ICollidableSprite, polygon: CollisionPolygon, ox: float, oy: float, scale: float = 1.0
 ) -> bool:
     """
     Check if sprite collides with a tile-local polygon at world offset (ox, oy).
@@ -256,17 +256,17 @@ def _check_sprite_polygon_offset(
     if isinstance(shape, RectangleShape):
         left = sprite.x + shape.offset[0]
         top  = sprite.y + shape.offset[1]
-        return _rect_polygon_collision_offset(left, top, shape.width, shape.height, polygon.vertices, ox, oy)
+        return _rect_polygon_collision_offset(left, top, shape.width, shape.height, polygon.vertices, ox, oy, scale)
     elif isinstance(shape, CircleShape):
         cx = sprite.x + shape.offset[0]
         cy = sprite.y + shape.offset[1]
-        return _circle_polygon_collision_offset(cx, cy, shape.radius, polygon.vertices, ox, oy)
+        return _circle_polygon_collision_offset(cx, cy, shape.radius, polygon.vertices, ox, oy, scale)
     elif isinstance(shape, CapsuleShape):
         left = sprite.x + shape.offset[0] - shape.radius
         top  = sprite.y + shape.offset[1]
         w    = shape.radius * 2
         h    = shape.height + shape.radius * 2
-        return _rect_polygon_collision_offset(left, top, w, h, polygon.vertices, ox, oy)
+        return _rect_polygon_collision_offset(left, top, w, h, polygon.vertices, ox, oy, scale)
     return False
 
 
@@ -304,6 +304,7 @@ class CollisionRunner:
         self,
         tile_size: Tuple[int, int] = (32, 32),
         mode: MovementMode = MovementMode.SLIDE,
+        render_scale: float = 1.0,
     ):
         """
         Initialize collision runner.
@@ -314,9 +315,15 @@ class CollisionRunner:
         Args:
             tile_size: Size of tiles in pixels (width, height)
             mode: Movement mode (slide, platformer, rpg)
+            render_scale: Visual scale factor for tile rendering (default 1.0)
         """
         self.tile_size = tile_size
         self.mode = mode
+        if render_scale <= 0:
+            raise ValueError(f"render_scale must be positive, got {render_scale}")
+        self.render_scale = render_scale
+        self._eff_tw = int(tile_size[0] * render_scale)
+        self._eff_th = int(tile_size[1] * render_scale)
 
         self.gravity = 800.0
         self.max_fall_speed = 600.0
@@ -334,8 +341,8 @@ class CollisionRunner:
 
     def get_tile_at(self, world_x: float, world_y: float) -> Tuple[int, int]:
         """Convert world position to tile coordinates"""
-        tile_x = int(world_x // self.tile_size[0])
-        tile_y = int(world_y // self.tile_size[1])
+        tile_x = int(world_x // self._eff_tw)
+        tile_y = int(world_y // self._eff_th)
         return (tile_x, tile_y)
 
     def get_tile_shapes(
@@ -352,10 +359,10 @@ class CollisionRunner:
         if tile_id is None or not tileset_collision.has_collision(tile_id):
             return []
 
-        tile_world_x = tile_x * self.tile_size[0]
-        tile_world_y = tile_y * self.tile_size[1]
+        tile_world_x = tile_x * self._eff_tw
+        tile_world_y = tile_y * self._eff_th
 
-        return tileset_collision.get_world_shapes(tile_id, tile_world_x, tile_world_y)
+        return tileset_collision.get_world_shapes(tile_id, tile_world_x, tile_world_y, self.render_scale)
 
     def get_nearby_tile_shapes(
         self,
@@ -372,7 +379,7 @@ class CollisionRunner:
         this allocation entirely.
         """
         left, top, right, bottom = get_shape_bounds(sprite)
-        tw, th = self.tile_size
+        tw, th = self._eff_tw, self._eff_th
 
         min_tile_x = int(left  // tw) - margin
         max_tile_x = int(right // tw) + margin
@@ -392,7 +399,7 @@ class CollisionRunner:
                 tile_world_y = tile_y * th
                 for poly in tile_data.shapes:
                     if poly.is_valid():
-                        shapes.append(poly.transform(tile_world_x, tile_world_y))
+                        shapes.append(poly.transform(tile_world_x, tile_world_y, self.render_scale))
         return shapes
 
     def _collides_at(
@@ -409,7 +416,7 @@ class CollisionRunner:
         inline, exits immediately on first hit.
         """
         left, top, right, bottom = get_shape_bounds(sprite)
-        tw, th = self.tile_size
+        tw, th = self._eff_tw, self._eff_th
 
         min_tile_x = int(left  // tw) - margin
         max_tile_x = int(right // tw) + margin
@@ -427,7 +434,7 @@ class CollisionRunner:
                 ox = tile_x * tw
                 oy = tile_y * th
                 for poly in tile_data.shapes:
-                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy):
+                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
                         return True
         return False
 
@@ -443,7 +450,7 @@ class CollisionRunner:
         Used by slope_slide to get the normal without allocating a full list.
         """
         left, top, right, bottom = get_shape_bounds(sprite)
-        tw, th = self.tile_size
+        tw, th = self._eff_tw, self._eff_th
 
         min_tile_x = int(left  // tw) - margin
         max_tile_x = int(right // tw) + margin
@@ -461,7 +468,7 @@ class CollisionRunner:
                 ox = tile_x * tw
                 oy = tile_y * th
                 for poly in tile_data.shapes:
-                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy):
+                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
                         return (poly, ox, oy)
         return None
 
@@ -528,7 +535,7 @@ class CollisionRunner:
 
                 poly, ox, oy = hit
                 normal = self._get_collision_normal_from_motion(
-                    sprite, poly, ox, oy, motion_x, motion_y
+                    sprite, poly, ox, oy, motion_x, motion_y, self.render_scale
                 )
                 if normal:
                     dot = motion_x * normal[0] + motion_y * normal[1]
@@ -587,6 +594,7 @@ class CollisionRunner:
         oy: float,
         motion_x: float,
         motion_y: float,
+        scale: float = 1.0,
     ) -> Optional[Tuple[float, float]]:
         """
         Calculate the collision normal for a tile-local polygon at offset (ox, oy).
@@ -601,8 +609,8 @@ class CollisionRunner:
         poly_cx = 0.0
         poly_cy = 0.0
         for vx, vy in vertices:
-            poly_cx += vx
-            poly_cy += vy
+            poly_cx += vx * scale
+            poly_cy += vy * scale
         poly_cx = ox + poly_cx / n
         poly_cy = oy + poly_cy / n
 
@@ -610,8 +618,8 @@ class CollisionRunner:
         best_alignment = -1.0
 
         for i in range(n):
-            v1x, v1y = vertices[i][0] + ox,           vertices[i][1] + oy
-            v2x, v2y = vertices[(i + 1) % n][0] + ox, vertices[(i + 1) % n][1] + oy
+            v1x, v1y = vertices[i][0] * scale + ox,           vertices[i][1] * scale + oy
+            v2x, v2y = vertices[(i + 1) % n][0] * scale + ox, vertices[(i + 1) % n][1] * scale + oy
 
             edge_x = v2x - v1x
             edge_y = v2y - v1y
@@ -699,7 +707,7 @@ class CollisionRunner:
         collided_y = False
 
         left, top, right, bottom = get_shape_bounds(sprite)
-        tw, th = self.tile_size
+        tw, th = self._eff_tw, self._eff_th
         min_tile_x = int(left  // tw) - 1
         max_tile_x = int(right // tw) + 1
         min_tile_y = int(top   // th) - 1
@@ -718,11 +726,11 @@ class CollisionRunner:
                 for poly in tile_data.shapes:
                     if not poly.is_valid():
                         continue
-                    if not _check_sprite_polygon_offset(sprite, poly, ox, oy):
+                    if not _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
                         continue
                     if poly.one_way and sprite.vy > 0:
                         # one-way: only block if sprite was above the platform top
-                        min_vy = min(v[1] for v in poly.vertices) + oy
+                        min_vy = min(v[1] for v in poly.vertices) * self.render_scale + oy
                         if old_y + (bottom - top) <= min_vy:
                             collided_y = True
                             break
@@ -855,6 +863,7 @@ class CollisionRunner:
         game_type: str,
         tile_size: Tuple[int, int] = (32, 32),
         strict: bool = False,
+        render_scale: float = 1.0,
     ) -> "CollisionRunner":
         """
         Create a collision runner with preset configuration for a specific game type.
@@ -910,7 +919,7 @@ class CollisionRunner:
         game_type = game_type.lower()
 
         if game_type == "platformer":
-            runner = cls(tile_size, mode=MovementMode.PLATFORMER)
+            runner = cls(tile_size, mode=MovementMode.PLATFORMER, render_scale=render_scale)
             runner.gravity = 800.0
             runner.max_fall_speed = 600.0
             runner.jump_strength = -400.0
@@ -919,7 +928,7 @@ class CollisionRunner:
             runner._strict = strict
 
         elif game_type == "topdown":
-            runner = cls(tile_size, mode=MovementMode.SLIDE)
+            runner = cls(tile_size, mode=MovementMode.SLIDE, render_scale=render_scale)
             runner.gravity = 0.0
             runner.max_fall_speed = 0.0
             runner.jump_strength = 0.0
@@ -928,7 +937,7 @@ class CollisionRunner:
             runner._strict = strict
 
         elif game_type == "rpg":
-            runner = cls(tile_size, mode=MovementMode.RPG)
+            runner = cls(tile_size, mode=MovementMode.RPG, render_scale=render_scale)
             runner.gravity = 0.0
             runner.max_fall_speed = 0.0
             runner.jump_strength = 0.0

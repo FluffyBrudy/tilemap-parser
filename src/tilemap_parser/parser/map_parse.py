@@ -170,6 +170,7 @@ class ParsedMeta:
     zoom_level: float
     scroll: Point
     version: str
+    render_scale: float = 1.0
 
 
 @dataclass
@@ -394,6 +395,7 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
         zoom_level=_coerce_float(meta_obj.get("zoom_level", 1.0), "meta.zoom_level"),
         scroll=_parse_point_field(meta_obj.get("scroll"), "meta.scroll", default="0;0"),
         version=_require_str(meta_obj.get("version", "1.1"), "meta.version"),
+        render_scale=_coerce_float(meta_obj.get("render_scale", 1.0), "meta.render_scale"),
     )
 
     data_obj = _require_dict(root.get("data"), "data")
