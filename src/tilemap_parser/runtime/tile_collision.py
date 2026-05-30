@@ -906,6 +906,126 @@ class CollisionRunner:
         result.collided = result.hit_wall_x or collided_y
         return result
 
+    def move_platformer_with_slide(
+        self,
+        sprite: ICollidableSprite,
+        tileset_collision: TilesetCollision,
+        tile_map: dict,
+        dt: float,
+        input_x: float = 0.0,
+        jump_pressed: bool = False,
+        max_iterations: int = 4,
+    ) -> CollisionResult:
+        """
+        Move sprite with platformer physics and combined slope-sliding collision.
+
+        Uses iterative normal projection for movement resolution instead of
+        separate X/Y sweeps. This allows smooth movement on slopes — walking
+        up a slope ascends the player, walking down follows the surface.
+
+        One-way platforms are treated as solid (same as move_and_slide).
+        Use move_platformer() if you need one-way pass-through from below.
+
+        Args:
+            sprite: Sprite to move (must have vx, vy, on_ground attributes)
+            tileset_collision: Tileset collision data
+            tile_map: Dictionary mapping (tile_x, tile_y) to tile_id
+            dt: Delta time in seconds
+            input_x: Horizontal input (-1 to 1)
+            jump_pressed: Whether jump button is pressed
+            max_iterations: Max slope-slide iterations (default 4)
+
+        Returns:
+            CollisionResult with final position and collision info
+        """
+        result = self._result
+        result.collided    = False
+        result.hit_wall_x  = False
+        result.hit_wall_y  = False
+        result.hit_ceiling = False
+        result.on_ground   = False
+        result.slide_vector = None
+        result.final_x = sprite.x
+        result.final_y = sprite.y
+
+        if not getattr(sprite, "on_ground", False):
+            sprite.vy += self.gravity * dt
+            if sprite.vy > self.max_fall_speed:
+                sprite.vy = self.max_fall_speed
+
+        if jump_pressed and getattr(sprite, "on_ground", False):
+            sprite.vy = self.jump_strength
+
+        sprite.vx = input_x * 200.0
+
+        delta_x = sprite.vx * dt
+        delta_y = sprite.vy * dt
+        old_x, old_y = sprite.x, sprite.y
+
+        if delta_x == 0 and delta_y == 0:
+            return result
+
+        motion_x, motion_y = delta_x, delta_y
+        collided = False
+
+        for _ in range(max_iterations):
+            if abs(motion_x) < 0.01 and abs(motion_y) < 0.01:
+                break
+
+            sprite.x = old_x + motion_x
+            sprite.y = old_y + motion_y
+
+            hit = self._first_colliding_shape(sprite, tileset_collision, tile_map)
+            if hit is None:
+                break
+
+            sprite.x = old_x
+            sprite.y = old_y
+            collided = True
+
+            poly, ox, oy = hit
+            normal = self._get_collision_normal_from_motion(
+                sprite, poly, ox, oy, motion_x, motion_y, self.render_scale
+            )
+            if normal is None:
+                break
+
+            dot = motion_x * normal[0] + motion_y * normal[1]
+            if dot < 0:
+                motion_x -= normal[0] * dot
+                motion_y -= normal[1] * dot
+            else:
+                break
+
+        result.final_x = sprite.x
+        result.final_y = sprite.y
+        result.collided = collided
+
+        if collided:
+            if sprite.vy >= 0:
+                sprite.y += 1.0
+                if self._collides_at(sprite, tileset_collision, tile_map):
+                    result.on_ground = True
+                    sprite.on_ground = True
+                    sprite.vy = 0.0
+                else:
+                    sprite.on_ground = False
+                sprite.y -= 1.0
+
+            if sprite.vy < 0:
+                sprite.y -= 1.0
+                if self._collides_at(sprite, tileset_collision, tile_map):
+                    result.hit_ceiling = True
+                    sprite.vy = 0.0
+                sprite.y += 1.0
+
+            if abs(result.final_x - old_x) < 0.01 and abs(delta_x) > 0.01:
+                result.hit_wall_x = True
+        else:
+            sprite.on_ground = False
+
+        return result
+
     def move_rpg(
         self,
         sprite: ICollidableSprite,
