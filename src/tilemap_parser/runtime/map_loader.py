@@ -104,6 +104,7 @@ class TilemapData:
                         self.warnings.append(
                             f"Unresolved tileset ref {tile.ttype!r} at layer {layer.name!r} cell {pos}"
                         )
+                        continue
                     tile.ttype = idx
 
     @property
