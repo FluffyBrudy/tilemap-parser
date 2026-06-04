@@ -1,0 +1,274 @@
+{
+  "spritesheet_path": "../../../assets/Rogue - Full_scaled.png",
+  "tile_size": [
+    128,
+    128
+  ],
+  "grid_offset": [
+    0,
+    0
+  ],
+  "animations": {
+    "idle": {
+      "name": "idle",
+      "frames": [
+        {
+          "variant_id": 0,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 1,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 2,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 3,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 4,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 5,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "run": {
+      "name": "run",
+      "frames": [
+        {
+          "variant_id": 13,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 14,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 15,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 16,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 17,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 18,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "jump": {
+      "name": "jump",
+      "frames": [
+        {
+          "variant_id": 26,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 27,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 28,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 29,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 30,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "anim_3": {
+      "name": "anim_3",
+      "frames": [],
+      "loop": true,
+      "fps": 60.0
+    },
+    "melee_attack": {
+      "name": "melee_attack",
+      "frames": [
+        {
+          "variant_id": 65,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 66,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 67,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 68,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "ranged_attack": {
+      "name": "ranged_attack",
+      "frames": [
+        {
+          "variant_id": 78,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 79,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 80,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 81,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "teleport": {
+      "name": "teleport",
+      "frames": [
+        {
+          "variant_id": 91,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 92,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 93,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 94,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 95,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 96,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "dash": {
+      "name": "dash",
+      "frames": [
+        {
+          "variant_id": 104,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 105,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 106,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 107,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 108,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 109,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 110,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "hurt": {
+      "name": "hurt",
+      "frames": [
+        {
+          "variant_id": 117,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 118,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 119,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "death": {
+      "name": "death",
+      "frames": [
+        {
+          "variant_id": 130,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 131,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 132,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 133,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 134,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 135,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 136,
+          "duration_ms": 100.0
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    }
+  }
+}

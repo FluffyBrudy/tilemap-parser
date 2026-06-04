@@ -1,0 +1,16 @@
+{
+  "name": "player",
+  "shape": {
+    "type": "rectangle",
+    "width": 32.291471639869826,
+    "height": 54.32565228825158,
+    "offset": [
+      50.14675595838604,
+      39.12966563419503
+    ]
+  },
+  "properties": {
+    "collision_layer": 1,
+    "collision_mask": 65535
+  }
+}

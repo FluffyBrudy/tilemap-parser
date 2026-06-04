@@ -34,6 +34,11 @@ class TileLayerRenderer:
             raise ValueError(f"render_scale must be positive, got {self._rs}")
         self._eff_w = int(self._tile_w * self._rs)
         self._eff_h = int(self._tile_h * self._rs)
+        if self._eff_w <= 0 or self._eff_h <= 0:
+            raise ValueError(
+                f"effective tile size ({self._eff_w}, {self._eff_h}) must be positive; "
+                f"got tile_size=({self._tile_w}, {self._tile_h}) render_scale={self._rs}"
+            )
 
     def get_layer_dict(self) -> Dict[int, object]:
         return dict(self.tile_layers)

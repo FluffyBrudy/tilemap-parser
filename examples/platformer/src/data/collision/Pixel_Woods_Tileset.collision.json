@@ -1,0 +1,37 @@
+{
+  "tileset_name": "Pixel_Woods_Tileset",
+  "tile_size": [
+    16,
+    16
+  ],
+  "tiles": {
+    "163": {
+      "tile_id": 163,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              0,
+              0
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              16,
+              16
+            ],
+            [
+              0,
+              16
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    }
+  }
+}
