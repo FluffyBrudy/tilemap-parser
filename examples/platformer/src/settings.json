@@ -1,5 +1,5 @@
 {
-    "base_path": "/Users/upstem/Desktop/tilemap-packages/tilemap-parser/examples/rpg/src",
+    "base_path": "/Users/upstem/Desktop/tilemap-packages/tilemap-parser/examples/platformer/src",
     "data_path": "data",
     "collision_paths": {
         "tileset": "collision",
