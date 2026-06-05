@@ -59,7 +59,14 @@ class SpriteAnimationSet:
         except pygame.error as e:
             raise AnimationParseError(f"Failed to load image {image_path}: {e}") from e
 
-        return cls(library=library, surface=surface, warnings=warnings, json_path=path)
+        return cls(
+            library=library,
+            surface=surface,
+            warnings=warnings,
+            json_path=path,
+            grid_offset_x=library.grid_offset[0],
+            grid_offset_y=library.grid_offset[1],
+        )
 
     def get_image(self, variant_id: int, *, copy_surface: bool = True) -> Optional[Surface]:
         tw, th = self.library.tile_size
