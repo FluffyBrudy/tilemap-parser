@@ -83,6 +83,10 @@ class SpriteAnimationSet:
         if not self.surface.get_rect().contains(src):
             return None
         cel = self.surface.subsurface(src)
+        if self.library.trim_transparent:
+            brect = cel.get_bounding_rect()
+            if brect:
+                cel = cel.subsurface(brect)
         return cel.copy() if copy_surface else cel
 
 

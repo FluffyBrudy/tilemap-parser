@@ -98,6 +98,7 @@ class AnimationLibrary:
     spritesheet_path: Optional[str] = None
     tile_size: Tuple[int, int] = (32, 32)
     grid_offset: Tuple[int, int] = (0, 0)
+    trim_transparent: bool = False
 
     def get(self, name: str) -> Optional[AnimationClip]:
         return self.animations.get(name)
@@ -168,7 +169,9 @@ def parse_animation_dict(data: Dict[str, Any]) -> AnimationLibrary:
         k = str(key)
         animations[k] = _parse_animation(k, _req_dict(value, f"animations[{k!r}]"), f"animations[{k!r}]")
 
-    return AnimationLibrary(animations=animations, spritesheet_path=spritesheet_path, tile_size=(tw, th), grid_offset=(gox, goy))
+    trim_transparent = bool(root.get("trim_transparent", False))
+
+    return AnimationLibrary(animations=animations, spritesheet_path=spritesheet_path, tile_size=(tw, th), grid_offset=(gox, goy), trim_transparent=trim_transparent)
 
 
 def parse_animation_json(text: str) -> AnimationLibrary:
