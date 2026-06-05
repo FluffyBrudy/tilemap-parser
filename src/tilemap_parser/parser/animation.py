@@ -97,6 +97,7 @@ class AnimationLibrary:
     animations: Dict[str, AnimationClip] = field(default_factory=dict)
     spritesheet_path: Optional[str] = None
     tile_size: Tuple[int, int] = (32, 32)
+    grid_offset: Tuple[int, int] = (0, 0)
 
     def get(self, name: str) -> Optional[AnimationClip]:
         return self.animations.get(name)
@@ -153,13 +154,21 @@ def parse_animation_dict(data: Dict[str, Any]) -> AnimationLibrary:
     if tw < 1 or th < 1:
         raise AnimationParseError("tile_size: width and height must be >= 1")
 
+    grid_offset_raw = root.get("grid_offset", [0, 0])
+    if not isinstance(grid_offset_raw, (list, tuple)) or len(grid_offset_raw) != 2:
+        raise AnimationParseError("grid_offset: expected [x, y]")
+    gox = _coerce_int(grid_offset_raw[0], "grid_offset[0]")
+    goy = _coerce_int(grid_offset_raw[1], "grid_offset[1]")
+    if gox < 0 or goy < 0:
+        raise AnimationParseError("grid_offset: values must be >= 0")
+
     animations_raw = _req_dict(root.get("animations", {}), "animations")
     animations: Dict[str, AnimationClip] = {}
     for key, value in animations_raw.items():
         k = str(key)
         animations[k] = _parse_animation(k, _req_dict(value, f"animations[{k!r}]"), f"animations[{k!r}]")
 
-    return AnimationLibrary(animations=animations, spritesheet_path=spritesheet_path, tile_size=(tw, th))
+    return AnimationLibrary(animations=animations, spritesheet_path=spritesheet_path, tile_size=(tw, th), grid_offset=(gox, goy))
 
 
 def parse_animation_json(text: str) -> AnimationLibrary:
