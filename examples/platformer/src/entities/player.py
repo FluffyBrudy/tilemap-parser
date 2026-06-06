@@ -3,7 +3,7 @@ from pathlib import Path
 from pygame import Surface, key, transform
 from pygame.constants import K_SPACE, K_UP, K_LEFT, K_RIGHT
 
-
+from ..debug import pgdebug
 from ..fsm.base import FsmBase
 from tilemap_parser import AnimationPlayer
 
@@ -97,6 +97,9 @@ class Player:
             self.input_x = 0
 
     def render(self, surface: Surface):
+        pgdebug(
+            f"velocity=({round(self.vx), round(self.vy)}), state=${self.current_state.name}"
+        )
         frame = (
             self.animation_states[self.current_state.name]
             .get_current_image()

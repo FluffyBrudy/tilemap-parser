@@ -5,6 +5,7 @@ from tilemap_parser.runtime.tile_collision import CollisionRunner
 
 from .entities.player import Player
 from .settings import BASE_PATH_
+from .debug import Debug
 from tilemap_parser.runtime.map_loader import TilemapData, load_map
 from tilemap_parser.runtime.renderer import TileLayerRenderer
 
@@ -64,6 +65,7 @@ class Game:
         self.screen.fill((0, 0, 0))
         self.renderer.render(self.screen)
         self.player.render(self.screen)
+        Debug.draw_all(self.screen)
         pygame.display.flip()
 
     def run(self):
