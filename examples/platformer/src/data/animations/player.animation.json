@@ -1,8 +1,8 @@
 {
-  "spritesheet_path": "../../../assets/Rogue - Full_scaled.png",
+  "spritesheet_path": "../../../assets/character_spritesheet_edited.png",
   "tile_size": [
-    128,
-    128
+    150,
+    60
   ],
   "grid_offset": [
     0,
@@ -40,9 +40,29 @@
       "loop": true,
       "fps": 60.0
     },
-    "run": {
-      "name": "run",
+    "walk": {
+      "name": "walk",
       "frames": [
+        {
+          "variant_id": 8,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 9,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 10,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 11,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 12,
+          "duration_ms": 100.0
+        },
         {
           "variant_id": 13,
           "duration_ms": 100.0
@@ -54,7 +74,14 @@
         {
           "variant_id": 15,
           "duration_ms": 100.0
-        },
+        }
+      ],
+      "loop": true,
+      "fps": 60.0
+    },
+    "jump": {
+      "name": "jump",
+      "frames": [
         {
           "variant_id": 16,
           "duration_ms": 100.0
@@ -66,14 +93,38 @@
         {
           "variant_id": 18,
           "duration_ms": 100.0
+        },
+        {
+          "variant_id": 19,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 20,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 21,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 22,
+          "duration_ms": 100.0
         }
       ],
-      "loop": true,
+      "loop": false,
       "fps": 60.0
     },
-    "jump": {
-      "name": "jump",
+    "attack": {
+      "name": "attack",
       "frames": [
+        {
+          "variant_id": 24,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 25,
+          "duration_ms": 100.0
+        },
         {
           "variant_id": 26,
           "duration_ms": 100.0
@@ -93,181 +144,75 @@
         {
           "variant_id": 30,
           "duration_ms": 100.0
-        }
-      ],
-      "loop": true,
-      "fps": 60.0
-    },
-    "anim_3": {
-      "name": "anim_3",
-      "frames": [],
-      "loop": true,
-      "fps": 60.0
-    },
-    "melee_attack": {
-      "name": "melee_attack",
-      "frames": [
-        {
-          "variant_id": 65,
-          "duration_ms": 100.0
         },
         {
-          "variant_id": 66,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 67,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 68,
+          "variant_id": 31,
           "duration_ms": 100.0
         }
       ],
-      "loop": true,
-      "fps": 60.0
-    },
-    "ranged_attack": {
-      "name": "ranged_attack",
-      "frames": [
-        {
-          "variant_id": 78,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 79,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 80,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 81,
-          "duration_ms": 100.0
-        }
-      ],
-      "loop": true,
-      "fps": 60.0
-    },
-    "teleport": {
-      "name": "teleport",
-      "frames": [
-        {
-          "variant_id": 91,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 92,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 93,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 94,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 95,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 96,
-          "duration_ms": 100.0
-        }
-      ],
-      "loop": true,
-      "fps": 60.0
-    },
-    "dash": {
-      "name": "dash",
-      "frames": [
-        {
-          "variant_id": 104,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 105,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 106,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 107,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 108,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 109,
-          "duration_ms": 100.0
-        },
-        {
-          "variant_id": 110,
-          "duration_ms": 100.0
-        }
-      ],
-      "loop": true,
+      "loop": false,
       "fps": 60.0
     },
     "hurt": {
       "name": "hurt",
       "frames": [
         {
-          "variant_id": 117,
+          "variant_id": 40,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 118,
+          "variant_id": 41,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 119,
+          "variant_id": 42,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 43,
           "duration_ms": 100.0
         }
       ],
-      "loop": true,
-      "fps": 60.0
+      "loop": false,
+      "fps": 30.0
     },
-    "death": {
-      "name": "death",
+    "dash": {
+      "name": "dash",
       "frames": [
         {
-          "variant_id": 130,
+          "variant_id": 48,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 131,
+          "variant_id": 49,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 132,
+          "variant_id": 50,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 133,
+          "variant_id": 51,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 134,
+          "variant_id": 52,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 135,
+          "variant_id": 53,
           "duration_ms": 100.0
         },
         {
-          "variant_id": 136,
+          "variant_id": 54,
+          "duration_ms": 100.0
+        },
+        {
+          "variant_id": 55,
           "duration_ms": 100.0
         }
       ],
-      "loop": true,
+      "loop": false,
       "fps": 60.0
     }
   }

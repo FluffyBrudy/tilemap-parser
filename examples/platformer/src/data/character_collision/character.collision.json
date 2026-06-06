@@ -1,12 +1,12 @@
 {
-  "name": "player",
+  "name": "character_spritesheet",
   "shape": {
     "type": "rectangle",
-    "width": 32.291471639869826,
-    "height": 54.32565228825158,
+    "width": 18.125,
+    "height": 28.5,
     "offset": [
-      50.14675595838604,
-      39.12966563419503
+      31.5,
+      5.75
     ]
   },
   "properties": {

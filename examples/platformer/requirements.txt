@@ -1,3 +1,3 @@
 pygame-ce==2.5.7
-tilemap-editor==3.2.3
-tilemap-parser==3.1.2
+tilemap-editor==3.2.6
+tilemap-parser==3.1.4
