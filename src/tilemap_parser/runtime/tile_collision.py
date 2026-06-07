@@ -917,6 +917,8 @@ class CollisionRunner:
         max_iterations: int = 4,
     ) -> CollisionResult:
         """
+        Note: WIP, this api is still buggy for flat platform on edges and currently unable to debug.
+
         Move sprite with platformer physics and combined slope-sliding collision.
 
         Uses iterative normal projection for movement resolution instead of
@@ -939,11 +941,11 @@ class CollisionRunner:
             CollisionResult with final position and collision info
         """
         result = self._result
-        result.collided    = False
-        result.hit_wall_x  = False
-        result.hit_wall_y  = False
+        result.collided = False
+        result.hit_wall_x = False
+        result.hit_wall_y = False
         result.hit_ceiling = False
-        result.on_ground   = False
+        result.on_ground = False
         result.slide_vector = None
         result.final_x = sprite.x
         result.final_y = sprite.y
@@ -964,6 +966,15 @@ class CollisionRunner:
 
         if delta_x == 0 and delta_y == 0:
             return result
+
+        lifted = False
+        if (
+            getattr(sprite, "on_ground", False)
+            and abs(sprite.vy) < 0.01
+            and delta_x != 0
+        ):
+            old_y -= self.ground_snap_tolerance
+            lifted = True
 
         motion_x, motion_y = delta_x, delta_y
         collided = False
@@ -997,32 +1008,50 @@ class CollisionRunner:
             else:
                 break
 
+        if lifted:
+            sprite.y += self.ground_snap_tolerance
+
         result.final_x = sprite.x
         result.final_y = sprite.y
         result.collided = collided
 
-        if collided:
-            if sprite.vy >= 0:
-                sprite.y += 1.0
-                if self._collides_at(sprite, tileset_collision, tile_map):
-                    result.on_ground = True
-                    sprite.on_ground = True
-                    sprite.vy = 0.0
-                else:
-                    sprite.on_ground = False
+        if sprite.vy >= 0:
+            sprite.y += 1.0
+            probe_hit = self._collides_at(sprite, tileset_collision, tile_map)
+            if probe_hit:
                 sprite.y -= 1.0
-
-            if sprite.vy < 0:
+                result.on_ground = True
+                sprite.on_ground = True
+                sprite.vy = 0.0
+            elif collided and delta_y > 0:
+                saved_y = sprite.y - 1.0
                 sprite.y -= 1.0
-                if self._collides_at(sprite, tileset_collision, tile_map):
-                    result.hit_ceiling = True
-                    sprite.vy = 0.0
-                sprite.y += 1.0
+                lo, hi = saved_y, saved_y + abs(delta_y)
+                for _ in range(8):
+                    mid = (lo + hi) * 0.5
+                    sprite.y = mid
+                    if self._collides_at(sprite, tileset_collision, tile_map):
+                        hi = mid
+                    else:
+                        lo = mid
+                sprite.y = lo
+                result.on_ground = True
+                sprite.on_ground = True
+                sprite.vy = 0.0
+            else:
+                sprite.y -= 1.0
+                sprite.on_ground = False
 
-            if abs(result.final_x - old_x) < 0.01 and abs(delta_x) > 0.01:
-                result.hit_wall_x = True
-        else:
+        if sprite.vy < 0:
+            sprite.y -= 1.0
+            if self._collides_at(sprite, tileset_collision, tile_map):
+                result.hit_ceiling = True
+                sprite.vy = 0.0
+            sprite.y += 1.0
             sprite.on_ground = False
+
+        if collided and abs(result.final_x - old_x) < 0.01 and abs(delta_x) > 0.01:
+            result.hit_wall_x = True
 
         return result
 
