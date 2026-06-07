@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
 
+import pygame
 from pygame import Rect, Surface, transform
 
 from .map_loader import TilemapData
@@ -40,6 +41,17 @@ class TileLayerRenderer:
                 f"got tile_size=({self._tile_w}, {self._tile_h}) render_scale={self._rs}"
             )
 
+        self._tileset_animations: Dict[int, dict] = {}
+        for ts_idx, ts in enumerate(data.parsed.tilesets):
+            if ts.animation is not None:
+                self._tileset_animations[ts_idx] = {
+                    "frame_count": ts.animation.frame_count,
+                    "frame_duration_ms": ts.animation.frame_duration_ms,
+                    "frame_stride": ts.animation.frame_stride,
+                    "loop": ts.animation.loop,
+                    "animation_mode": ts.animation.animation_mode,
+                }
+
     def get_layer_dict(self) -> Dict[int, object]:
         return dict(self.tile_layers)
 
@@ -62,11 +74,31 @@ class TileLayerRenderer:
                     self._get_cached_variant(tile.ttype, tile.variant)
         self.data = None
 
+    def _compute_display_variant(
+        self,
+        variant: int,
+        ttype: int,
+        x: int,
+        y: int,
+        time_ms: int,
+    ) -> int:
+        anim = self._tileset_animations.get(ttype)
+        if anim is None:
+            return variant
+        frame_count = anim["frame_count"]
+        frame_idx = int(time_ms / anim["frame_duration_ms"]) % frame_count
+        if anim.get("animation_mode") == "random_start_times":
+            phase = hash((x, y, ttype)) % frame_count
+            frame_idx = (frame_idx + phase) % frame_count
+        return variant + frame_idx * anim["frame_stride"]
+
     def render(
         self,
         target: Surface,
         camera_xy: Union[Tuple[float, float], Tuple[int, int]] = (0, 0),
         viewport_size: Optional[Tuple[int, int]] = None,
+        *,
+        current_time_ms: Optional[float] = None,
     ) -> LayerRenderStats:
         cam_x, cam_y = float(camera_xy[0]), float(camera_xy[1])
         if viewport_size is None:
@@ -78,6 +110,10 @@ class TileLayerRenderer:
         max_x = int((cam_x + viewport.width) // self._eff_w) + 1
         min_y = int(cam_y // self._eff_h) - 1
         max_y = int((cam_y + viewport.height) // self._eff_h) + 1
+
+        if current_time_ms is None:
+            current_time_ms = pygame.time.get_ticks()
+        time_ms = int(current_time_ms)
 
         drawn = 0
         skipped = 0
@@ -95,7 +131,10 @@ class TileLayerRenderer:
                 if not isinstance(tile.ttype, int):
                     skipped += 1
                     continue
-                cell = self._get_cached_variant(tile.ttype, tile.variant)
+                display_variant = self._compute_display_variant(
+                    tile.variant, tile.ttype, x, y, time_ms
+                )
+                cell = self._get_cached_variant(tile.ttype, display_variant)
                 if cell is None:
                     skipped += 1
                     continue

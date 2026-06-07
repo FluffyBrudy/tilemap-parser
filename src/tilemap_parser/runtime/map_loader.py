@@ -198,6 +198,19 @@ class TilemapData:
             return None
         return self.get_tile_surface(tile.ttype, tile.variant)
 
+    def get_tileset_animation(self, ttype: int) -> Optional[dict]:
+        if 0 <= ttype < len(self.parsed.tilesets):
+            anim = self.parsed.tilesets[ttype].animation
+            if anim is not None:
+                return {
+                    "frame_count": anim.frame_count,
+                    "frame_duration_ms": anim.frame_duration_ms,
+                    "frame_stride": anim.frame_stride,
+                    "loop": anim.loop,
+                    "animation_mode": anim.animation_mode,
+                }
+        return None
+
 
 def _variant_surface(
     surf: Surface,

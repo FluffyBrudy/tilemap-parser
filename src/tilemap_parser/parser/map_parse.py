@@ -126,11 +126,21 @@ class ParsedObject:
 
 
 @dataclass
+class TilesetAnimation:
+    frame_count: int
+    frame_duration_ms: float
+    frame_stride: int
+    loop: bool = True
+    animation_mode: str = "default"
+
+
+@dataclass
 class ParsedTileset:
     path: str
     type: str
     properties: JsonDict = field(default_factory=dict)
     tile_properties: Dict[str, JsonDict] = field(default_factory=dict)
+    animation: Optional[TilesetAnimation] = None
 
 
 @dataclass
@@ -340,9 +350,21 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
                 tile_props[str(k)] = _require_dict(
                     v, f"{ctx}[{i}].tile_properties[{k!r}]"
                 )
+        animation = None
+        animation_raw = ts_obj.get("animation")
+        if animation_raw is not None:
+            anim_obj = _require_dict(animation_raw, f"{ctx}[{i}].animation")
+            animation = TilesetAnimation(
+                frame_count=_coerce_int(anim_obj.get("frame_count"), f"{ctx}[{i}].animation.frame_count"),
+                frame_duration_ms=_coerce_float(anim_obj.get("frame_duration_ms"), f"{ctx}[{i}].animation.frame_duration_ms"),
+                frame_stride=_coerce_int(anim_obj.get("frame_stride"), f"{ctx}[{i}].animation.frame_stride"),
+                loop=_coerce_bool(anim_obj.get("loop", True), f"{ctx}[{i}].animation.loop"),
+                animation_mode=_require_str(anim_obj.get("animation_mode", "default"), f"{ctx}[{i}].animation.animation_mode"),
+            )
         out.append(
             ParsedTileset(
-                path=path, type=ts_type, properties=props, tile_properties=tile_props
+                path=path, type=ts_type, properties=props, tile_properties=tile_props,
+                animation=animation,
             )
         )
     return out
