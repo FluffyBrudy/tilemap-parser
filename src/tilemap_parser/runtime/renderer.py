@@ -85,12 +85,13 @@ class TileLayerRenderer:
         anim = self._tileset_animations.get(ttype)
         if anim is None:
             return variant
+        stride = anim["frame_stride"]
         frame_count = anim["frame_count"]
         frame_idx = int(time_ms / anim["frame_duration_ms"]) % frame_count
         if anim.get("animation_mode") == "random_start_times":
             phase = hash((x, y, ttype)) % frame_count
             frame_idx = (frame_idx + phase) % frame_count
-        return variant + frame_idx * anim["frame_stride"]
+        return variant + frame_idx * stride
 
     def render(
         self,
