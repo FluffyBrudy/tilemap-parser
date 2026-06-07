@@ -23,9 +23,11 @@ from .object_collision import (
     check_collision,
 )
 from .renderer import LayerRenderStats, TileLayerRenderer
+from .area_node import AreaNode
 
 __all__ = [
     "AnimationPlayer",
+    "AreaNode",
     "CollisionCache",
     "CollisionHit",
     "CollisionResult",

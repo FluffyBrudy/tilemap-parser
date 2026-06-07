@@ -5,7 +5,10 @@ import re
 import string
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from .node_parse import ParsedNode
 
 JsonDict = Dict[str, Any]
 Point = Tuple[int, int]
@@ -187,6 +190,8 @@ class ParsedMap:
     tilesets: List[ParsedTileset]
     project_state: ParsedProjectState
     raw: JsonDict
+    nodes: List["ParsedNode"] = field(default_factory=list)
+    node_groups: List[str] = field(default_factory=list)
 
 
 def _parse_tile(tile_data: JsonDict, ctx: str) -> ParsedTile:

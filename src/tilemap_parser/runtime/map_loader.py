@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -8,6 +9,7 @@ import pygame
 from pygame import Rect, Surface
 
 from ..parser.map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedTile, parse_map_file
+from ..parser.node_parse import parse_nodes_dict
 
 PathLike = Union[str, Path]
 
@@ -65,6 +67,27 @@ class TilemapData:
                 if not skip_missing_images:
                     raise MapParseError(msg) from e
                 surfaces.append(None)
+
+        nodes_name = f"{p.stem}.nodes.json"
+        nodes_candidates = [
+            map_dir / nodes_name,
+            map_dir.parent / "nodes" / nodes_name,
+        ]
+        if extra_search_base is not None:
+            nodes_candidates.append(extra_search_base / "nodes" / nodes_name)
+        for nodes_path in nodes_candidates:
+            if nodes_path.is_file():
+                try:
+                    nodes_text = nodes_path.read_text(encoding="utf-8")
+                    nodes_raw = json.loads(nodes_text)
+                    parsed.nodes = parse_nodes_dict(nodes_raw)
+                    groups_raw = nodes_raw.get("groups", [])
+                    if not isinstance(groups_raw, list):
+                        raise MapParseError("root.groups must be a list")
+                    parsed.node_groups = groups_raw
+                except (json.JSONDecodeError, OSError, MapParseError) as e:
+                    warnings.append(f"Failed to load nodes: {e}")
+                break
 
         return cls(parsed, surfaces, resolved_paths, warnings, map_path=p)
 
