@@ -1011,8 +1011,6 @@ class CollisionRunner:
         if lifted:
             sprite.y += self.ground_snap_tolerance
 
-        result.final_x = sprite.x
-        result.final_y = sprite.y
         result.collided = collided
 
         if sprite.vy >= 0:
@@ -1026,18 +1024,33 @@ class CollisionRunner:
             elif collided and delta_y > 0:
                 saved_y = sprite.y - 1.0
                 sprite.y -= 1.0
-                lo, hi = saved_y, saved_y + abs(delta_y)
-                for _ in range(8):
-                    mid = (lo + hi) * 0.5
-                    sprite.y = mid
-                    if self._collides_at(sprite, tileset_collision, tile_map):
-                        hi = mid
-                    else:
-                        lo = mid
-                sprite.y = lo
-                result.on_ground = True
-                sprite.on_ground = True
-                sprite.vy = 0.0
+                # Verify this is a floor-like contact (primarily vertical)
+                eps = 0.5
+                # Check if moving up clears collision
+                sprite.y = saved_y - eps
+                can_move_up = not self._collides_at(sprite, tileset_collision, tile_map)
+                # Check if collision exists below
+                sprite.y = saved_y + eps
+                has_floor_below = self._collides_at(sprite, tileset_collision, tile_map)
+                sprite.y = saved_y
+
+                if can_move_up and has_floor_below:
+                    # This is a true floor contact, run bisection
+                    lo, hi = saved_y, saved_y + abs(delta_y)
+                    for _ in range(8):
+                        mid = (lo + hi) * 0.5
+                        sprite.y = mid
+                        if self._collides_at(sprite, tileset_collision, tile_map):
+                            hi = mid
+                        else:
+                            lo = mid
+                    sprite.y = lo
+                    result.on_ground = True
+                    sprite.on_ground = True
+                    sprite.vy = 0.0
+                else:
+                    # Not a floor contact, keep sprite at saved position
+                    sprite.on_ground = False
             else:
                 sprite.y -= 1.0
                 sprite.on_ground = False
@@ -1049,6 +1062,10 @@ class CollisionRunner:
                 sprite.vy = 0.0
             sprite.y += 1.0
             sprite.on_ground = False
+
+        # Set final positions AFTER all probe/correction logic
+        result.final_x = sprite.x
+        result.final_y = sprite.y
 
         if collided and abs(result.final_x - old_x) < 0.01 and abs(delta_x) > 0.01:
             result.hit_wall_x = True
