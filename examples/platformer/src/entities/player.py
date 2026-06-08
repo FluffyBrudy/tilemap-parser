@@ -96,7 +96,7 @@ class Player:
         else:
             self.input_x = 0
 
-    def render(self, surface: Surface):
+    def render(self, surface: Surface, offset: Tuple[float, float]):
         pgdebug(
             f"velocity=({round(self.vx), round(self.vy)}), state=${self.current_state.name}"
         )
@@ -106,7 +106,7 @@ class Player:
             .subsurface(self._shape_bound[self.current_state.name])  # type: ignore
         )
         left, _, right, bottom = get_shape_aabb(self.x, self.y, self.collision_shape)
-        frame_rect = frame.get_rect(midbottom=((left + right) * 0.5, bottom))  # type: ignore
+        frame_rect = frame.get_rect(midbottom=((left + right) * 0.5 - offset[0], bottom - offset[1]))  # type: ignore
         if self.facing:
             frame = transform.flip(frame, True, False)
 

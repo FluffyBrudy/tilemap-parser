@@ -4,7 +4,7 @@ from tilemap_parser.runtime.collision_cache import CollisionCache
 from tilemap_parser.runtime.tile_collision import CollisionRunner
 
 from .entities.player import Player
-from .settings import BASE_PATH_
+from .settings import BASE_PATH_, SCREEN_WIDTH, SCREEN_HEIGHT
 from .debug import Debug
 from tilemap_parser.runtime.map_loader import TilemapData, load_map
 from tilemap_parser.runtime.renderer import TileLayerRenderer
@@ -12,7 +12,7 @@ from tilemap_parser.runtime.renderer import TileLayerRenderer
 
 class Game:
     def __init__(self):
-        self.screen = pygame.display.set_mode((800, 600))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.running = True
 
@@ -62,9 +62,10 @@ class Game:
         )
 
     def render(self):
+        camera = self.player.x - SCREEN_WIDTH // 2, self.player.y - SCREEN_HEIGHT // 2
         self.screen.fill((0, 0, 0))
-        self.renderer.render(self.screen)
-        self.player.render(self.screen)
+        self.renderer.render(self.screen, camera)
+        self.player.render(self.screen, camera)
         Debug.draw_all(self.screen)
         pygame.display.flip()
 

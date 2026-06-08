@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "groups": [],
+  "nodes": [
+    {
+      "node_id": "89761cda-d93a-4297-9a35-b614ffcca121",
+      "name": "stair",
+      "node_type": "area",
+      "area": {
+        "x": 1150,
+        "y": 218,
+        "w": 19,
+        "h": 147
+      },
+      "layer_name": "background",
+      "properties": {},
+      "group": null
+    }
+  ]
+}
