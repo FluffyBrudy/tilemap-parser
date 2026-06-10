@@ -46,6 +46,14 @@ from .map_parse import (
     parse_map_json,
 )
 from .node_parse import ParsedNode, parse_nodes_dict, parse_nodes_file
+from .particle import (
+    ALPHA_FADE_MODES,
+    EMISSION_SHAPES,
+    PARTICLE_SHAPES,
+    ParticleSystemConfig,
+    parse_particle_dict,
+    parse_particle_file,
+)
 
 __all__ = [
     "AnimationClip",
@@ -90,4 +98,10 @@ __all__ = [
     "parse_nodes_file",
     "parse_object_collision",
     "parse_tileset_collision",
+    "ALPHA_FADE_MODES",
+    "EMISSION_SHAPES",
+    "PARTICLE_SHAPES",
+    "ParticleSystemConfig",
+    "parse_particle_dict",
+    "parse_particle_file",
 ]

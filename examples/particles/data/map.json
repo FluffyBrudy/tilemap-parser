@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "tile_size": "32;32",
+    "map_size": "30;20",
+    "zoom_level": 1.0,
+    "scroll": "0;0",
+    "initial_map_size": "30;20",
+    "render_scale": 1.0,
+    "version": "1.1"
+  },
+  "resources": {
+    "tilesets": []
+  },
+  "project_state": {
+    "rules": [],
+    "groups": [
+      {
+        "name": "Default",
+        "rules": []
+      }
+    ],
+    "automap_rules": []
+  },
+  "data": {
+    "ongrid": {},
+    "layers": [
+      {
+        "name": "Layer 1",
+        "type": "tile",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "z_index": 0,
+        "tiles": {},
+        "properties": {}
+      }
+    ]
+  }
+}

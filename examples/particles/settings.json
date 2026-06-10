@@ -1,0 +1,20 @@
+{
+    "base_path": "/Users/upstem/Desktop/tilemap-packages/tilemap-parser/examples/particles",
+    "data_path": "data",
+    "collision_paths": {
+        "tileset": "collision",
+        "character": "character_collision"
+    },
+    "nodes_path": "nodes",
+    "error_handler": {
+        "log_path": "errors.log",
+        "max_recent_errors": 50,
+        "console_output": true,
+        "file_logging": true,
+        "severity_levels": [
+            "error",
+            "warning",
+            "info"
+        ]
+    }
+}

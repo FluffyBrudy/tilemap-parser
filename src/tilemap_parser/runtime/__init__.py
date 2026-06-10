@@ -24,6 +24,15 @@ from .object_collision import (
 )
 from .renderer import LayerRenderStats, TileLayerRenderer
 from .area_node import AreaNode
+from .particles import (
+    Particle,
+    ParticleEmitter,
+    ParticleEmitterNode,
+    ParticleRenderer,
+    ParticleSystem,
+    SpriteBatchRenderer,
+    clear_texture_caches,
+)
 
 __all__ = [
     "AnimationPlayer",
@@ -49,4 +58,11 @@ __all__ = [
     "load_map",
     "load_object_collision",
     "load_tileset_collision",
+    "Particle",
+    "ParticleEmitter",
+    "ParticleEmitterNode",
+    "ParticleRenderer",
+    "ParticleSystem",
+    "SpriteBatchRenderer",
+    "clear_texture_caches",
 ]

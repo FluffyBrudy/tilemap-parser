@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "groups": [],
+  "nodes": [
+    {
+      "node_id": "8b3e553a-7a1a-4f8e-bfd0-c095a8e3bc9f",
+      "name": "Emitter 1",
+      "node_type": "particle_emitter",
+      "area": {
+        "x": 350,
+        "y": 385,
+        "w": 64,
+        "h": 64
+      },
+      "layer_name": "Layer 1",
+      "properties": {
+        "emission_shape": "point",
+        "particle_shape": "circle",
+        "particle_size_min": 4,
+        "particle_size_max": 10,
+        "spawn_rate": 50,
+        "max_particles": 120,
+        "lifetime_min": 0.5,
+        "lifetime_max": 1.8,
+        "speed_min": 30,
+        "speed_max": 80,
+        "direction": 270,
+        "spread": 40,
+        "gravity_x": 2,
+        "gravity_y": -15,
+        "start_color_r": 255,
+        "start_color_g": 180,
+        "start_color_b": 30,
+        "start_color_a": 255,
+        "end_color_r": 200,
+        "end_color_g": 60,
+        "end_color_b": 10,
+        "end_color_a": 0,
+        "start_scale": 1.0,
+        "end_scale": 0.3,
+        "rotation_speed": 5,
+        "alpha_fade": "fade_out"
+      },
+      "group": null
+    }
+  ]
+}
