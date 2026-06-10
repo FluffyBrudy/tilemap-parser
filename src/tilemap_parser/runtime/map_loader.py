@@ -10,6 +10,8 @@ from pygame import Rect, Surface
 
 from ..parser.map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedTile, parse_map_file
 from ..parser.node_parse import parse_nodes_dict
+from .area_node import AreaNode
+from .particles import ParticleEmitterNode
 
 PathLike = Union[str, Path]
 
@@ -29,6 +31,8 @@ class TilemapData:
         self.resolved_paths = resolved_paths
         self.warnings = warnings
         self.map_path = map_path
+        self.area_nodes: List[AreaNode] = []
+        self.particle_emitters: List[ParticleEmitterNode] = []
         self._tw, self._th = parsed.meta.tile_size
         self._build_path_index()
         self._normalize_tile_ttypes()
@@ -40,6 +44,7 @@ class TilemapData:
         *,
         extra_search_base: Optional[Path] = None,
         skip_missing_images: bool = True,
+        nodes_dir: Optional[PathLike] = None,
     ) -> "TilemapData":
         p = Path(path)
         parsed = parse_map_file(p)
@@ -69,12 +74,16 @@ class TilemapData:
                 surfaces.append(None)
 
         nodes_name = f"{p.stem}.nodes.json"
-        nodes_candidates = [
-            map_dir / nodes_name,
-            map_dir.parent / "nodes" / nodes_name,
-        ]
-        if extra_search_base is not None:
-            nodes_candidates.append(extra_search_base / "nodes" / nodes_name)
+        nodes_candidates: List[Path] = []
+        if nodes_dir is not None:
+            nodes_candidates.append(Path(nodes_dir) / nodes_name)
+        else:
+            nodes_candidates = [
+                map_dir / nodes_name,
+                map_dir.parent / "nodes" / nodes_name,
+            ]
+            if extra_search_base is not None:
+                nodes_candidates.append(extra_search_base / "nodes" / nodes_name)
         for nodes_path in nodes_candidates:
             if nodes_path.is_file():
                 try:
@@ -89,7 +98,12 @@ class TilemapData:
                     warnings.append(f"Failed to load nodes: {e}")
                 break
 
-        return cls(parsed, surfaces, resolved_paths, warnings, map_path=p)
+        result = cls(parsed, surfaces, resolved_paths, warnings, map_path=p)
+        result.area_nodes = [AreaNode(n) for n in parsed.nodes if n.node_type == "area"]
+        result.particle_emitters = [
+            ParticleEmitterNode(n) for n in parsed.nodes if n.node_type == "particle_emitter"
+        ]
+        return result
 
     def _build_path_index(self) -> None:
         self._path_to_index: Dict[str, int] = {}
@@ -246,5 +260,5 @@ def _resolve_resource_path(path_str: str, map_dir: Path, extra_search_base: Opti
     return candidate
 
 
-def load_map(path: PathLike, *, extra_search_base: Optional[Path] = None, skip_missing_images: bool = True) -> TilemapData:
-    return TilemapData.load(path, extra_search_base=extra_search_base, skip_missing_images=skip_missing_images)
+def load_map(path: PathLike, *, extra_search_base: Optional[Path] = None, skip_missing_images: bool = True, nodes_dir: Optional[PathLike] = None) -> TilemapData:
+    return TilemapData.load(path, extra_search_base=extra_search_base, skip_missing_images=skip_missing_images, nodes_dir=nodes_dir)
