@@ -97,6 +97,27 @@ def _point_in_polygon_offset(
     return inside
 
 
+def _segments_intersect(
+    ax: float,
+    ay: float,
+    bx: float,
+    by: float,
+    cx: float,
+    cy: float,
+    dx: float,
+    dy: float,
+) -> bool:
+    """Check if segment AB intersects CD (open — ignores collinear/endpoint)."""
+    o1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    o2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax)
+    o3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)
+    o4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx)
+    if (o1 > 0 and o2 < 0) or (o1 < 0 and o2 > 0):
+        if (o3 > 0 and o4 < 0) or (o3 < 0 and o4 > 0):
+            return True
+    return False
+
+
 def rect_polygon_collision(
     rect_x: float, rect_y: float, rect_w: float, rect_h: float, vertices: List[Point]
 ) -> bool:
@@ -115,29 +136,39 @@ def rect_polygon_collision(
             min_vy = vy
         elif vy > max_vy:
             max_vy = vy
-    if (
-        rect_x > max_vx
-        or rect_x + rect_w < min_vx
-        or rect_y > max_vy
-        or rect_y + rect_h < min_vy
-    ):
+    rx2 = rect_x + rect_w
+    ry2 = rect_y + rect_h
+    if rect_x > max_vx or rx2 < min_vx or rect_y > max_vy or ry2 < min_vy:
         return False
 
     # Corner tests — no tuple allocation
     if point_in_polygon((rect_x, rect_y), vertices):
         return True
-    if point_in_polygon((rect_x + rect_w, rect_y), vertices):
+    if point_in_polygon((rx2, rect_y), vertices):
         return True
-    if point_in_polygon((rect_x, rect_y + rect_h), vertices):
+    if point_in_polygon((rect_x, ry2), vertices):
         return True
-    if point_in_polygon((rect_x + rect_w, rect_y + rect_h), vertices):
+    if point_in_polygon((rx2, ry2), vertices):
         return True
 
     # Vertex-in-rect
-    rx2, ry2 = rect_x + rect_w, rect_y + rect_h
     for vx, vy in vertices:
         if rect_x <= vx <= rx2 and rect_y <= vy <= ry2:
             return True
+
+    # Edge-edge intersection (catches triangle-vs-rectangle cases)
+    rect_edges = (
+        (rect_x, rect_y, rx2, rect_y),
+        (rx2, rect_y, rx2, ry2),
+        (rx2, ry2, rect_x, ry2),
+        (rect_x, ry2, rect_x, rect_y),
+    )
+    for rax, ray, rbx, rby in rect_edges:
+        for i in range(n):
+            p1x, p1y = vertices[i]
+            p2x, p2y = vertices[(i + 1) % n]
+            if _segments_intersect(rax, ray, rbx, rby, p1x, p1y, p2x, p2y):
+                return True
     return False
 
 
@@ -190,6 +221,21 @@ def _rect_polygon_collision_offset(
     for vx, vy in vertices:
         wx, wy = vx * scale + ox, vy * scale + oy
         if rect_x <= wx <= rx2 and rect_y <= wy <= ry2:
+            return True
+
+    # Edge-edge intersection (catches triangle-vs-rectangle cases)
+    for i in range(n):
+        p1x = vertices[i][0] * scale + ox
+        p1y = vertices[i][1] * scale + oy
+        p2x = vertices[(i + 1) % n][0] * scale + ox
+        p2y = vertices[(i + 1) % n][1] * scale + oy
+        if _segments_intersect(rect_x, rect_y, rx2, rect_y, p1x, p1y, p2x, p2y):
+            return True
+        if _segments_intersect(rx2, rect_y, rx2, ry2, p1x, p1y, p2x, p2y):
+            return True
+        if _segments_intersect(rx2, ry2, rect_x, ry2, p1x, p1y, p2x, p2y):
+            return True
+        if _segments_intersect(rect_x, ry2, rect_x, rect_y, p1x, p1y, p2x, p2y):
             return True
     return False
 
@@ -398,6 +444,8 @@ class CollisionRunner:
 
         self.ground_snap_tolerance = 2.0
         self.step_height = 4.0
+
+        self.max_walk_angle = 60.0  # degrees from horizontal; steeper = wall
 
         self.slide_friction = 0.1
 
@@ -906,6 +954,138 @@ class CollisionRunner:
         result.collided = result.hit_wall_x or collided_y
         return result
 
+    def _walkable_slope_at(
+        self,
+        sprite: ICollidableSprite,
+        tileset_collision: TilesetCollision,
+        tile_map: dict,
+        motion_x: float,
+        motion_y: float,
+        walk_upness: float,
+    ) -> Optional[float]:
+        """Check if there is a walkable slope at the sprite's current position.
+        Iterates all overlapping tiles and picks the best walkable edge.
+        Returns the Y offset to apply, or None if not a walkable slope.
+        """
+        left, top, right, bottom = get_shape_bounds(sprite)
+        tw, th = self._eff_tw, self._eff_th
+        min_tile_x = int(left // tw) - 1
+        max_tile_x = int(right // tw) + 1
+        min_tile_y = int(top // th) - 1
+        max_tile_y = int(bottom // th) + 1
+
+        best_adj_y = None
+
+        for tile_y in range(min_tile_y, max_tile_y + 1):
+            for tile_x in range(min_tile_x, max_tile_x + 1):
+                tile_id = tile_map.get((tile_x, tile_y))
+                if tile_id is None:
+                    continue
+                tile_data = tileset_collision.tiles.get(tile_id)
+                if tile_data is None:
+                    continue
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if self._is_full_rect(poly):
+                        continue
+                    if not _check_sprite_polygon_offset(
+                        sprite, poly, ox, oy, self.render_scale
+                    ):
+                        continue
+
+                    # Non-full-rect polygon overlapping the sprite — find the best edge.
+                    verts = poly.vertices
+                    n = len(verts)
+                    cx = sum(verts[j][0] for j in range(n)) / n * self.render_scale + ox
+                    cy = sum(verts[j][1] for j in range(n)) / n * self.render_scale + oy
+                    for i in range(n):
+                        v1x = verts[i][0] * self.render_scale + ox
+                        v1y = verts[i][1] * self.render_scale + oy
+                        v2x = verts[(i + 1) % n][0] * self.render_scale + ox
+                        v2y = verts[(i + 1) % n][1] * self.render_scale + oy
+
+                        ex = v2x - v1x
+                        ey = v2y - v1y
+                        e_len = math.sqrt(ex * ex + ey * ey)
+                        if e_len < 0.01:
+                            continue
+
+                        # Two perpendicular normals
+                        nx_a = -ey / e_len
+                        ny_a = ex / e_len
+                        nx_b = -nx_a
+                        ny_b = -ny_a
+
+                        # Pick the one pointing INTO the solid (toward polygon interior).
+                        # Use the polygon centroid to determine which side is interior.
+                        mx = (v1x + v2x) * 0.5
+                        my = (v1y + v2y) * 0.5
+                        to_centroid_x = cx - mx
+                        to_centroid_y = cy - my
+                        if nx_a * to_centroid_x + ny_a * to_centroid_y < 0:
+                            nx_a = -nx_a
+                            ny_a = -ny_a
+                            nx_b = -nx_b
+                            ny_b = -ny_b
+
+                        # nx_a/ny_a now points away from centroid (outward).
+                        # nx_b/ny_b points toward centroid (inward) = into the solid.
+
+                        # For a walkable surface, the inward normal should push the
+                        # player UP (negative screen y when inward is upward).
+                        # Inward normal = (nx_b, ny_b) = (-nx_a, -ny_a).
+                        # "Upward" in the inward sense means the y-component of
+                        # inward normal is negative (pointing up on screen).
+                        inward_up = -ny_b  # inward normal y component, negated
+                        # Actually: for a floor, inward normal = (0, 1) pointing DOWN.
+                        # -inward_y = -1, which is wrong.
+                        # Better: just use the outward normal's upness.
+                        # Outward normal = (nx_a, ny_a).
+                        # For a floor, outward = (0, -1). upness = -(-1) = 1. ✓
+                        # For this diagonal, outward = ? Let ny_a determine outward.
+
+                        outward_ny = ny_a
+                        upness = -outward_ny
+                        if upness < walk_upness:
+                            continue
+
+                        # Check motion is INTO the surface (dot with outward normal < 0).
+                        out_nx = nx_a
+                        out_ny = ny_a
+                        dot = motion_x * out_nx + motion_y * out_ny
+                        if dot >= 0:
+                            continue
+
+                        # Project motion along the slope surface.
+                        adj_x = motion_x - out_nx * dot
+                        adj_y = motion_y - out_ny * dot
+                        dy_off = adj_y - motion_y
+                        if best_adj_y is None or dy_off > best_adj_y:
+                            best_adj_y = dy_off
+
+        if best_adj_y is not None:
+            return best_adj_y
+        return None
+
+    def _is_full_rect(self, poly: CollisionPolygon) -> bool:
+        """Check if a polygon is a full-tile rectangle."""
+        if len(poly.vertices) != 4:
+            return False
+        verts = [
+            (vx * self.render_scale, vy * self.render_scale) for vx, vy in poly.vertices
+        ]
+        min_x = min(v[0] for v in verts)
+        max_x = max(v[0] for v in verts)
+        min_y = min(v[1] for v in verts)
+        max_y = max(v[1] for v in verts)
+        return (
+            abs(max_x - min_x - self._eff_tw) < 1.0
+            and abs(max_y - min_y - self._eff_th) < 1.0
+        )
+
     def move_platformer_with_slide(
         self,
         sprite: ICollidableSprite,
@@ -914,14 +1094,16 @@ class CollisionRunner:
         dt: float,
         input_x: float = 0.0,
         jump_pressed: bool = False,
-        max_iterations: int = 4,
     ) -> CollisionResult:
         """
-        Move sprite with platformer physics and combined slope-sliding collision.
+        Move sprite with platformer physics and slope-aware walking.
 
-        Uses iterative normal projection for movement resolution instead of
-        separate X/Y sweeps. This allows smooth movement on slopes — walking
-        up a slope ascends the player, walking down follows the surface.
+        Like move_platformer() but can walk up and down slopes smoothly.
+        The player's motion is projected along slope surfaces so they
+        ascend when walking into a slope and descend when walking off one.
+
+        This does NOT auto-slide along walls (unlike Godot's move_and_slide).
+        Steep walls (near-vertical) block horizontal movement entirely.
 
         One-way platforms are treated as solid (same as move_and_slide).
         Use move_platformer() if you need one-way pass-through from below.
@@ -933,17 +1115,16 @@ class CollisionRunner:
             dt: Delta time in seconds
             input_x: Horizontal input (-1 to 1)
             jump_pressed: Whether jump button is pressed
-            max_iterations: Max slope-slide iterations (default 4)
 
         Returns:
             CollisionResult with final position and collision info
         """
         result = self._result
-        result.collided    = False
-        result.hit_wall_x  = False
-        result.hit_wall_y  = False
+        result.collided = False
+        result.hit_wall_x = False
+        result.hit_wall_y = False
         result.hit_ceiling = False
-        result.on_ground   = False
+        result.on_ground = False
         result.slide_vector = None
         result.final_x = sprite.x
         result.final_y = sprite.y
@@ -965,65 +1146,198 @@ class CollisionRunner:
         if delta_x == 0 and delta_y == 0:
             return result
 
-        motion_x, motion_y = delta_x, delta_y
-        collided = False
+        walk_upness = math.cos(math.radians(self.max_walk_angle))
 
-        for _ in range(max_iterations):
-            if abs(motion_x) < 0.01 and abs(motion_y) < 0.01:
-                break
+        # --- X Movement ---
+        sprite.x = old_x + delta_x
+        snapped_to_ground = False
 
-            sprite.x = old_x + motion_x
-            sprite.y = old_y + motion_y
-
-            hit = self._first_colliding_shape(sprite, tileset_collision, tile_map)
-            if hit is None:
-                break
-
-            sprite.x = old_x
-            sprite.y = old_y
-            collided = True
-
-            poly, ox, oy = hit
-            normal = self._get_collision_normal_from_motion(
-                sprite, poly, ox, oy, motion_x, motion_y, self.render_scale
+        # If we are on the ground, we should actively try to follow the ground contour.
+        # This seamlessly handles flat ground, upward slopes, and downward slopes.
+        if getattr(sprite, "on_ground", False):
+            # Calculate the maximum vertical distance the ground could have changed
+            # based on horizontal movement and the maximum walkable angle.
+            max_drop = (
+                abs(delta_x) * math.tan(math.radians(self.max_walk_angle))
+                + self.ground_snap_tolerance
             )
-            if normal is None:
-                break
 
-            dot = motion_x * normal[0] + motion_y * normal[1]
-            if dot < 0:
-                motion_x -= normal[0] * dot
-                motion_y -= normal[1] * dot
+            if max_drop > 0:
+                # 1. Check DOWNWARDS (for downward slopes or dropping off a small ledge)
+                test_y = old_y + max_drop
+                sprite.y = test_y
+                if self._collides_at(sprite, tileset_collision, tile_map):
+                    # Binary search for the exact surface transition
+                    lo, hi = old_y - self.ground_snap_tolerance, test_y
+                    for _ in range(8):
+                        mid = (lo + hi) * 0.5
+                        sprite.y = mid
+                        if self._collides_at(sprite, tileset_collision, tile_map):
+                            hi = mid
+                        else:
+                            lo = mid
+
+                    sprite.y = hi
+                    # Verify it's actually a walkable slope and not a wall
+                    slope_dy = self._walkable_slope_at(
+                        sprite, tileset_collision, tile_map, 0.0, 1.0, walk_upness
+                    )
+                    if slope_dy is not None:
+                        sprite.y = lo
+                        snapped_to_ground = True
+                else:
+                    # 2. Check UPWARDS (for upward slopes)
+                    test_y = old_y - max_drop
+                    sprite.y = test_y
+                    if self._collides_at(sprite, tileset_collision, tile_map):
+                        # Binary search for the exact surface transition
+                        lo, hi = test_y, old_y + self.ground_snap_tolerance
+                        for _ in range(8):
+                            mid = (lo + hi) * 0.5
+                            sprite.y = mid
+                            if self._collides_at(sprite, tileset_collision, tile_map):
+                                hi = mid
+                            else:
+                                lo = mid
+
+                        sprite.y = hi
+                        slope_dy = self._walkable_slope_at(
+                            sprite, tileset_collision, tile_map, 0.0, 1.0, walk_upness
+                        )
+                        if slope_dy is not None:
+                            sprite.y = lo
+                            snapped_to_ground = True
+
+        # If we didn't snap to a slope, we might be hitting a wall, stepping up stairs,
+        # or walking off a cliff.
+        if not snapped_to_ground:
+            # Try to step up (handles stairs and small bumps)
+            sprite.y = old_y - self.ground_snap_tolerance
+            if self._collides_at(sprite, tileset_collision, tile_map):
+                sprite.y = old_y - self.ground_snap_tolerance - self.step_height
+                if not self._collides_at(sprite, tileset_collision, tile_map):
+                    sprite.y = old_y - self.step_height
+                    snapped_to_ground = True
+                else:
+                    # Can't step up, so it's a wall. Revert X movement.
+                    sprite.x = old_x
+                    sprite.vx = 0.0
+                    result.hit_wall_x = True
             else:
-                break
+                # No collision at lifted position. Check original Y to see if we hit a wall.
+                sprite.y = old_y
+                if self._collides_at(sprite, tileset_collision, tile_map):
+                    sprite.x = old_x
+                    sprite.vx = 0.0
+                    result.hit_wall_x = True
+                else:
+                    # No wall. We either walked off a cliff or are in the air.
+                    if getattr(sprite, "on_ground", False):
+                        sprite.on_ground = False
+
+        # If we successfully snapped to the ground or stepped up, we are grounded.
+        # We zero out vertical velocity and skip Y-axis movement to prevent falling into the slope.
+        if snapped_to_ground:
+            sprite.vy = 0.0
+            sprite.on_ground = True
+            result.on_ground = True
+            collided_y = False
+        else:
+            # --- Y Movement (Standard Gravity & Collision) ---
+            sprite.y = sprite.y + delta_y
+            collided_y = False
+
+            left, top, right, bottom = get_shape_bounds(sprite)
+            tw, th = self._eff_tw, self._eff_th
+            min_tile_x = int(left // tw) - 1
+            max_tile_x = int(right // tw) + 1
+            min_tile_y = int(top // th) - 1
+            max_tile_y = int(bottom // th) + 1
+
+            for tile_y in range(min_tile_y, max_tile_y + 1):
+                for tile_x in range(min_tile_x, max_tile_x + 1):
+                    tile_id = tile_map.get((tile_x, tile_y))
+                    if tile_id is None:
+                        continue
+                    tile_data = tileset_collision.tiles.get(tile_id)
+                    if tile_data is None:
+                        continue
+                    ox = tile_x * tw
+                    oy = tile_y * th
+                    for poly in tile_data.shapes:
+                        if not poly.is_valid():
+                            continue
+                        if poly.one_way and sprite.vy > 0:
+                            min_vy = (
+                                min(v[1] for v in poly.vertices) * self.render_scale
+                                + oy
+                            )
+                            if old_y + (bottom - sprite.y) <= min_vy:
+                                if self._is_full_rect(
+                                    poly
+                                ) or _check_sprite_polygon_offset(
+                                    sprite, poly, ox, oy, self.render_scale
+                                ):
+                                    collided_y = True
+                                    break
+                        elif not poly.one_way:
+                            if _check_sprite_polygon_offset(
+                                sprite, poly, ox, oy, self.render_scale
+                            ):
+                                collided_y = True
+                                break
+                    if collided_y:
+                        break
+                if collided_y:
+                    break
+
+            if collided_y:
+                sprite.y = old_y
+                if sprite.vy > 0:
+                    fall_y = sprite.vy * dt
+                    sprite.vy = 0.0
+                    sprite.on_ground = True
+                    result.on_ground = True
+                    lo, hi = old_y, old_y + fall_y
+                    for _ in range(8):
+                        mid = (lo + hi) * 0.5
+                        sprite.y = mid
+                        if self._collides_at(sprite, tileset_collision, tile_map):
+                            hi = mid
+                        else:
+                            lo = mid
+                    sprite.y = lo
+                elif sprite.vy < 0:
+                    sprite.vy = 0.0
+                    result.hit_ceiling = True
+                else:
+                    sprite.on_ground = True
+                    result.on_ground = True
+            else:
+                sprite.on_ground = False
+
+            downward_travel = max(0.0, sprite.vy) * dt
+            if (
+                not sprite.on_ground
+                and 0 <= downward_travel <= self.ground_snap_tolerance
+            ):
+                if self._collides_at(sprite, tileset_collision, tile_map):
+                    sprite.on_ground = True
+                    result.on_ground = True
+                    sprite.vy = 0.0
+                else:
+                    saved_y = sprite.y
+                    sprite.y += self.ground_snap_tolerance
+                    if self._collides_at(sprite, tileset_collision, tile_map):
+                        sprite.on_ground = True
+                        result.on_ground = True
+                        sprite.vy = 0.0
+                    else:
+                        sprite.y = saved_y
 
         result.final_x = sprite.x
         result.final_y = sprite.y
-        result.collided = collided
-
-        if collided:
-            if sprite.vy >= 0:
-                sprite.y += 1.0
-                if self._collides_at(sprite, tileset_collision, tile_map):
-                    result.on_ground = True
-                    sprite.on_ground = True
-                    sprite.vy = 0.0
-                else:
-                    sprite.on_ground = False
-                sprite.y -= 1.0
-
-            if sprite.vy < 0:
-                sprite.y -= 1.0
-                if self._collides_at(sprite, tileset_collision, tile_map):
-                    result.hit_ceiling = True
-                    sprite.vy = 0.0
-                sprite.y += 1.0
-
-            if abs(result.final_x - old_x) < 0.01 and abs(delta_x) > 0.01:
-                result.hit_wall_x = True
-        else:
-            sprite.on_ground = False
-
+        result.collided = result.hit_wall_x or collided_y
         return result
 
     def move_rpg(
