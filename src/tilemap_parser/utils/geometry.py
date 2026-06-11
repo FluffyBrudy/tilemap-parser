@@ -193,16 +193,16 @@ def rect_vs_circle(
 
         if min_dist == dist_left:
             normal = (-1.0, 0.0)
-            depth = circle_radius - dist_left
+            depth = circle_radius + dist_left
         elif min_dist == dist_right:
             normal = (1.0, 0.0)
-            depth = circle_radius - dist_right
+            depth = circle_radius + dist_right
         elif min_dist == dist_top:
             normal = (0.0, -1.0)
-            depth = circle_radius - dist_top
+            depth = circle_radius + dist_top
         else:
             normal = (0.0, 1.0)
-            depth = circle_radius - dist_bottom
+            depth = circle_radius + dist_bottom
     else:
         depth = circle_radius - dist
         normal = (dx / dist, dy / dist)

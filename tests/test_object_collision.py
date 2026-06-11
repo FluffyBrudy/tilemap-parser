@@ -141,6 +141,16 @@ class TestCheckCollisionRectCircle:
         c = _make_circle(30, 5, 5)
         assert check_collision(r, c) is None
 
+    def test_circle_fully_inside_rect_has_positive_depth(self):
+        r = _make_rect(0, 0, 100, 100)
+        c = _make_circle(50, 50, 5)
+
+        hit = check_collision(r, c)
+
+        assert hit is not None
+        assert hit.depth == pytest.approx(55.0)
+        assert hit.normal == (-1.0, 0.0)
+
 
 class TestCheckCollisionCircleRect:
     def test_normal_flipped(self):
@@ -151,6 +161,16 @@ class TestCheckCollisionCircleRect:
         assert hit is not None
         # Normal should point from circle toward rect (left, so negative X)
         assert hit.normal[0] == pytest.approx(-1.0)
+
+    def test_rect_fully_contains_circle_has_positive_depth(self):
+        c = _make_circle(50, 50, 5)
+        r = _make_rect(0, 0, 100, 100)
+
+        hit = check_collision(c, r)
+
+        assert hit is not None
+        assert hit.depth == pytest.approx(55.0)
+        assert hit.normal == (1.0, -0.0)
 
 
 class TestCheckCollisionLayerFiltering:

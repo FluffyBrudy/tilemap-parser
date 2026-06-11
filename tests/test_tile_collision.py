@@ -207,6 +207,18 @@ class TestMoveAndSlide:
 
         assert result.final_y == 56
 
+    def test_diagonal_corner_collision_keeps_safe_slide_axis(self):
+        tile_map = {(4, 4): 0}
+        sprite = MockSprite(x=100, y=92)
+
+        result = self.runner.move_and_slide(sprite, self.tileset, tile_map, 5, 5)
+
+        assert result.collided is True
+        assert result.final_x == 105
+        assert result.final_y == 92
+        assert result.slide_vector == (5, 0.0)
+        assert not self.runner._collides_at(sprite, self.tileset, tile_map)
+
 
 # ===========================================================================
 # Runner: move_platformer Tests
@@ -227,6 +239,101 @@ class TestMovePlatformer:
 
         assert sprite.vy > 0
 
+    def test_ground_snap_does_not_embed_sprite(self):
+        tile_map = {(0, 5): 0}
+        sprite = MockSprite(x=4, y=127)
+        sprite.vy = 0
+        sprite.on_ground = False
+
+        result = self.runner.move_platformer(
+            sprite, self.tileset, tile_map, dt=0.016, input_x=0, jump_pressed=False
+        )
+
+        assert result.on_ground is True
+        assert sprite.on_ground is True
+        assert sprite.y < 129
+        assert not self.runner._collides_at(sprite, self.tileset, tile_map)
+
+    def test_one_way_platform_does_not_block_horizontal_movement(self):
+        tile_map = make_tilemap_with_one_way()
+        sprite = MockSprite(x=137, y=160)
+        sprite.vy = 0
+        sprite.on_ground = True
+
+        result = self.runner.move_platformer(
+            sprite, self.tileset, tile_map, dt=0.016, input_x=1, jump_pressed=False
+        )
+
+        assert sprite.x > 137
+        assert result.hit_wall_x is False
+
+
+class TestMovePlatformerWithSlide:
+    def setup_method(self):
+        self.runner = CollisionRunner.from_game_type("platformer", (32, 32))
+        self.tileset = make_tileset_with_floor()
+
+    def test_moves_and_resets_reused_result(self):
+        blocking_map = make_tilemap_floor_only()
+        blocked_sprite = MockSprite(x=96, y=32)
+        first = self.runner.move_rpg(blocked_sprite, self.tileset, blocking_map, 5, 0)
+        assert first.collided is True
+
+        sprite = MockSprite(x=100, y=100)
+        sprite.vy = 0
+        sprite.on_ground = False
+
+        result = self.runner.move_platformer_with_slide(
+            sprite, self.tileset, {}, dt=0.016, input_x=1, jump_pressed=False
+        )
+
+        assert sprite.x > 100
+        assert sprite.y > 100
+        assert result.collided is False
+        assert result.hit_wall_x is False
+
+    def test_jump_takes_priority_over_ground_following(self):
+        sprite = MockSprite(x=100, y=100)
+        sprite.vy = 0
+        sprite.on_ground = True
+
+        result = self.runner.move_platformer_with_slide(
+            sprite, self.tileset, {}, dt=0.016, input_x=0, jump_pressed=True
+        )
+
+        assert sprite.y < 100
+        assert sprite.vy < 0
+        assert sprite.on_ground is False
+        assert result.on_ground is False
+
+    def test_follows_walkable_slope_up(self):
+        tile_map = {(5, 5): 2}
+        sprite = MockSprite(x=160, y=169.99, shape=RectangleShape(width=8, height=16))
+        sprite.vy = 0
+        sprite.on_ground = True
+
+        result = self.runner.move_platformer_with_slide(
+            sprite, self.tileset, tile_map, dt=0.016, input_x=1, jump_pressed=False
+        )
+
+        assert sprite.x > 160
+        assert sprite.y < 169.99
+        assert sprite.on_ground is True
+        assert result.on_ground is True
+
+    def test_steep_wall_blocks_horizontal_motion(self):
+        tile_map = {(4, 2): 0}
+        sprite = MockSprite(x=103, y=80)
+        sprite.vy = 0
+        sprite.on_ground = True
+
+        result = self.runner.move_platformer_with_slide(
+            sprite, self.tileset, tile_map, dt=0.016, input_x=1, jump_pressed=False
+        )
+
+        assert sprite.x == 103
+        assert result.hit_wall_x is True
+
 
 class TestMoveRpg:
     def setup_method(self):
@@ -240,6 +347,16 @@ class TestMoveRpg:
         result = self.runner.move_rpg(sprite, self.tileset, tile_map, 5, 5)
 
         assert result.final_x == 100
+
+    def test_reports_blocked_axis_for_diagonal_move(self):
+        tile_map = {(4, 2): 0}
+        sprite = MockSprite(x=103, y=80)
+
+        result = self.runner.move_rpg(sprite, self.tileset, tile_map, 5, 5)
+
+        assert result.collided is True
+        assert result.hit_wall_x is True
+        assert result.hit_wall_y is False
 
 
 # ===========================================================================
