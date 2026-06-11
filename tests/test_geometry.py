@@ -390,9 +390,9 @@ class TestRectVsCircle:
         result = rect_vs_circle(rect, center, 8.0)
         assert result is not None
         # Closest edge is left (dist_left = 5.0), so normal = (-1, 0)
-        # depth = radius - dist_left = 8 - 5 = 3
+        # depth separates the full circle out of the rect: radius + dist_left.
         assert result.normal == (-1.0, 0.0)
-        assert result.depth == pytest.approx(3.0)
+        assert result.depth == pytest.approx(13.0)
 
     def test_circle_inside_rect_closest_top(self):
         rect = (0.0, 0.0, 20.0, 20.0)
@@ -401,7 +401,7 @@ class TestRectVsCircle:
         assert result is not None
         # Closest edge is top (dist_top = 3.0)
         assert result.normal == (0.0, -1.0)
-        assert result.depth == pytest.approx(5.0)
+        assert result.depth == pytest.approx(11.0)
 
     def test_circle_inside_rect_closest_bottom(self):
         rect = (0.0, 0.0, 20.0, 20.0)
@@ -410,7 +410,7 @@ class TestRectVsCircle:
         assert result is not None
         # Closest edge is bottom (dist_bottom = 3.0)
         assert result.normal == (0.0, 1.0)
-        assert result.depth == pytest.approx(5.0)
+        assert result.depth == pytest.approx(11.0)
 
     def test_circle_center_on_edge(self):
         """Circle center exactly on rect edge."""
