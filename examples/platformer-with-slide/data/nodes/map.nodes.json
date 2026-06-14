@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "groups": [],
+  "nodes": [
+    {
+      "node_id": "fc5eae05-0f8b-42f2-9b5e-9f1d0fa1752d",
+      "name": "Emitter 1",
+      "node_type": "particle_emitter",
+      "area": {
+        "x": 90,
+        "y": 5,
+        "w": 485,
+        "h": 314
+      },
+      "layer_name": "decoration",
+      "properties": {
+        "emission_shape": "rect",
+        "particle_shape": "circle",
+        "particle_size_min": 1,
+        "particle_size_max": 3,
+        "spawn_rate": 60,
+        "max_particles": 180,
+        "lifetime_min": 1.0,
+        "lifetime_max": 3.0,
+        "speed_min": 50,
+        "speed_max": 120,
+        "direction": 0,
+        "spread": 15,
+        "gravity_x": 80,
+        "gravity_y": 5,
+        "start_color_r": 200,
+        "start_color_g": 180,
+        "start_color_b": 140,
+        "start_color_a": 180,
+        "end_color_r": 160,
+        "end_color_g": 140,
+        "end_color_b": 100,
+        "end_color_a": 20,
+        "start_scale": 1.0,
+        "end_scale": 0.5,
+        "rotation_speed": 5,
+        "alpha_fade": "fade_out"
+      },
+      "group": null
+    }
+  ]
+}

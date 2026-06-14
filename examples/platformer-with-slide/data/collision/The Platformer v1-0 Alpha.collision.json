@@ -1,0 +1,85 @@
+{
+  "tileset_name": "The Platformer v1-0 Alpha",
+  "tile_size": [
+    16,
+    16
+  ],
+  "tiles": {
+    "95": {
+      "tile_id": 95,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              0,
+              0
+            ],
+            [
+              16,
+              16
+            ],
+            [
+              0,
+              16
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    },
+    "93": {
+      "tile_id": 93,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              0,
+              16
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              16,
+              16
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    },
+    "94": {
+      "tile_id": 94,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [
+            [
+              0,
+              0
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              16,
+              16
+            ],
+            [
+              0,
+              16
+            ]
+          ],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    }
+  }
+}

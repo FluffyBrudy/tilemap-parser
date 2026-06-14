@@ -1,0 +1,16 @@
+{
+  "name": "Player Idle",
+  "shape": {
+    "type": "rectangle",
+    "width": 15.070346414639634,
+    "height": 26.132621974321918,
+    "offset": [
+      25.33100780333042,
+      20.68164561157992
+    ]
+  },
+  "properties": {
+    "collision_layer": 1,
+    "collision_mask": 65535
+  }
+}
