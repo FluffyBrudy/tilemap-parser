@@ -14,6 +14,7 @@ from .tile_collision import (
     CollisionRunner,
     ICollidableSprite,
     MovementMode,
+    rect_vs_tilemap,
 )
 from .map_loader import TilemapData, load_map
 from .object_collision import (
@@ -63,6 +64,7 @@ __all__ = [
     "ParticleEmitterNode",
     "ParticleRenderer",
     "ParticleSystem",
+    "rect_vs_tilemap",
     "SpriteBatchRenderer",
     "clear_texture_caches",
 ]

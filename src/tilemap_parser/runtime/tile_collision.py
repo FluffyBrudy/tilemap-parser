@@ -1936,3 +1936,55 @@ class CollisionRunner:
                 raise ValueError(warning_msg)
             else:
                 warnings.warn(warning_msg, UserWarning, stacklevel=2)
+
+
+def rect_vs_tilemap(
+    left: float,
+    top: float,
+    right: float,
+    bottom: float,
+    tile_map: Dict[Tuple[int, int], int],
+    tileset_collision: TilesetCollision,
+    tile_size: Tuple[int, int],
+    render_scale: float = 1.0,
+) -> bool:
+    """Check if an AABB collides with any collision tile in a tile map.
+
+    Iterates overlapping tiles, transforms each tile's collision polygons to
+    world space, and tests for intersection with the given rectangle.
+
+    Args:
+        left, top, right, bottom: World-space AABB of the query rect.
+        tile_map: Dict mapping (col, row) -> tile_variant_id.
+        tileset_collision: TilesetCollision with per-tile polygon shapes.
+        tile_size: Raw tile size as (width, height) from map data.
+        render_scale: Multiplier from tile-local to world pixels.
+
+    Returns:
+        True if the rect overlaps any tile collision polygon.
+    """
+    tw = tile_size[0] * render_scale
+    th = tile_size[1] * render_scale
+    tx0 = math.floor(left / tw)
+    tx1 = math.floor((right - 1) / tw)
+    ty0 = math.floor(top / th)
+    ty1 = math.floor((bottom - 1) / th)
+    rw = right - left
+    rh = bottom - top
+
+    for ty in range(ty0, ty1 + 1):
+        for tx in range(tx0, tx1 + 1):
+            tile_id = tile_map.get((tx, ty))
+            if tile_id is None:
+                continue
+            tile_data = tileset_collision.tiles.get(tile_id)
+            if tile_data is None:
+                continue
+            ox = tx * tw
+            oy = ty * th
+            for poly in tile_data.shapes:
+                if not poly.is_valid():
+                    continue
+                if _rect_polygon_collision_offset(left, top, rw, rh, poly.vertices, ox, oy, render_scale):
+                    return True
+    return False

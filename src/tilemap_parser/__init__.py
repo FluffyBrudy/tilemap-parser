@@ -82,4 +82,5 @@ __all__ = [
     "polygon_vs_rect",
     "rect_vs_circle",
     "rect_vs_rect",
+    "rect_vs_tilemap",
 ]
