@@ -960,6 +960,7 @@ class CollisionRunner:
                 sprite.y = lo
             elif sprite.vy < 0:
                 sprite.vy = 0.0
+                sprite.on_ground = False
                 result.hit_ceiling = True
             else:
                 sprite.on_ground = True
