@@ -729,15 +729,16 @@ while running:
     },
     {
       name: "ObjectCollisionManager",
-      signature: "class ObjectCollisionManager",
-      description: "Manages collision detection for multiple objects. Supports add/remove, all-vs-all, and one-vs-all queries with layer filtering.",
+      signature: "class ObjectCollisionManager(objects: Optional[Iterable[ICollidableObject]] = None, *, cell_size: float = 128.0)",
+      description: "Manages collision detection for multiple objects using a uniform-grid spatial broadphase plus exact shape narrowphase. Supports add/remove, all-vs-all, and one-vs-all queries with layer filtering.",
       properties: [
         { name: "objects", type: "List[ICollidableObject]", description: "All managed objects" },
       ],
       methods: [
         { name: "add_object", signature: "add_object(obj: ICollidableObject)", description: "Add an object to the collision system.", parameters: [], returns: "None" },
         { name: "remove_object", signature: "remove_object(obj: ICollidableObject)", description: "Remove an object from the collision system.", parameters: [], returns: "None" },
-        { name: "check_all_collisions", signature: "check_all_collisions() -> List[CollisionHit]", description: "Check every unique pair (brute-force O(n²)).", parameters: [], returns: "List[CollisionHit]" },
+        { name: "clear", signature: "clear()", description: "Remove all objects from the collision system.", parameters: [], returns: "None" },
+        { name: "check_all_collisions", signature: "check_all_collisions() -> List[CollisionHit]", description: "Check every potentially colliding pair using the spatial grid broadphase.", parameters: [], returns: "List[CollisionHit]" },
         { name: "check_object", signature: "check_object(obj: ICollidableObject) -> List[CollisionHit]", description: "Check one object against all others.", parameters: [], returns: "List[CollisionHit]" },
       ],
     },

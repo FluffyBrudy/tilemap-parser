@@ -7,7 +7,7 @@ Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and co
 - **Map parsing**: Load and query tilemaps, layers, objects, and autotile data from JSON
 - **Animation**: Frame-based sprite animation with `AnimationPlayer`
 - **Collision (tile-based)**: Polygon collision detection for tilemaps with slide, platformer, and RPG movement modes via `CollisionRunner`
-- **Collision (object-to-object)**: Mixed-shape collision detection (rect, circle, capsule, polygon) with layer filtering via `ObjectCollisionManager`
+- **Collision (object-to-object)**: Spatial-grid mixed-shape collision detection (rect, circle, capsule, polygon) with layer filtering via `ObjectCollisionManager`
 - **Capsule support**: Full capsule collision against all shape types
 - **Hit helpers**: `CollisionHit.resolve()`, `involves()`, `other()` for ergonomic separation
 

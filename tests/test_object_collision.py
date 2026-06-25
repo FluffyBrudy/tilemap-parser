@@ -21,6 +21,7 @@ from tilemap_parser.parser.collision import (
     CollisionPolygon,
     RectangleShape,
 )
+import tilemap_parser.runtime.object_collision as object_collision_runtime
 from tilemap_parser.runtime.object_collision import (
     CollisionHit,
     ObjectCollisionManager,
@@ -257,6 +258,22 @@ class TestManagerAddRemove:
             assert "already" in str(w[0].message).lower()
         assert len(mgr.objects) == 1
 
+    def test_add_value_equal_distinct_objects(self):
+        class EqualObject(_DummyObject):
+            def __eq__(self, other):
+                return isinstance(other, EqualObject)
+
+        mgr = ObjectCollisionManager()
+        a = EqualObject(0, 0)
+        b = EqualObject(20, 0)
+
+        mgr.add_object(a)
+        mgr.add_object(b)
+
+        assert len(mgr.objects) == 2
+        assert mgr.objects[0] is a
+        assert mgr.objects[1] is b
+
     def test_remove_nonexistent_warns(self):
         mgr = ObjectCollisionManager()
         obj = _make_rect(0, 0, 10, 10)
@@ -267,8 +284,49 @@ class TestManagerAddRemove:
             assert issubclass(w[0].category, UserWarning)
             assert "not" in str(w[0].message).lower()
 
+    def test_remove_uses_identity_not_equality(self):
+        class EqualObject(_DummyObject):
+            def __eq__(self, other):
+                return isinstance(other, EqualObject)
+
+        mgr = ObjectCollisionManager()
+        a = EqualObject(0, 0)
+        b = EqualObject(20, 0)
+        mgr.add_object(a)
+        mgr.add_object(b)
+
+        mgr.remove_object(b)
+
+        assert len(mgr.objects) == 1
+        assert mgr.objects[0] is a
+
+    def test_construct_with_objects(self):
+        a = _make_rect(0, 0, 10, 10)
+        b = _make_rect(20, 0, 10, 10)
+
+        mgr = ObjectCollisionManager([a, b])
+
+        assert len(mgr) == 2
+        objects = list(mgr)
+        assert objects[0] is a
+        assert objects[1] is b
+        assert a in mgr
+        assert b in mgr
+
+    def test_clear(self):
+        mgr = ObjectCollisionManager([_make_rect(0, 0, 10, 10)])
+
+        mgr.clear()
+
+        assert len(mgr) == 0
+        assert mgr.objects == []
+
 
 class TestManagerCheckAll:
+    def test_invalid_cell_size_raises(self):
+        with pytest.raises(ValueError, match="cell_size"):
+            ObjectCollisionManager(cell_size=0)
+
     def test_no_duplicates(self):
         """Three overlapping circles — should produce exactly 3 pairs."""
         mgr = ObjectCollisionManager()
@@ -285,6 +343,56 @@ class TestManagerCheckAll:
         mgr = ObjectCollisionManager()
         mgr.add_object(_make_rect(0, 0, 10, 10))
         assert mgr.check_all_collisions() == []
+
+    def test_spatial_broadphase_skips_distant_pairs(self, monkeypatch):
+        mgr = ObjectCollisionManager(cell_size=16)
+        a = _make_rect(0, 0, 10, 10)
+        b = _make_rect(100, 0, 10, 10)
+        mgr.add_object(a)
+        mgr.add_object(b)
+        calls = []
+
+        def fake_check_collision(obj_a, obj_b):
+            calls.append((obj_a, obj_b))
+            return None
+
+        monkeypatch.setattr(
+            object_collision_runtime,
+            "check_collision",
+            fake_check_collision,
+        )
+
+        assert mgr.check_all_collisions() == []
+        assert calls == []
+
+    def test_large_object_spanning_cells_collides(self):
+        mgr = ObjectCollisionManager(cell_size=16)
+        large = _make_rect(0, 0, 64, 16)
+        small = _make_rect(48, 0, 8, 8)
+        mgr.add_object(large)
+        mgr.add_object(small)
+
+        hits = mgr.check_all_collisions()
+
+        assert len(hits) == 1
+        assert hits[0].object_a is large
+        assert hits[0].object_b is small
+
+    def test_moved_objects_are_reindexed_per_query(self):
+        mgr = ObjectCollisionManager(cell_size=16)
+        a = _make_rect(0, 0, 10, 10)
+        b = _make_rect(100, 0, 10, 10)
+        mgr.add_object(a)
+        mgr.add_object(b)
+
+        assert mgr.check_all_collisions() == []
+
+        b.x = 8
+        hits = mgr.check_all_collisions()
+
+        assert len(hits) == 1
+        assert hits[0].involves(a)
+        assert hits[0].involves(b)
 
 
 class TestManagerCheckObject:
@@ -315,6 +423,20 @@ class TestManagerCheckObject:
         mgr.add_object(b)
         hits = mgr.check_object(a)
         assert hits == []
+
+    def test_unmanaged_query_object(self):
+        mgr = ObjectCollisionManager(cell_size=16)
+        query = _make_rect(0, 0, 10, 10)
+        managed = _make_rect(8, 0, 10, 10)
+        far = _make_rect(100, 0, 10, 10)
+        mgr.add_object(managed)
+        mgr.add_object(far)
+
+        hits = mgr.check_object(query)
+
+        assert len(hits) == 1
+        assert hits[0].object_a is query
+        assert hits[0].object_b is managed
 
 
 # ---------------------------------------------------------------------------

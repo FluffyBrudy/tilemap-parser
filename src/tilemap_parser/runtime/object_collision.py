@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import List, Optional, Protocol, Union
+from math import floor, isfinite
+from typing import Dict, Iterable, Iterator, List, Optional, Protocol, Set, Tuple, Union
 
 from ..parser.collision import (
     CapsuleShape,
@@ -310,16 +311,47 @@ class ObjectCollisionManager:
         - All-vs-all and one-vs-all queries
         - Layer filtering
 
-    Note: This version uses brute-force O(n²) detection.
-          Spatial partitioning is deferred to other version.
+    Uses a uniform-grid spatial broadphase and exact shape narrowphase.
+    The grid is rebuilt for each query so moved objects are always indexed
+    at their current world positions.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        objects: Optional[Iterable[ICollidableObject]] = None,
+        *,
+        cell_size: float = 128.0,
+    ) -> None:
+        if not isfinite(cell_size) or cell_size <= 0:
+            raise ValueError("cell_size must be a finite positive number")
+
         self.objects: List[ICollidableObject] = []
+        self.cell_size = float(cell_size)
+        if objects is not None:
+            for obj in objects:
+                self.add_object(obj)
+
+    def __len__(self) -> int:
+        """Return the number of objects currently managed."""
+        return len(self.objects)
+
+    def __iter__(self) -> Iterator[ICollidableObject]:
+        """Iterate over managed objects in insertion order."""
+        return iter(self.objects)
+
+    def __contains__(self, obj: object) -> bool:
+        """Return True if the exact object instance is managed."""
+        return any(existing is obj for existing in self.objects)
+
+    def _find_object_index(self, obj: ICollidableObject) -> int:
+        for index, existing in enumerate(self.objects):
+            if existing is obj:
+                return index
+        return -1
 
     def add_object(self, obj: ICollidableObject) -> None:
         """Add an object to the collision system."""
-        if obj in self.objects:
+        if self._find_object_index(obj) != -1:
             warnings.warn(
                 f"Object {obj} is already in the collision manager, skipping.",
                 UserWarning,
@@ -330,27 +362,78 @@ class ObjectCollisionManager:
 
     def remove_object(self, obj: ICollidableObject) -> None:
         """Remove an object from the collision system."""
-        if obj not in self.objects:
+        index = self._find_object_index(obj)
+        if index == -1:
             warnings.warn(
                 f"Object {obj} is not in the collision manager, skipping.",
                 UserWarning,
                 stacklevel=2,
             )
             return
-        self.objects.remove(obj)
+        del self.objects[index]
+
+    def clear(self) -> None:
+        """Remove all objects from the collision system."""
+        self.objects.clear()
+
+    def _cells_for_aabb(
+        self,
+        aabb: tuple[float, float, float, float],
+    ) -> Iterator[Tuple[int, int]]:
+        left, top, right, bottom = aabb
+        min_cell_x = floor(left / self.cell_size)
+        max_cell_x = floor(right / self.cell_size)
+        min_cell_y = floor(top / self.cell_size)
+        max_cell_y = floor(bottom / self.cell_size)
+
+        for cell_y in range(min_cell_y, max_cell_y + 1):
+            for cell_x in range(min_cell_x, max_cell_x + 1):
+                yield (cell_x, cell_y)
+
+    def _object_aabb(
+        self,
+        obj: ICollidableObject,
+    ) -> tuple[float, float, float, float]:
+        return get_shape_aabb(obj.x, obj.y, obj.collision_shape)
+
+    def _build_spatial_index(
+        self,
+    ) -> tuple[Tuple[ICollidableObject, ...], Dict[Tuple[int, int], List[int]]]:
+        objects = tuple(self.objects)
+        grid: Dict[Tuple[int, int], List[int]] = {}
+
+        for index, obj in enumerate(objects):
+            for cell in self._cells_for_aabb(self._object_aabb(obj)):
+                grid.setdefault(cell, []).append(index)
+
+        return objects, grid
+
+    def _candidate_indices(
+        self,
+        obj: ICollidableObject,
+        grid: Dict[Tuple[int, int], List[int]],
+    ) -> Set[int]:
+        candidates: Set[int] = set()
+        for cell in self._cells_for_aabb(self._object_aabb(obj)):
+            candidates.update(grid.get(cell, ()))
+        return candidates
 
     def check_all_collisions(self) -> List[CollisionHit]:
         """
-        Check every unique pair (brute-force).
+        Check every potentially colliding pair.
 
         Returns a list of CollisionHit for all colliding pairs.
         Each pair appears at most once (i, j) with j > i.
         """
+        objects, grid = self._build_spatial_index()
         hits: List[CollisionHit] = []
-        n = len(self.objects)
-        for i in range(n):
-            for j in range(i + 1, n):
-                hit = check_collision(self.objects[i], self.objects[j])
+
+        for i, obj in enumerate(objects):
+            candidate_indices = self._candidate_indices(obj, grid)
+            for j in sorted(candidate_indices):
+                if j <= i:
+                    continue
+                hit = check_collision(objects[i], objects[j])
                 if hit is not None:
                     hits.append(hit)
         return hits
@@ -359,10 +442,13 @@ class ObjectCollisionManager:
         """
         Check one object against all others.
 
-        Skips comparison with itself.
+        The queried object does not need to be managed. If it is managed,
+        comparison with itself is skipped by identity.
         """
+        objects, grid = self._build_spatial_index()
         hits: List[CollisionHit] = []
-        for other in self.objects:
+        for index in sorted(self._candidate_indices(obj, grid)):
+            other = objects[index]
             if other is obj:
                 continue
             hit = check_collision(obj, other)
