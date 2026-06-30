@@ -39,14 +39,6 @@ def _make_map_json(tileset_path: str, data_dir: Path) -> Path:
     return map_path
 
 
-@pytest.fixture(autouse=True)
-def pygame_init():
-    pygame.display.init()
-    pygame.display.set_mode((1, 1))
-    yield
-    pygame.quit()
-
-
 @pytest.fixture
 def tmp_project():
     with tempfile.TemporaryDirectory() as tmp:

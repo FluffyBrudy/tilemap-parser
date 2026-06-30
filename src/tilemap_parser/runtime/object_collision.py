@@ -224,9 +224,7 @@ def check_collision(
                 depth=result.depth,
             )
 
-    # ------------------------------------------------------------------
     # Capsule pairs
-    # ------------------------------------------------------------------
     elif isinstance(shape_a, CapsuleShape) and isinstance(shape_b, CapsuleShape):
         p1 = (obj_a.x + shape_a.offset[0], obj_a.y + shape_a.offset[1])
         p2 = (p1[0], p1[1] + shape_a.height)
@@ -455,3 +453,23 @@ class ObjectCollisionManager:
             if hit is not None:
                 hits.append(hit)
         return hits
+
+    def check_object_first(self, obj: ICollidableObject) -> Optional[CollisionHit]:
+        """
+        Check one object against all others and return the first collision hit.
+
+        The queried object does not need to be managed. If it is managed,
+        comparison with itself is skipped by identity.
+
+        Candidate iteration follows insertion order among the spatially relevant
+        managed objects.
+        """
+        objects, grid = self._build_spatial_index()
+        for index in sorted(self._candidate_indices(obj, grid)):
+            other = objects[index]
+            if other is obj:
+                continue
+            hit = check_collision(obj, other)
+            if hit is not None:
+                return hit
+        return None

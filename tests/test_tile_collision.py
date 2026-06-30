@@ -142,9 +142,9 @@ class TestShapeBounds:
         sprite = MockSprite(x=100, y=200, shape=CapsuleShape(radius=8, height=48, offset=(0, 0)))
         left, top, right, bottom = get_shape_bounds(sprite)
         assert left == 92
-        assert top == 200
+        assert top == 192
         assert right == 108
-        assert bottom == 264
+        assert bottom == 256
 
 
 # ===========================================================================
