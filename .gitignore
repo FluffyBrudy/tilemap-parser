@@ -1,5 +1,4 @@
 benchmarks/
-examples/fixtures/
 
 __pycache__/
 *.py[cod]

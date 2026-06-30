@@ -1,0 +1,36 @@
+{
+  "tileset_name": "Terrain (32x32)",
+  "tile_size": [32, 32],
+  "tiles": {
+    "8": {
+      "tile_id": 8,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [[0.0, 16.0], [32.0, 16.0], [32.0, 32.0], [0.0, 32.0]],
+          "one_way": true
+        }
+      ]
+    },
+    "26": {
+      "tile_id": 26,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [[0.0, 0.0], [32.0, 0.0], [32.0, 32.0], [0.0, 32.0]],
+          "one_way": false
+        }
+      ]
+    },
+    "27": {
+      "tile_id": 27,
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [[0.0, 0.0], [32.0, 0.0], [32.0, 32.0], [0.0, 32.0]],
+          "one_way": false
+        }
+      ]
+    }
+  }
+}

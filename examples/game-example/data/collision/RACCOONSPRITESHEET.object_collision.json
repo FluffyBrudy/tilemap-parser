@@ -1,0 +1,18 @@
+{
+  "tileset_name": "RACCOONSPRITESHEET",
+  "regions": {
+    "body": {
+      "region_id": "body",
+      "region_rect": [0, 0, 32, 32],
+      "name": "Body",
+      "shapes": [
+        {
+          "type": "polygon",
+          "vertices": [[0.0, 0.0], [32.0, 0.0], [32.0, 32.0], [0.0, 32.0]],
+          "one_way": false
+        }
+      ],
+      "properties": {}
+    }
+  }
+}

@@ -8,31 +8,32 @@ Covers:
 - ObjectCollisionManager (add/remove, queries, duplicates, warnings)
 """
 
-import warnings
-import pytest
-from pathlib import Path
 import sys
+import warnings
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import tilemap_parser.runtime.object_collision as object_collision_runtime
 from tilemap_parser.parser.collision import (
     CapsuleShape,
     CircleShape,
     CollisionPolygon,
     RectangleShape,
 )
-import tilemap_parser.runtime.object_collision as object_collision_runtime
 from tilemap_parser.runtime.object_collision import (
     CollisionHit,
     ObjectCollisionManager,
-    should_collide,
     check_collision,
+    should_collide,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — concrete objects implementing ICollidableObject
 # ---------------------------------------------------------------------------
+
 
 class _DummyObject:
     """Minimal collidable object for tests."""
@@ -68,6 +69,7 @@ def _make_poly(x, y, vertices, collision_layer=1, collision_mask=0xFFFFFFFF):
 # should_collide
 # ---------------------------------------------------------------------------
 
+
 class TestShouldCollide:
     def test_default_layers_collide(self):
         a = _make_rect(0, 0, 10, 10)
@@ -94,12 +96,14 @@ class TestShouldCollide:
             x = 0.0
             y = 0.0
             collision_shape = RectangleShape(width=10, height=10)
+
         assert should_collide(BareObject(), BareObject()) is True
 
 
 # ---------------------------------------------------------------------------
 # check_collision
 # ---------------------------------------------------------------------------
+
 
 class TestCheckCollisionCircleCircle:
     def test_colliding(self):
@@ -236,6 +240,7 @@ class TestCheckCollisionPolygon:
 # ---------------------------------------------------------------------------
 # ObjectCollisionManager
 # ---------------------------------------------------------------------------
+
 
 class TestManagerAddRemove:
     def test_add_and_remove(self):
@@ -439,9 +444,43 @@ class TestManagerCheckObject:
         assert hits[0].object_b is managed
 
 
+class TestManagerCheckObjectFirst:
+    def test_returns_first_hit(self):
+        mgr = ObjectCollisionManager()
+        query = _make_circle(0, 0, 10)
+        first = _make_circle(15, 0, 10)
+        second = _make_circle(18, 0, 10)
+        far = _make_circle(100, 0, 10)
+        mgr.add_object(first)
+        mgr.add_object(second)
+        mgr.add_object(far)
+
+        hit = mgr.check_object_first(query)
+
+        assert hit is not None
+        assert hit.object_a is query
+        assert hit.object_b is first
+
+    def test_returns_none_when_no_hit(self):
+        mgr = ObjectCollisionManager()
+        query = _make_rect(0, 0, 10, 10)
+        far = _make_rect(100, 0, 10, 10)
+        mgr.add_object(far)
+
+        assert mgr.check_object_first(query) is None
+
+    def test_skips_self(self):
+        mgr = ObjectCollisionManager()
+        obj = _make_rect(0, 0, 10, 10)
+        mgr.add_object(obj)
+
+        assert mgr.check_object_first(obj) is None
+
+
 # ---------------------------------------------------------------------------
 # CollisionHit helpers
 # ---------------------------------------------------------------------------
+
 
 class TestCollisionHitHelpers:
     def test_resolve_separates(self):
@@ -486,8 +525,10 @@ class TestCollisionHitHelpers:
     def test_slide_head_on(self):
         """Directly into surface → zero tangential motion."""
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=(1.0, 0.0), depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=(1.0, 0.0),
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(10.0, 0.0)
         assert sx == 0.0
@@ -496,8 +537,10 @@ class TestCollisionHitHelpers:
     def test_slide_angled(self):
         """Diagonal into surface → only perpendicular component removed."""
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=(1.0, 0.0), depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=(1.0, 0.0),
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(10.0, 5.0)
         assert sx == 0.0  # x component fully removed
@@ -506,8 +549,10 @@ class TestCollisionHitHelpers:
     def test_slide_parallel(self):
         """Velocity along the surface → unchanged."""
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=(0.0, 1.0), depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=(0.0, 1.0),
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(10.0, 0.0)
         assert sx == 10.0
@@ -516,8 +561,10 @@ class TestCollisionHitHelpers:
     def test_slide_away(self):
         """Velocity pointing away from surface → unchanged."""
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=(1.0, 0.0), depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=(1.0, 0.0),
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(-10.0, 0.0)
         assert sx == -10.0
@@ -526,8 +573,10 @@ class TestCollisionHitHelpers:
     def test_slide_zero(self):
         """Zero velocity → zero."""
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=(1.0, 0.0), depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=(1.0, 0.0),
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(0.0, 0.0)
         assert sx == 0.0
@@ -536,10 +585,13 @@ class TestCollisionHitHelpers:
     def test_slide_diagonal_normal(self):
         """Normal at 45°, velocity into surface → slide along surface."""
         import math
+
         n = (1.0 / math.sqrt(2), 1.0 / math.sqrt(2))
         hit = CollisionHit(
-            object_a=None, object_b=None,
-            normal=n, depth=5.0,
+            object_a=None,
+            object_b=None,
+            normal=n,
+            depth=5.0,
         )
         sx, sy = hit.slide_velocity(1.0, 0.0)
         # Dot = 1/sqrt(2) ≈ 0.707
@@ -552,6 +604,7 @@ class TestCollisionHitHelpers:
 # Capsule collision
 # ---------------------------------------------------------------------------
 
+
 def _make_capsule(
     x: float = 0.0,
     y: float = 0.0,
@@ -563,7 +616,8 @@ def _make_capsule(
     collision_mask: int = 0xFFFFFFFF,
 ) -> _DummyObject:
     return _DummyObject(
-        x=x, y=y,
+        x=x,
+        y=y,
         shape=CapsuleShape(radius=radius, height=height, offset=(ox, oy)),
         collision_layer=collision_layer,
         collision_mask=collision_mask,
