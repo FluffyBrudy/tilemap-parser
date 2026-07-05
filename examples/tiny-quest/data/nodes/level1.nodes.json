@@ -76,17 +76,17 @@
       "name": "snow",
       "node_type": "particle_emitter",
       "area": {
-        "x": -23,
-        "y": 722,
-        "w": 800,
+        "x": 6,
+        "y": 643,
+        "w": 250,
         "h": 50
       },
       "layer_name": "Layer 1",
       "properties": {
         "emission_shape": "rect",
         "particle_shape": "circle",
-        "particle_size_min": 4.63,
-        "particle_size_max": 8.94,
+        "particle_size_min": 1,
+        "particle_size_max": 2,
         "spawn_rate": 20,
         "max_particles": 120,
         "lifetime_min": 4.02,
@@ -109,6 +109,47 @@
         "end_scale": 0.9,
         "rotation_speed": 20,
         "alpha_fade": "fade_out"
+      },
+      "group": null
+    },
+    {
+      "node_id": "c6b9d272-267e-4fec-8424-3dfe53f7e892",
+      "name": "starysky",
+      "node_type": "particle_emitter",
+      "area": {
+        "x": -6,
+        "y": 514,
+        "w": 250,
+        "h": 44
+      },
+      "layer_name": "Layer 1",
+      "properties": {
+        "emission_shape": "rect",
+        "particle_shape": "star",
+        "particle_size_min": 1,
+        "particle_size_max": 2.06,
+        "spawn_rate": 3,
+        "max_particles": 40,
+        "lifetime_min": 3.0,
+        "lifetime_max": 6.0,
+        "speed_min": 2,
+        "speed_max": 8,
+        "direction": -1,
+        "spread": 360,
+        "gravity_x": 0,
+        "gravity_y": 0,
+        "start_color_r": 255,
+        "start_color_g": 255,
+        "start_color_b": 255,
+        "start_color_a": 200,
+        "end_color_r": 200,
+        "end_color_g": 200,
+        "end_color_b": 255,
+        "end_color_a": 30,
+        "start_scale": 0.97,
+        "end_scale": 0.3,
+        "rotation_speed": 20,
+        "alpha_fade": "fade_both"
       },
       "group": null
     }

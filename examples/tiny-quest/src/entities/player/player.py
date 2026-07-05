@@ -5,6 +5,7 @@ from tilemap_parser import CollisionHit, ICollidableSprite, get_shape_aabb
 from tilemap_parser.runtime.collision_cache import _global_cache
 
 from src.settings import *
+from src.utils.pgdebug import pgdebug
 from src.utils.shape import get_sprite_center
 
 from ..entity import Entity
@@ -60,6 +61,7 @@ class Player(Entity, ICollidableSprite):
         Bullet.add_bullet(Bullet(bullet_x, bullet_y, (300 + abs(self.vx)) * direction))
 
     def update(self, dt: float):
+        pgdebug(f"{self.current_state.name}, is_hit={self.is_hitted}")
         self.handle_input()
         super().update(dt)
 

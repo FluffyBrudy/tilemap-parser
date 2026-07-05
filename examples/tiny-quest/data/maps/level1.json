@@ -2,8 +2,8 @@
   "meta": {
     "tile_size": "8;8",
     "map_size": "32;20",
-    "zoom_level": 0.799999999999999,
-    "scroll": "313;313.74999999999886",
+    "zoom_level": 0.4999999999999991,
+    "scroll": "0;0",
     "initial_map_size": "30;20",
     "render_scale": 8.0,
     "version": "1.1"

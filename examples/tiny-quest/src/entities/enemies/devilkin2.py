@@ -132,7 +132,8 @@ class DevilkinRunFsm(BaseFsm):
         dy = tcy - ecy
         length = (dx * dx + dy * dy) ** 0.5
 
-        if length <= entity.attack_range:
+        attackable = not getattr(target, "is_hitted", False)
+        if length <= entity.attack_range and attackable:
             return "attack"
         if length > CHASE_RANGE * 1.5:
             return "idle"

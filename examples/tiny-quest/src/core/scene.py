@@ -1,17 +1,6 @@
 from typing import Optional, cast
 
 from pygame import Rect
-from src.effects import CircleTransition, TransitionState
-from src.entities import Bullet, Player
-from src.entities.collision.resolver import resolve_player_enemy_hit
-from src.entities.enemies.arial import EyeFire, MutatedBat
-from src.entities.enemies.base import EnemyManager
-from src.entities.enemies.devilkin2 import Devilkin2
-from src.entities.tilemap import Tilemap
-from src.settings import *
-from src.utils.pgdebug import Debug, pgdebug
-from src.world_context import world_context
-
 from tilemap_parser import (
     Camera,
     CollisionRunner,
@@ -24,6 +13,17 @@ from tilemap_parser import (
 )
 from tilemap_parser.runtime.collision_cache import _global_cache
 
+from src.effects import CircleTransition, TransitionState
+from src.entities import Bullet, Player
+from src.entities.collision.resolver import resolve_player_enemy_hit
+from src.entities.enemies.arial import EyeFire, MutatedBat
+from src.entities.enemies.base import EnemyManager
+from src.entities.enemies.devilkin2 import Devilkin2
+from src.entities.tilemap import Tilemap
+from src.settings import *
+from src.utils.pgdebug import Debug, pgdebug
+from src.world_context import world_context
+
 
 class LevelScene:
     __slots__ = (
@@ -35,6 +35,7 @@ class LevelScene:
         "enemy_manager",
         "bullet_effect",
         "snow",
+        "star",
         "camera",
         "level_name",
         "exit_rect",
@@ -78,8 +79,14 @@ class LevelScene:
         self.snow = ParticleSystem(
             next(pn for pn in mapdata.particle_emitters if pn.name == "snow").config,
         )
+        self.star = ParticleSystem(
+            next(pn for pn in mapdata.particle_emitters if pn.name == "starysky").config,
+        )
         self.player = Player(node.rect.centerx * rs, node.rect.top * rs)
         self.tilemap = Tilemap(mapdata, self.collision_tileset)
+
+        self.snow.config.apply_render_scale(self.tilemap.render_scale)
+        self.star.config.apply_render_scale(self.tilemap.render_scale)
 
         world_context.player = self.player
 
@@ -92,7 +99,7 @@ class LevelScene:
         m.set_target(self.player)
         self.enemy_manager.add(m)
 
-        d = Devilkin2(700, 700)
+        d = Devilkin2(900, 0)
         d.set_target(self.player)
         self.enemy_manager.add(d)
 
@@ -134,6 +141,8 @@ class LevelScene:
             enemy = hit.other(self.player)
             if isinstance(enemy, MutatedBat) and enemy.current_state.name == "explode":
                 self.camera.shake(0.5, 8.0)
+            if isinstance(enemy, Devilkin2) and enemy.current_state.name == "attack":
+                self.camera.shake(0.5, 8)
 
     def _handle_bullet_enemy_collision(self):
         for enemy in self.enemy_manager.get_enemies():
@@ -189,6 +198,7 @@ class LevelScene:
             self.camera.follow(self.player)
             self.camera.update(dt)
             self.snow.update(dt, self.camera.x, self.camera.y + HEIGHT // 4, WIDTH, HEIGHT // 2)
+            self.star.update(dt, self.camera.x, self.camera.y + HEIGHT // 6, WIDTH, HEIGHT // 2)
 
             if self.exit_rect is not None:
                 px, py, pw, ph = get_shape_aabb(
@@ -217,6 +227,7 @@ class LevelScene:
         camera_offset = self.camera.offset
         self.tile_renderer.render(screen, camera_offset)
         self.snow.draw(screen, self.camera.x, self.camera.y, 1.0)
+        self.star.draw(screen, self.camera.x, self.camera.y, 1.0)
         self.bullet_effect.draw(screen, self.camera.x, self.camera.y, 1.0)
         Bullet.render(screen, camera_offset)
         self.player.render(screen, camera_offset)
