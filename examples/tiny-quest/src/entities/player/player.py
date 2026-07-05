@@ -7,6 +7,7 @@ from tilemap_parser.runtime.collision_cache import _global_cache
 from src.settings import *
 from src.utils.pgdebug import pgdebug
 from src.utils.shape import get_sprite_center
+from src.utils.soundmanager import soundmanager
 
 from ..entity import Entity
 from ..fsm import BaseFsm
@@ -56,6 +57,7 @@ class Player(Entity, ICollidableSprite):
             self.input_x = 0
 
     def shoot_bullet(self):
+        soundmanager.play("player_shoot", "sfx")
         bullet_x, bullet_y = get_sprite_center(self)
         direction = -1 if self.flipped else 1
         Bullet.add_bullet(Bullet(bullet_x, bullet_y, (300 + abs(self.vx)) * direction))
@@ -67,6 +69,8 @@ class Player(Entity, ICollidableSprite):
 
     def render(self, surface: pygame.Surface, offset: Tuple[float | int, float | int]):
         Bullet.render(surface, offset)
+        if self.is_hitted and (pygame.time.get_ticks() // 80) % 2 == 0:
+            return
         return super().render(surface, offset)
 
 
@@ -97,6 +101,7 @@ class RunFsm(BaseFsm):
 class JumpFsm(BaseFsm):
     def enter(self, entity: Player) -> None:
         entity.jump_pressed = False
+        soundmanager.play("player_jump", "sfx")
 
     def get_next_state(self, entity: Player) -> str | None:
         if entity.is_hitted:
@@ -118,8 +123,11 @@ class HurtFsm(BaseFsm):
         self.cooldown_reached = False
 
         if entity.hit_result is not None:
-            dx, dy = entity.hit_result.normal
-            entity.velocity_override = -dx * SPEED_NORMAL, dy
+            enemy = entity.hit_result.other(entity)
+            ecx, _ = get_sprite_center(enemy)
+            pcx, _ = get_sprite_center(entity)
+            direction = 1 if pcx > ecx else -1
+            entity.velocity_override = direction * SPEED_NORMAL, -SPEED_LOW
 
     def get_next_state(self, entity: Player, /) -> str | None:
         if not self.cooldown_reached:

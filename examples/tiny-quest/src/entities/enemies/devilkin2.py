@@ -42,17 +42,21 @@ class Devilkin2(Entity):
         self.hit_flag = False
         self.invulnerable_timer = 0.0
         self.on_ground = False
+        self.detection_range = CHASE_RANGE
 
     def set_target(self, entity: Entity) -> None:
         self.target = entity
 
-    def take_damage(self, amount: int = 1) -> None:
+    def take_damage(self, amount: int = 1) -> bool:
         if self.invulnerable_timer > 0:
-            return
+            return False
         self.hp -= amount
         self.hit_flag = True
+        return True
 
     def can_kill(self) -> bool:
+        if self.hp <= 0:
+            return True
         return self.current_state.name == "death" and self.animation_states["death"].finished
 
     def make_states(self, mover_cfg: EnemyTargetMoverConfig) -> dict[str, BaseFsm]:
@@ -100,7 +104,7 @@ class DevilkinIdleFsm(BaseFsm):
         dy = tcy - ecy
         length = (dx * dx + dy * dy) ** 0.5
 
-        if length <= CHASE_RANGE:
+        if length <= entity.detection_range:
             return "run"
         return None
 
@@ -115,7 +119,8 @@ class DevilkinRunFsm(BaseFsm):
 
     def update(self, entity: Devilkin2, /) -> None:
         target = entity.target
-        if target is None:
+        if target is None or getattr(target, "is_hitted", False):
+            entity.vx = 0
             return
         vx, _vy, _length = velocity_toward_target(entity, target, config=self.mover_cfg)
         entity.vx = vx
@@ -126,14 +131,16 @@ class DevilkinRunFsm(BaseFsm):
         if target is None:
             return "idle"
 
+        if getattr(target, "is_hitted", False):
+            return None
+
         ecx, ecy = get_sprite_center(entity)
         tcx, tcy = get_sprite_center(target)
         dx = tcx - ecx
         dy = tcy - ecy
         length = (dx * dx + dy * dy) ** 0.5
 
-        attackable = not getattr(target, "is_hitted", False)
-        if length <= entity.attack_range and attackable:
+        if length <= entity.attack_range:
             return "attack"
         if length > CHASE_RANGE * 1.5:
             return "idle"

@@ -38,9 +38,16 @@ class ArialEnemyBase(Entity):
         self.current_state = self.states[self.initial_state]
         self.spawn_coor = get_sprite_center(self)[:2]
         self.target: Optional[Entity] = None
+        self.hp = 2
+        self.hit_flag = False
+        self.detection_range = CHASE_RANGE
 
     def can_kill(self) -> bool:
-        return False
+        return self.hp <= 0
+
+    def take_damage(self, amount: int = 1) -> None:
+        self.hp -= amount
+        self.hit_flag = True
 
     def make_states(self, mover_cfg: EnemyTargetMoverConfig) -> dict[str, BaseFsm]:
         raise NotImplementedError
@@ -51,6 +58,7 @@ class ArialEnemyBase(Entity):
     def update(self, dt: float):
         self.x += self.vx * dt
         self.y += self.vy * dt
+        self.hit_flag = False
         return super().update(dt)
 
 
@@ -68,7 +76,7 @@ class EyeFire(ArialEnemyBase):
         }
 
     def can_kill(self) -> bool:
-        return super().can_kill()
+        return self.hp <= 0 or super().can_kill()
 
 
 class MutatedBat(ArialEnemyBase):
@@ -92,6 +100,8 @@ class MutatedBat(ArialEnemyBase):
         }
 
     def can_kill(self) -> bool:
+        if self.hp <= 0:
+            return True
         current_name = self.current_state.name
         return current_name == "explode" and self.animation_states[current_name].finished
 
@@ -123,7 +133,9 @@ class ArialFollowTargetFsm(BaseFsm):
 
     def update(self, entity: "EyeFire", /) -> None:
         target = entity.target
-        if target is None:
+        if target is None or getattr(target, "is_hitted", False):
+            entity.vx = 0
+            entity.vy = 0
             return
 
         vx, vy, _length = velocity_toward_target(entity, target, config=self.mover_cfg)
@@ -135,7 +147,7 @@ class ArialFollowTargetFsm(BaseFsm):
 class EyeFireIdleFsm(ArialNoActionFsm):
     def get_next_state(self, entity: "EyeFire", /) -> str | None:
         target = entity.target
-        if target is None:
+        if target is None or getattr(target, "is_hitted", False):
             return None
 
         ecx, ecy = get_sprite_center(entity)
@@ -144,7 +156,7 @@ class EyeFireIdleFsm(ArialNoActionFsm):
         dy = tcy - ecy
         length = (dx * dx + dy * dy) ** 0.5
 
-        if length <= CHASE_RANGE:
+        if length <= entity.detection_range:
             return "chase"
         return None
 
@@ -169,7 +181,7 @@ class EyeFireChaseFsm(ArialFollowTargetFsm):
 class MutatedBatIdleFsm(ArialNoActionFsm):
     def get_next_state(self, entity: "EyeFire", /) -> str | None:
         target = entity.target
-        if target is None:
+        if target is None or getattr(target, "is_hitted", False):
             return None
 
         ecx, ecy = get_sprite_center(entity)
@@ -178,7 +190,7 @@ class MutatedBatIdleFsm(ArialNoActionFsm):
         dy = tcy - ecy
         length = (dx * dx + dy * dy) ** 0.5
 
-        if length <= CHASE_RANGE:
+        if length <= entity.detection_range:
             return "chase"
         return None
 
@@ -198,7 +210,9 @@ class MutatedBatChaseFsm(ArialFollowTargetFsm):
         pgdebug(f"{entity.current_state.name}")
         if length > CHASE_RANGE:
             return "flyidle"
-        elif length <= 2 * entity.explode_radius:
+        if getattr(target, "is_hitted", False):
+            return None
+        if length <= 2 * entity.explode_radius:
             return "explode"
 
         return None

@@ -152,6 +152,47 @@
         "alpha_fade": "fade_both"
       },
       "group": null
+    },
+    {
+      "node_id": "ad66a41b-5e06-44c6-8777-ab3797d97d8f",
+      "name": "blood",
+      "node_type": "particle_emitter",
+      "area": {
+        "x": 1108,
+        "y": 741,
+        "w": 64,
+        "h": 64
+      },
+      "layer_name": "Layer 1",
+      "properties": {
+        "emission_shape": "point",
+        "particle_shape": "circle",
+        "particle_size_min": 1,
+        "particle_size_max": 3,
+        "spawn_rate": 80,
+        "max_particles": 100,
+        "lifetime_min": 1.5,
+        "lifetime_max": 4.0,
+        "speed_min": 60,
+        "speed_max": 180,
+        "direction": -1,
+        "spread": 360,
+        "gravity_x": 0,
+        "gravity_y": 60,
+        "start_color_r": 180,
+        "start_color_g": 10,
+        "start_color_b": 10,
+        "start_color_a": 255,
+        "end_color_r": 120,
+        "end_color_g": 5,
+        "end_color_b": 5,
+        "end_color_a": 50,
+        "start_scale": 1.0,
+        "end_scale": 0.5,
+        "rotation_speed": 20,
+        "alpha_fade": "fade_out"
+      },
+      "group": null
     }
   ]
 }

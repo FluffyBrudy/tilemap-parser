@@ -25,6 +25,7 @@ class Game:
                 if event.key == pygame.K_SPACE:
                     if self.scene.player:
                         self.scene.player.shoot_bullet()
+
                 elif event.key == pygame.K_1:
                     self.scene.emit_bullet_burst()
 

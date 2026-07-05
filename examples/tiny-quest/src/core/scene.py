@@ -22,6 +22,8 @@ from src.entities.enemies.devilkin2 import Devilkin2
 from src.entities.tilemap import Tilemap
 from src.settings import *
 from src.utils.pgdebug import Debug, pgdebug
+from src.utils.shape import get_sprite_center
+from src.utils.soundmanager import SoundManager
 from src.world_context import world_context
 
 
@@ -34,9 +36,11 @@ class LevelScene:
         "tilemap",
         "enemy_manager",
         "bullet_effect",
+        "blood_effect",
         "snow",
         "star",
         "camera",
+        "soundmanager",
         "level_name",
         "exit_rect",
         "transition",
@@ -70,12 +74,21 @@ class LevelScene:
 
         node = mapdata.area_nodes[0]
         rs = mapdata.render_scale
+
         bullet_cfg = next(pn for pn in mapdata.particle_emitters if pn.name == "bulletEffect").config
         bullet_cfg.apply_render_scale(rs)
         self.bullet_effect = ParticleSystem(bullet_cfg)
         self.bullet_effect.config.spawn_rate = 0
         self.bullet_effect.config.direction = -1
         self.bullet_effect.emitter.clear()
+
+        blood_cfg = next(pn for pn in mapdata.particle_emitters if pn.name == "blood").config
+        blood_cfg.apply_render_scale(rs)
+        self.blood_effect = ParticleSystem(blood_cfg)
+        self.blood_effect.config.spawn_rate = 0
+        self.blood_effect.config.direction = -1
+        self.blood_effect.emitter.clear()
+
         self.snow = ParticleSystem(
             next(pn for pn in mapdata.particle_emitters if pn.name == "snow").config,
         )
@@ -88,24 +101,18 @@ class LevelScene:
         self.snow.config.apply_render_scale(self.tilemap.render_scale)
         self.star.config.apply_render_scale(self.tilemap.render_scale)
 
+        self.soundmanager = SoundManager()
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "Shoot.wav", "player_shoot", "sfx")
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "Hit.wav", "player_hit", "sfx")
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "enemy_death.wav", "enemy_death", "sfx")
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "Jump.wav", "player_jump", "sfx")
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "Nextlevel.wav", "next_level", "main")
+        self.soundmanager.add_sound(ASSETS_PATH / "sounds" / "Powerup.wav", "powerup", "sfx")
+
         world_context.player = self.player
 
         self.enemy_manager = EnemyManager()
-        e = EyeFire(400, 400)
-        e.set_target(self.player)
-        self.enemy_manager.add(e)
-
-        m = MutatedBat(800, 1000)
-        m.set_target(self.player)
-        self.enemy_manager.add(m)
-
-        d = Devilkin2(900, 0)
-        d.set_target(self.player)
-        self.enemy_manager.add(d)
-
-        d2 = Devilkin2(1100, 800)
-        d2.set_target(self.player)
-        self.enemy_manager.add(d2)
+        self._spawn_enemies()
 
         self.camera = Camera(WIDTH, HEIGHT, mode="deadzone")
         self.camera.lerp_speed = 1
@@ -114,6 +121,19 @@ class LevelScene:
         self.transition.start_open()
 
         self.exit_rect = self._find_exit_rect(mapdata, rs)
+
+    def _spawn_enemies(self):
+        s = EnemyManager.spawn
+        t = self.player
+        s(EyeFire, 400, 400, t)
+        s(MutatedBat, 800, 1000, t)
+        s(MutatedBat, 600, 600, t)
+        s(MutatedBat, 1400, 500, t)
+        s(Devilkin2, 1100, 0, t)
+        s(Devilkin2, 100, 300, t)
+        s(Devilkin2, 1500, 0, t)
+        s(Devilkin2, 100, 800, t)
+        s(EyeFire, 1000, 300, t)
 
     def _find_exit_rect(self, mapdata, rs: float) -> Optional[Rect]:
         for an in mapdata.area_nodes:
@@ -138,21 +158,45 @@ class LevelScene:
         hit = self.enemy_manager.manager.check_object_first(self.player)
         if hit is not None:
             resolve_player_enemy_hit(self.player, hit)
+            if self.player.is_hitted:
+                self.soundmanager.play("player_hit", "sfx")
+                self.camera.shake(0.3, 6.0)
             enemy = hit.other(self.player)
             if isinstance(enemy, MutatedBat) and enemy.current_state.name == "explode":
                 self.camera.shake(0.5, 8.0)
+                l, t, r, b = get_shape_aabb(enemy.x, enemy.y, enemy.collision_shape)
+                self.blood_effect.emit_burst(60, (l + r) * 0.5, (t + b) * 0.5, 1, 1)
             if isinstance(enemy, Devilkin2) and enemy.current_state.name == "attack":
                 self.camera.shake(0.5, 8)
 
     def _handle_bullet_enemy_collision(self):
         for enemy in self.enemy_manager.get_enemies():
-            if not isinstance(enemy, Devilkin2):
-                continue
             bullets_to_remove = set()
             for bullet in Bullet.bullet_group:
-                if check_collision(bullet, enemy):
-                    bullets_to_remove.add(bullet)
+                if not check_collision(bullet, enemy):
+                    continue
+                if isinstance(enemy, Devilkin2) and not enemy.take_damage(1):
+                    continue
+                bullets_to_remove.add(bullet)
+                cx, cy = get_sprite_center(enemy)
+                if isinstance(enemy, Devilkin2):
+                    self.blood_effect.emit_burst(6, cx, cy, 1, 1)
+                    if enemy.hp <= 0:
+                        self.blood_effect.emit_burst(100, cx, cy, 1, 1)
+                        self.soundmanager.play("enemy_death", "sfx")
+                elif isinstance(enemy, MutatedBat):
                     enemy.take_damage(1)
+                    self.blood_effect.emit_burst(6, cx, cy, 1, 1)
+                    if enemy.hp <= 0:
+                        self.blood_effect.emit_burst(80, cx, cy, 1, 1)
+                        self.soundmanager.play("enemy_death", "sfx")
+                elif isinstance(enemy, EyeFire):
+                    enemy.take_damage(1)
+                    self.blood_effect.emit_burst(4, cx, cy, 1, 1)
+                    if enemy.hp <= 0:
+                        self.blood_effect.emit_burst(60, cx, cy, 1, 1)
+                        self.soundmanager.play("enemy_death", "sfx")
+
             Bullet.bullet_group -= bullets_to_remove
 
     def _update_ground_enemy_physics(self, dt: float) -> None:
@@ -194,6 +238,7 @@ class LevelScene:
             self.enemy_manager.update(dt)
             self._update_ground_enemy_physics(dt)
             self.bullet_effect.update(dt, 0, 0, 0, 0)
+            self.blood_effect.update(dt, 0, 0, 0, 0)
 
             self.camera.follow(self.player)
             self.camera.update(dt)
@@ -201,15 +246,12 @@ class LevelScene:
             self.star.update(dt, self.camera.x, self.camera.y + HEIGHT // 6, WIDTH, HEIGHT // 2)
 
             if self.exit_rect is not None:
-                px, py, pw, ph = get_shape_aabb(
-                    self.player.x,
-                    self.player.y,
-                    self.player.collision_shape,
-                )
-                if self.exit_rect.colliderect(px, py, pw, ph):
+                pcx, pcy = get_sprite_center(self.player)
+                if self.exit_rect.collidepoint(pcx, pcy):
                     self.exit_reached = True
-                    cx = int((px + pw * 0.5) - self.camera.x)
-                    cy = int((py + ph * 0.5) - self.camera.y)
+                    self.soundmanager.play("next_level", "main")
+                    cx = int(pcx - self.camera.x)
+                    cy = int(pcy - self.camera.y)
                     self.transition.start_close(
                         center_x=cx,
                         center_y=cy,
@@ -229,9 +271,10 @@ class LevelScene:
         self.snow.draw(screen, self.camera.x, self.camera.y, 1.0)
         self.star.draw(screen, self.camera.x, self.camera.y, 1.0)
         self.bullet_effect.draw(screen, self.camera.x, self.camera.y, 1.0)
+        self.blood_effect.draw(screen, self.camera.x, self.camera.y, 1.0)
         Bullet.render(screen, camera_offset)
         self.player.render(screen, camera_offset)
-        EnemyManager.render(screen, camera_offset)
+        EnemyManager.render(screen, camera_offset, (self.player.x, self.player.y))
         self.transition.draw(screen)
         Debug.draw_all(screen)
 
