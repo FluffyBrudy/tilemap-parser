@@ -95,7 +95,7 @@ class LevelScene:
         self.star = ParticleSystem(
             next(pn for pn in mapdata.particle_emitters if pn.name == "starysky").config,
         )
-        self.player = Player(node.rect.centerx * rs, node.rect.top * rs)
+        self.player = Player(node.rect.x , node.rect.top)
         self.tilemap = Tilemap(mapdata, self.collision_tileset)
 
         self.snow.config.apply_render_scale(self.tilemap.render_scale)

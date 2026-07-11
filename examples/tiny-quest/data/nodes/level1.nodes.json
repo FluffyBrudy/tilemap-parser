@@ -7,8 +7,8 @@
       "name": "entry",
       "node_type": "area",
       "area": {
-        "x": 1,
-        "y": 118,
+        "x": 82,
+        "y": -108,
         "w": 14,
         "h": 18
       },
@@ -190,6 +190,47 @@
         "start_scale": 1.0,
         "end_scale": 0.5,
         "rotation_speed": 20,
+        "alpha_fade": "fade_out"
+      },
+      "group": null
+    },
+    {
+      "node_id": "c61b3b44-4137-434d-b584-c515a2b8af2f",
+      "name": "Emitter 7",
+      "node_type": "particle_emitter",
+      "area": {
+        "x": -448,
+        "y": 600,
+        "w": 64,
+        "h": 64
+      },
+      "layer_name": "nature",
+      "properties": {
+        "emission_shape": "point",
+        "particle_shape": "circle",
+        "particle_size_min": 4,
+        "particle_size_max": 10,
+        "spawn_rate": 50,
+        "max_particles": 120,
+        "lifetime_min": 0.5,
+        "lifetime_max": 1.8,
+        "speed_min": 30,
+        "speed_max": 80,
+        "direction": 270,
+        "spread": 40,
+        "gravity_x": 2,
+        "gravity_y": -15,
+        "start_color_r": 255,
+        "start_color_g": 180,
+        "start_color_b": 30,
+        "start_color_a": 255,
+        "end_color_r": 200,
+        "end_color_g": 60,
+        "end_color_b": 10,
+        "end_color_a": 0,
+        "start_scale": 1.0,
+        "end_scale": 0.3,
+        "rotation_speed": 5,
         "alpha_fade": "fade_out"
       },
       "group": null

@@ -114,6 +114,87 @@ class TestTilemapDataLoad:
         assert td.resolved_paths[0] == png.resolve()
         assert td.surfaces[0] is not None
 
+    def test_negative_coordinates_normalized_to_zero_origin(self, tmp_project):
+        tmp, data_dir, assets_dir = tmp_project
+        payload = {
+            "meta": {
+                "tile_size": "16;16",
+                "map_size": "4;4",
+                "initial_map_size": "4;4",
+                "render_scale": 2,
+                "scroll": "-64;-32",
+                "version": "1.1",
+            },
+            "resources": {"tilesets": []},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "layers": [
+                    {
+                        "name": "Terrain",
+                        "type": "tile",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "tiles": {
+                            "-2;-1": {"pos": "-2;-1", "ttype": 0, "variant": 1},
+                            "1;0": {"pos": "1;0", "ttype": 0, "variant": 2},
+                        },
+                    },
+                    {
+                        "name": "Objects",
+                        "type": "object",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 1,
+                        "tiles": {},
+                        "objects": {
+                            "1": {
+                                "area": {"x": -8, "y": -20, "w": 16, "h": 16},
+                                "ttype": 0,
+                                "tileset_type": "object",
+                                "variant": 0,
+                            }
+                        },
+                    },
+                ]
+            },
+        }
+        map_path = data_dir / "test_map.json"
+        with open(map_path, "w") as f:
+            json.dump(payload, f, indent=2)
+        nodes_path = data_dir / "test_map.nodes.json"
+        with open(nodes_path, "w") as f:
+            json.dump(
+                {
+                    "nodes": [
+                        {
+                            "node_id": "pe_neg",
+                            "name": "Mist",
+                            "node_type": "particle_emitter",
+                            "area": {"x": -40, "y": 0, "w": 16, "h": 16},
+                            "layer_name": "fx",
+                            "properties": {},
+                            "group": "",
+                        }
+                    ],
+                    "groups": [],
+                },
+                f,
+                indent=2,
+            )
+
+        td = TilemapData.load(map_path)
+
+        assert td.origin_offset == (64, 32)
+        assert td.map_size == (6, 5)
+        assert td.get_tile_at("Terrain", 0, 0).variant == 1
+        assert td.get_tile_at("Terrain", 3, 1).variant == 2
+        obj = td.get_layer("Objects").objects[1]
+        assert (obj.area.x, obj.area.y) == (56, 12)
+        assert td.particle_emitters[0].rect == Rect(24, 32, 16, 16)
+
 
 MINIMAL_NODES = {
     "nodes": [

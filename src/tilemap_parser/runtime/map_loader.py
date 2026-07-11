@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -31,6 +32,8 @@ class TilemapData:
         self.resolved_paths = resolved_paths
         self.warnings = warnings
         self.map_path = map_path
+        # Pixel/world offset applied while normalizing negative source coordinates.
+        self.origin_offset = (0, 0)
         self.area_nodes: List[AreaNode] = []
         self.particle_emitters: List[ParticleEmitterNode] = []
         self._tw, self._th = parsed.meta.tile_size
@@ -98,7 +101,9 @@ class TilemapData:
                     warnings.append(f"Failed to load nodes: {e}")
                 break
 
+        origin_offset = _normalize_origin(parsed)
         result = cls(parsed, surfaces, resolved_paths, warnings, map_path=p)
+        result.origin_offset = origin_offset
         result.area_nodes = [AreaNode(n) for n in parsed.nodes if n.node_type == "area"]
         result.particle_emitters = [
             ParticleEmitterNode(n) for n in parsed.nodes if n.node_type == "particle_emitter"
@@ -310,6 +315,84 @@ def _resolve_resource_path(path_str: str, map_dir: Path, extra_search_base: Opti
         if extra_candidate.is_file():
             return extra_candidate
     return candidate
+
+
+def _normalize_origin(parsed: ParsedMap) -> Tuple[int, int]:
+    tw, th = parsed.meta.tile_size
+    rs = parsed.meta.render_scale
+    eff_w = int(tw * rs)
+    eff_h = int(th * rs)
+    if eff_w <= 0 or eff_h <= 0:
+        return (0, 0)
+
+    min_x = 0
+    min_y = 0
+    max_x = parsed.meta.map_size[0]
+    max_y = parsed.meta.map_size[1]
+
+    for layer in parsed.layers:
+        for x, y in layer.tiles.keys():
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x + 1)
+            max_y = max(max_y, y + 1)
+
+        for obj in layer.objects.values():
+            left = math.floor(obj.area.x / eff_w)
+            top = math.floor(obj.area.y / eff_h)
+            right = math.ceil((obj.area.x + obj.area.w) / eff_w)
+            bottom = math.ceil((obj.area.y + obj.area.h) / eff_h)
+            min_x = min(min_x, left)
+            min_y = min(min_y, top)
+            max_x = max(max_x, right)
+            max_y = max(max_y, bottom)
+
+    for node in parsed.nodes:
+        left = math.floor(node.area.x / eff_w)
+        top = math.floor(node.area.y / eff_h)
+        right = math.ceil((node.area.x + node.area.w) / eff_w)
+        bottom = math.ceil((node.area.y + node.area.h) / eff_h)
+        min_x = min(min_x, left)
+        min_y = min(min_y, top)
+        max_x = max(max_x, right)
+        max_y = max(max_y, bottom)
+
+    if min_x >= 0 and min_y >= 0:
+        parsed.meta.map_size = (max_x, max_y)
+        return (0, 0)
+
+    shift_x = -min_x
+    shift_y = -min_y
+    pixel_shift_x = shift_x * eff_w
+    pixel_shift_y = shift_y * eff_h
+
+    for layer in parsed.layers:
+        if layer.tiles:
+            shifted_tiles = {}
+            for (x, y), tile in layer.tiles.items():
+                new_pos = (x + shift_x, y + shift_y)
+                tile.pos = new_pos
+                shifted_tiles[new_pos] = tile
+            layer.tiles = shifted_tiles
+
+        for obj in layer.objects.values():
+            obj.area.x += pixel_shift_x
+            obj.area.y += pixel_shift_y
+
+    for node in parsed.nodes:
+        node.area.x += pixel_shift_x
+        node.area.y += pixel_shift_y
+
+    parsed.meta.map_size = (max_x + shift_x, max_y + shift_y)
+    parsed.meta.initial_map_size = (
+        parsed.meta.initial_map_size[0] + shift_x,
+        parsed.meta.initial_map_size[1] + shift_y,
+    )
+    parsed.meta.scroll = (
+        parsed.meta.scroll[0] + pixel_shift_x,
+        parsed.meta.scroll[1] + pixel_shift_y,
+    )
+    return (pixel_shift_x, pixel_shift_y)
 
 
 def load_map(path: PathLike, *, extra_search_base: Optional[Path] = None, skip_missing_images: bool = True, nodes_dir: Optional[PathLike] = None) -> TilemapData:
