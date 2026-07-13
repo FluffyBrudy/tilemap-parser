@@ -24,10 +24,16 @@ log = logging.getLogger(__name__)
 TILE_FLIP_H = 0x80000000
 TILE_FLIP_V = 0x40000000
 TILE_FLIP_D = 0x20000000
-TILE_FLIP_MASK = 0x1FFFFFFF
+TILE_FLIP_HEX = 0x10000000
+TILE_FLIP_MASK = 0x0FFFFFFF
 
-FLIP_BIT_NAMES = {TILE_FLIP_H: "H", TILE_FLIP_V: "V", TILE_FLIP_D: "D"}
-FLIP_ALL = TILE_FLIP_H | TILE_FLIP_V | TILE_FLIP_D
+FLIP_BIT_NAMES = {
+    TILE_FLIP_H: "H",
+    TILE_FLIP_V: "V",
+    TILE_FLIP_D: "D",
+    TILE_FLIP_HEX: "HEX120",
+}
+FLIP_ALL = TILE_FLIP_H | TILE_FLIP_V | TILE_FLIP_D | TILE_FLIP_HEX
 
 
 class TmxParseError(MapParseError):
@@ -55,12 +61,21 @@ def _require_attr(elem: ElementTree.Element, name: str, ctx: str) -> str:
     return value
 
 
-def _strip_flip_bits(gid: int) -> int:
+def _decode_flip_flags(
+    gid: int,
+) -> Tuple[int, bool, bool, bool, bool]:
     flipped = gid & FLIP_ALL
+    stripped = gid & TILE_FLIP_MASK
     if flipped:
         bits = "+".join(name for mask, name in FLIP_BIT_NAMES.items() if flipped & mask)
-        log.debug("Tile GID 0x%x has flip flag(s) %s — stripped", gid, bits)
-    return gid & TILE_FLIP_MASK
+        log.debug("Tile GID 0x%x has flip flag(s) %s — decoded", gid, bits)
+    return (
+        stripped,
+        bool(gid & TILE_FLIP_H),
+        bool(gid & TILE_FLIP_V),
+        bool(gid & TILE_FLIP_D),
+        bool(gid & TILE_FLIP_HEX),
+    )
 
 
 def _parse_tsx_root(root: ElementTree.Element, source_path: Path) -> dict:
@@ -100,30 +115,16 @@ def _build_tsx_data(ts_elem: ElementTree.Element, source_path: Path) -> dict:
         "imageheight": image_height,
     }
 
-    properties_elem = ts_elem.find("properties")
-    if properties_elem is not None:
-        props: Dict[str, Any] = {}
-        for prop in properties_elem.findall("property"):
-            prop_name = prop.get("name", "")
-            prop_value = prop.get("value", "")
-            prop_type = prop.get("type", "string")
-            props[prop_name] = _coerce_property_value(prop_value, prop_type)
-        if props:
-            data["properties"] = props
+    props = _parse_properties(ts_elem)
+    if props:
+        data["properties"] = props
 
     tile_properties: Dict[str, Dict[str, Any]] = {}
     for tile_elem in ts_elem.findall("tile"):
         tid = _coerce_int(_require_attr(tile_elem, "id", f"{name}.tile"), f"{name}.tile.id")
-        tp = tile_elem.find("properties")
-        if tp is not None:
-            tile_props: Dict[str, Any] = {}
-            for prop in tp.findall("property"):
-                prop_name = prop.get("name", "")
-                prop_value = prop.get("value", "")
-                prop_type = prop.get("type", "string")
-                tile_props[prop_name] = _coerce_property_value(prop_value, prop_type)
-            if tile_props:
-                tile_properties[str(tid)] = tile_props
+        tile_props = _parse_properties(tile_elem)
+        if tile_props:
+            tile_properties[str(tid)] = tile_props
     if tile_properties:
         data["tile_properties"] = tile_properties
 
@@ -140,6 +141,21 @@ def _coerce_property_value(value: str, prop_type: str) -> Any:
     elif prop_type == "color":
         return value
     return value
+
+
+def _parse_properties(elem: ElementTree.Element) -> Dict[str, Any]:
+    props: Dict[str, Any] = {}
+    props_elem = elem.find("properties")
+    if props_elem is None:
+        return props
+    for prop in props_elem.findall("property"):
+        prop_name = prop.get("name", "")
+        prop_type = prop.get("type", "string")
+        raw_value = prop.get("value")
+        if raw_value is None:
+            raw_value = (prop.text or "").strip()
+        props[prop_name] = _coerce_property_value(raw_value, prop_type)
+    return props
 
 
 def _build_embedded_tileset_properties(data: dict) -> Dict[str, Any]:
@@ -254,6 +270,8 @@ def _parse_tile_layer(
         z_index=0,
     )
 
+    layer.properties = _parse_properties(layer_elem)
+
     data_elem = layer_elem.find("data")
     if data_elem is None:
         return layer
@@ -273,11 +291,8 @@ def _parse_tile_layer(
 
     expected = width * height
     if len(gids) != expected:
-        log.warning(
-            "%s: expected %d tile GIDs but got %d",
-            ctx,
-            expected,
-            len(gids),
+        raise TmxParseError(
+            f"{ctx}: expected {expected} tile GIDs, got {len(gids)}"
         )
 
     for idx, raw_gid in enumerate(gids):
@@ -285,14 +300,18 @@ def _parse_tile_layer(
             continue
         tx = idx % width
         ty = idx // width
-        gid = _strip_flip_bits(raw_gid)
-        ttype, variant = _map_gid(gid, tilesets, f"{ctx}.tile[{ty},{tx}]")
+        stripped_gid, flip_h, flip_v, flip_d, flip_hex = _decode_flip_flags(raw_gid)
+        ttype, variant = _map_gid(stripped_gid, tilesets, f"{ctx}.tile[{ty},{tx}]")
         if ttype is not None:
             pos = (tx, ty)
             layer.tiles[pos] = ParsedTile(
                 pos=pos,
                 ttype=ttype,
                 variant=variant,
+                flip_h=flip_h,
+                flip_v=flip_v,
+                flip_d=flip_d,
+                rotated_hex120=flip_hex,
             )
 
     return layer
