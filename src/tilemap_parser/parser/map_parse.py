@@ -106,6 +106,10 @@ class ParsedTile:
     ttype: TilesetRef
     variant: int
     properties: Optional[JsonDict] = None
+    flip_h: bool = False
+    flip_v: bool = False
+    flip_d: bool = False
+    rotated_hex120: bool = False
 
 
 @dataclass
@@ -213,7 +217,16 @@ def _parse_tile(tile_data: JsonDict, ctx: str) -> ParsedTile:
     else:
         ttype = _coerce_int(ttype_raw, f"{ctx}.ttype")
     props = _optional_dict(tile_data.get("properties"), f"{ctx}.properties")
-    return ParsedTile(pos=pos, ttype=ttype, variant=variant, properties=props)
+    return ParsedTile(
+        pos=pos,
+        ttype=ttype,
+        variant=variant,
+        properties=props,
+        flip_h=tile_data.get("flip_h", False),
+        flip_v=tile_data.get("flip_v", False),
+        flip_d=tile_data.get("flip_d", False),
+        rotated_hex120=tile_data.get("rotated_hex120", False),
+    )
 
 
 def _parse_tiles(tiles_obj: JsonDict, ctx: str) -> Dict[Point, ParsedTile]:

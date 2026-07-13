@@ -131,7 +131,7 @@ class TestParseTmxBase64:
 
 
 class TestFlipFlags:
-    def test_flip_flag_stripped(self):
+    def test_flip_flags_preserved_on_parsed_tile(self):
         from tilemap_parser.parser.map_parse import parse_map_file
 
         parsed = parse_map_file(_resolve("test_map_flip.tmx"))
@@ -141,26 +141,36 @@ class TestFlipFlags:
 
         tile_with_flag = layer.tiles[(0, 0)]
         assert tile_with_flag.variant == 0
+        assert tile_with_flag.flip_h is True
+        assert tile_with_flag.flip_v is False
+        assert tile_with_flag.flip_d is False
+        assert tile_with_flag.rotated_hex120 is False
 
         tile_no_flag = layer.tiles[(1, 0)]
         assert tile_no_flag.variant == 0
+        assert tile_no_flag.flip_h is False
+        assert tile_no_flag.flip_v is False
+        assert tile_no_flag.flip_d is False
+        assert tile_no_flag.rotated_hex120 is False
 
     def test_strip_flip_bits(self):
         from tilemap_parser.parser.tmx_converter import (
             TILE_FLIP_H,
             TILE_FLIP_V,
             TILE_FLIP_D,
+            TILE_FLIP_HEX,
             TILE_FLIP_MASK,
-            _strip_flip_bits,
+            _decode_flip_flags,
         )
 
-        assert _strip_flip_bits(1) == 1
-        assert _strip_flip_bits(TILE_FLIP_H | 5) == 5
-        assert _strip_flip_bits(TILE_FLIP_V | 3) == 3
-        assert _strip_flip_bits(TILE_FLIP_D | 7) == 7
-        assert _strip_flip_bits(TILE_FLIP_H | TILE_FLIP_V | 42) == 42
-        assert _strip_flip_bits(TILE_FLIP_H | TILE_FLIP_V | TILE_FLIP_D | 99) == 99
-        assert _strip_flip_bits(0) == 0
+        assert _decode_flip_flags(1) == (1, False, False, False, False)
+        assert _decode_flip_flags(TILE_FLIP_H | 5) == (5, True, False, False, False)
+        assert _decode_flip_flags(TILE_FLIP_V | 3) == (3, False, True, False, False)
+        assert _decode_flip_flags(TILE_FLIP_D | 7) == (7, False, False, True, False)
+        assert _decode_flip_flags(TILE_FLIP_HEX | 11) == (11, False, False, False, True)
+        assert _decode_flip_flags(TILE_FLIP_H | TILE_FLIP_V | 42) == (42, True, True, False, False)
+        assert _decode_flip_flags(TILE_FLIP_H | TILE_FLIP_V | TILE_FLIP_D | 99) == (99, True, True, True, False)
+        assert _decode_flip_flags(0) == (0, False, False, False, False)
 
 
 class TestDecodeHelpers:
@@ -325,7 +335,7 @@ class TestRuntimeIntegration:
         pygame.image.save(surf, str(png))
 
         tmx = data_dir / "test.tmx"
-        tmx.write_text(f"""<?xml version="1.0" encoding="UTF-8"?>
+        tmx.write_text("""<?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" orientation="orthogonal" renderorder="right-down" width="2" height="2" tilewidth="32" tileheight="32" infinite="0">
  <tileset firstgid="1" name="test" tilewidth="32" tileheight="32" tilecount="4" columns="2">
   <image source="../assets/tileset.png" width="64" height="64"/>
