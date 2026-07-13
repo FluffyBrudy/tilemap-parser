@@ -46,6 +46,7 @@ from .map_parse import (
     parse_map_json,
 )
 from .node_parse import ParsedNode, parse_nodes_dict, parse_nodes_file
+from .tmx_converter import TmxParseError, parse_tmx_file, parse_tsx_file
 from .particle import (
     ALPHA_FADE_MODES,
     EMISSION_SHAPES,
@@ -84,6 +85,7 @@ __all__ = [
     "TilesetAnimation",
     "TileCollisionData",
     "TilesetCollision",
+    "TmxParseError",
     "parse_animation_dict",
     "parse_animation_file",
     "parse_animation_json",
@@ -96,6 +98,8 @@ __all__ = [
     "parse_map_json",
     "parse_nodes_dict",
     "parse_nodes_file",
+    "parse_tmx_file",
+    "parse_tsx_file",
     "parse_object_collision",
     "parse_tileset_collision",
     "ALPHA_FADE_MODES",

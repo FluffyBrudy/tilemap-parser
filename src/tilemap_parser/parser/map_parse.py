@@ -484,8 +484,13 @@ def parse_map_file(path: Union[str, Path]) -> ParsedMap:
     p = Path(path)
     if not p.is_file():
         raise MapParseError(f"Not a file: {p}")
-    if p.suffix.lower() != ".json":
-        raise MapParseError(f"Expected .json map file, got {p.suffix!r}")
+    suffix = p.suffix.lower()
+    if suffix == ".tmx":
+        from .tmx_converter import parse_tmx_file
+
+        return parse_tmx_file(p)
+    if suffix != ".json":
+        raise MapParseError(f"Expected .json or .tmx map file, got {suffix!r}")
     try:
         text = p.read_text(encoding="utf-8")
     except OSError as e:
