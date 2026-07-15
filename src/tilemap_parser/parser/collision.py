@@ -77,6 +77,44 @@ class TilesetCollision:
             return []
         return [shape.transform(tile_x, tile_y, scale) for shape in tile_data.shapes]
 
+    @classmethod
+    def merge(
+        cls,
+        collisions: List["TilesetCollision"],
+        firstgids: List[int],
+    ) -> "TilesetCollision":
+        """Merge multiple tileset collisions into one, offsetting keys by firstgid.
+
+        Each collision's tiles are re-keyed as ``firstgid + local_id`` so that
+        the resulting dict uses global tile IDs for lookup.
+
+        Args:
+            collisions: List of TilesetCollision objects to merge.
+            firstgids: List of firstgid offsets, one per collision, in the
+                       same order as *collisions*.  The offset is added to
+                       each tile's local ID to produce the global key.
+
+        Usage::
+
+            merged = TilesetCollision.merge([ts0, ts1], [0, 200])
+        """
+        if not collisions:
+            return cls(tileset_name="merged", tile_size=(0, 0))
+        tile_size = collisions[0].tile_size
+        merged_tiles: Dict[int, TileCollisionData] = {}
+        for coll, offset in zip(collisions, firstgids, strict=True):
+            for local_id, data in coll.tiles.items():
+                gid = offset + local_id
+                merged_tiles[gid] = TileCollisionData(
+                    tile_id=gid,
+                    shapes=data.shapes[:],
+                )
+        return cls(
+            tileset_name="merged",
+            tile_size=tile_size,
+            tiles=merged_tiles,
+        )
+
 
 @dataclass
 class RectangleShape:
@@ -211,7 +249,7 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
             tiles[tile_id] = TileCollisionData(tile_id=tile_id, shapes=shapes)
 
         return TilesetCollision(
-            tileset_name=tileset_name, tile_size=tile_size, tiles=tiles
+            tileset_name=tileset_name, tile_size=tile_size, tiles=tiles,
         )
     except (KeyError, ValueError, TypeError) as e:
         raise CollisionParseError(f"Invalid tileset collision data: {e}") from e
