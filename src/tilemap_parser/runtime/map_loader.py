@@ -197,6 +197,7 @@ class TilemapData:
     def build_tile_map(
         self,
         exclude_layers: Optional[set[str]] = None,
+        use_gids: bool = False,
     ) -> Dict[Tuple[int, int], int]:
         """Build a ``{(col, row): tile_id}`` dict for use with
         :class:`tilemap_parser.runtime.tile_collision.CollisionRunner`.
@@ -204,6 +205,10 @@ class TilemapData:
         Only tile layers are scanned; object layers are skipped
         automatically.  Pass *exclude_layers* to skip specific tile
         layers by name (e.g. collisions, overlays).
+
+        When *use_gids* is ``True``, the returned values are global tile
+        IDs (firstgid + variant) so that tiles from different tilesets
+        with the same variant number produce distinct values.
         """
         tile_map: Dict[Tuple[int, int], int] = {}
         for layer in self.parsed.layers:
@@ -212,7 +217,22 @@ class TilemapData:
             if exclude_layers and layer.name in exclude_layers:
                 continue
             for (tx, ty), tile in layer.tiles.items():
-                if isinstance(tile.ttype, int):
+                if not isinstance(tile.ttype, int):
+                    continue
+                if use_gids:
+                    if tile.gid is not None:
+                        tile_map[(tx, ty)] = tile.gid
+                    else:
+                        ts_idx = tile.ttype
+                        if 0 <= ts_idx < len(self.parsed.tilesets):
+                            ts = self.parsed.tilesets[ts_idx]
+                            if ts.firstgid:
+                                tile_map[(tx, ty)] = ts.firstgid + tile.variant
+                            else:
+                                tile_map[(tx, ty)] = tile.variant
+                        else:
+                            tile_map[(tx, ty)] = tile.variant
+                else:
                     tile_map[(tx, ty)] = tile.variant
         return tile_map
 

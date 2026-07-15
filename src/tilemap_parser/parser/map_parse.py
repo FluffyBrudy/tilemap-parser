@@ -105,6 +105,7 @@ class ParsedTile:
     pos: Point
     ttype: TilesetRef
     variant: int
+    gid: Optional[int] = None
     properties: Optional[JsonDict] = None
     flip_h: bool = False
     flip_v: bool = False
@@ -142,6 +143,8 @@ class TilesetAnimation:
 class ParsedTileset:
     path: str
     type: str
+    tile_count: int = 0
+    firstgid: int = 0
     properties: JsonDict = field(default_factory=dict)
     tile_properties: Dict[str, JsonDict] = field(default_factory=dict)
     animation: Optional[TilesetAnimation] = None
@@ -217,10 +220,13 @@ def _parse_tile(tile_data: JsonDict, ctx: str) -> ParsedTile:
     else:
         ttype = _coerce_int(ttype_raw, f"{ctx}.ttype")
     props = _optional_dict(tile_data.get("properties"), f"{ctx}.properties")
+    gid_raw = tile_data.get("gid")
+    gid = _coerce_int(gid_raw, f"{ctx}.gid") if gid_raw is not None else None
     return ParsedTile(
         pos=pos,
         ttype=ttype,
         variant=variant,
+        gid=gid,
         properties=props,
         flip_h=tile_data.get("flip_h", False),
         flip_v=tile_data.get("flip_v", False),
@@ -378,6 +384,8 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
             ParsedTileset(
                 path=path, type=ts_type, properties=props, tile_properties=tile_props,
                 animation=animation,
+                tile_count=_coerce_int(ts_obj.get("tile_count", 0), f"{ctx}[{i}].tile_count"),
+                firstgid=_coerce_int(ts_obj.get("firstgid", 0), f"{ctx}[{i}].firstgid"),
             )
         )
     return out
