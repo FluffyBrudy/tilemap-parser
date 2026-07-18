@@ -10,6 +10,7 @@ from .collision_cache import (
     load_object_collision,
     load_tileset_collision,
 )
+from .map_object import MapObject, load_map_objects
 from .tile_collision import (
     CollisionResult,
     CollisionRunner,
@@ -47,6 +48,7 @@ __all__ = [
     "ICollidableObject",
     "ICollidableSprite",
     "LayerRenderStats",
+    "MapObject",
     "MovementMode",
     "ObjectCollisionManager",
     "SpriteAnimationSet",
@@ -59,6 +61,7 @@ __all__ = [
     "get_cached_tileset_collision",
     "load_character_collision",
     "load_map",
+    "load_map_objects",
     "load_object_collision",
     "load_tileset_collision",
     "Particle",

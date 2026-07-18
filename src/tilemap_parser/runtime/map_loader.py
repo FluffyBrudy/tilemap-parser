@@ -68,7 +68,12 @@ class TilemapData:
                 surfaces.append(None)
                 continue
             try:
-                surfaces.append(pygame.image.load(str(resolved)).convert_alpha())
+                surf = pygame.image.load(str(resolved))
+                try:
+                    surf = surf.convert_alpha()
+                except pygame.error:
+                    pass
+                surfaces.append(surf)
             except pygame.error as e:
                 msg = f"Tileset load failed ({i}) {resolved}: {e}"
                 warnings.append(msg)
@@ -244,6 +249,16 @@ class TilemapData:
             return None
         return _variant_surface(source, variant, self.tile_size, copy_surface=copy_surface)
 
+    def get_object_surface(self, obj: ParsedObject, *, copy_surface: bool = True) -> Optional[Surface]:
+        if obj.ttype < 0 or obj.ttype >= len(self.surfaces):
+            return None
+        source = self.surfaces[obj.ttype]
+        if source is None:
+            return None
+        if (obj.area.w, obj.area.h) == (source.get_width(), source.get_height()):
+            return source.copy() if copy_surface else source
+        return _variant_surface(source, obj.variant, self.tile_size, copy_surface=copy_surface)
+
     def get_tile_surface(self, ttype: int, variant: int, *, copy_surface: bool = True) -> Optional[Surface]:
         return self.get_image(variant=variant, ttype=ttype, copy_surface=copy_surface)
 
@@ -258,9 +273,6 @@ class TilemapData:
         if tile is None or not isinstance(tile.ttype, int):
             return None
         return self.get_tile_surface(tile.ttype, tile.variant)
-
-    def get_object_surface(self, obj: ParsedObject, *, copy_surface: bool = True) -> Optional[Surface]:
-        return self.get_image(variant=obj.variant, ttype=obj.ttype, copy_surface=copy_surface)
 
     def get_object_surface_by_id(
         self, layer_id_or_name: Union[int, str], object_id: int, *, copy_surface: bool = True
