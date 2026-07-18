@@ -18,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+import pygame
 from pygame import Surface
 
 from ..parser.collision import CollisionPolygon, ObjectCollisionData
@@ -30,6 +31,12 @@ class MapObject:
     """
     A game object loaded from a tilemap, carrying a surface for
     rendering and collision data for physics.
+
+    All spatial data (``x``, ``y``, ``surface`` size, and collision
+    polygon vertices) is pre-scaled by the map's ``render_scale``.
+    Units are in *effective* pixels (``render_scale × tile_size``).
+    The object is ready for direct use in a game loop that runs in
+    effective-pixel space — no additional scaling needed.
 
     Satisfies the :class:`ICollidableObject` protocol so it can be
     added directly to an :class:`ObjectCollisionManager`.
@@ -89,9 +96,26 @@ def load_map_objects(
 
     Iterates every object layer in *tilemap_data*, resolves the
     corresponding ``.object_collision.json`` from *collision_dir*, and
-    builds :class:`MapObject` instances with surfaces, owner-local
-    collision shapes (region offset only; consumers add x/y), and
-    layer/mask values from the collision regions.
+    builds :class:`MapObject` instances with pre-scaled surfaces,
+    positions, and collision shapes.
+
+    **render_scale transparency**
+
+    All spatial data is automatically scaled by the map's
+    ``render_scale`` (from ``tilemap_data.render_scale``):
+
+    * ``MapObject.x`` / ``MapObject.y`` — raw map coords × ``rs``
+      (stored as ``float``; fractional pixel positions are preserved).
+    * ``MapObject.surface`` — surface is scaled by ``rs`` via
+      :func:`pygame.transform.scale` (no-op when ``rs == 1.0``).
+      Raster dimensions are truncated to integers via ``int()``
+      to satisfy :func:`pygame.transform.scale` requirements.
+    * Collision polygon vertices and ``region_rect`` offsets are
+      multiplied by ``rs`` via :meth:`CollisionPolygon.transform`.
+
+    The returned objects are ready for a game loop that runs in
+    effective-pixel space (``render_scale × tile_size``).  No
+    additional scaling is required by the caller.
 
     Collision data is cached per tileset index so the same file is
     never loaded twice.
@@ -123,6 +147,13 @@ def load_map_objects(
                 continue
 
             surf, x, y = surf_x_y
+            rs = tilemap_data.render_scale
+            x = x * rs
+            y = y * rs
+
+            if rs != 1.0 and surf is not None:
+                w, h = surf.get_size()
+                surf = pygame.transform.scale(surf, (int(w * rs), int(h * rs)))
 
             ttype = obj.ttype
             if ttype not in loaded_collision:
@@ -142,9 +173,9 @@ def load_map_objects(
                 if not world_shapes:
                     region_layer = region.collision_layer
                     region_mask = region.collision_mask
-                ox = region.region_rect[0]
-                oy = region.region_rect[1]
-                world_shapes.extend(shape.transform(ox, oy) for shape in region.shapes)
+                ox = region.region_rect[0] * rs
+                oy = region.region_rect[1] * rs
+                world_shapes.extend(shape.transform(ox, oy, rs) for shape in region.shapes)
             if not world_shapes:
                 continue
 

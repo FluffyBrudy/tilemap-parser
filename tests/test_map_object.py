@@ -652,6 +652,601 @@ class TestLoadMapObjects:
             hit = check_collision(loaded, manual)
             assert hit is not None, "loaded and manual object at same world pos should collide"
 
+    def test_default_scale_no_op(self, basic_map):
+        """render_scale=1.0 (default) behaves identically to before."""
+        td, collision_dir, _ = basic_map
+        assert td.render_scale == 1.0
+        objects = load_map_objects(td, collision_dir)
+        assert len(objects) == 1
+        obj = objects[0]
+        # Positions are raw (no scaling)
+        assert obj.x == 100
+        assert obj.y == 200
+        # Vertices are raw
+        verts = obj.collision_shape.vertices
+        assert verts[0] == (0, 0)
+        assert verts[1] == (16, 0)
+        assert verts[2] == (16, 16)
+        assert verts[3] == (0, 16)
+
+    def test_render_scale_3x(self):
+        """render_scale=3.0 scales positions and polygon vertices."""
+        from tilemap_parser.runtime.map_object import load_map_objects
+        from tilemap_parser.runtime.map_loader import TilemapData
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            assets_dir = tmp / "assets"
+            data_dir = tmp / "data"
+            collision_dir = tmp / "data" / "collision"
+            assets_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+            collision_dir.mkdir(parents=True)
+
+            png = assets_dir / "tileset.png"
+            _make_minimal_png(png, (32, 16))
+
+            collision_payload = {
+                "tileset_name": "tileset",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [5, 10, 16, 16],
+                        "name": "R",
+                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "properties": {},
+                    },
+                },
+            }
+            coll_path = collision_dir / "tileset.object_collision.json"
+            with open(coll_path, "w") as f:
+                json.dump(collision_payload, f, indent=2)
+
+            # Map with render_scale=3.0
+            payload = {
+                "meta": {
+                    "tile_size": "16;16",
+                    "map_size": "10;10",
+                    "version": "1.1",
+                    "render_scale": 3.0,
+                },
+                "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "object"}]},
+                "project_state": {"rules": [], "groups": []},
+                "data": {
+                    "ongrid": {},
+                    "layers": [
+                        {
+                            "name": "Object Layer",
+                            "type": "object",
+                            "visible": True,
+                            "locked": False,
+                            "opacity": 1.0,
+                            "z_index": 0,
+                            "properties": {},
+                            "tiles": {},
+                            "objects": {
+                                "1": {
+                                    "area": {"x": 100, "y": 200, "w": 16, "h": 16},
+                                    "ttype": 0,
+                                    "tileset_type": "object",
+                                    "variant": 0,
+                                    "properties": {},
+                                },
+                            },
+                            "next_object_id": 2,
+                        },
+                    ],
+                },
+            }
+            map_path = data_dir / "test_map.json"
+            with open(map_path, "w") as f:
+                json.dump(payload, f, indent=2)
+
+            td = TilemapData.load(map_path)
+            assert td.render_scale == 3.0
+            objects = load_map_objects(td, collision_dir)
+            assert len(objects) == 1
+            obj = objects[0]
+
+            # Position scaled by 3x
+            assert obj.x == 300  # 100 * 3
+            assert obj.y == 600  # 200 * 3
+
+            # region_rect [5, 10] scaled by 3x → ox=15, oy=30
+            # Vertices scaled by 3x: (0,0)→(0,0), (16,0)→(48,0), (16,16)→(48,48), (0,16)→(0,48)
+            # World = ox + vx*rs: (15+0, 30+0) = (15, 30)
+            #                     (15+48, 30+0) = (63, 30)
+            #                     (15+48, 30+48) = (63, 78)
+            #                     (15+0, 30+48) = (15, 78)
+            verts = obj.collision_shape.vertices
+            assert len(verts) == 4
+            assert verts[0] == pytest.approx((15.0, 30.0))
+            assert verts[1] == pytest.approx((63.0, 30.0))
+            assert verts[2] == pytest.approx((63.0, 78.0))
+            assert verts[3] == pytest.approx((15.0, 78.0))
+
+            # Surface scaled by 3x: tileset is 32×16, variant 0 is 16×16
+            assert obj.surface.get_size() == (48, 48)  # 16*3, 16*3
+
+    def test_render_scale_surface_scaled(self):
+        """Surface is scaled by render_scale in load_map_objects."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            assets_dir = tmp / "assets"
+            data_dir = tmp / "data"
+            collision_dir = tmp / "data" / "collision"
+            assets_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+            collision_dir.mkdir(parents=True)
+
+            png = assets_dir / "tileset.png"
+            # Create a 64×32 tileset with 2 variants (16×16 each)
+            surf = pygame.Surface((64, 32))
+            surf.fill((255, 0, 255))
+            pygame.image.save(surf, str(png))
+
+            collision_payload = {
+                "tileset_name": "tileset",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [0, 0, 16, 16],
+                        "name": "R",
+                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "properties": {},
+                    },
+                },
+            }
+            coll_path = collision_dir / "tileset.object_collision.json"
+            with open(coll_path, "w") as f:
+                json.dump(collision_payload, f, indent=2)
+
+            for rs_val, expected_w, expected_h in [(1.0, 16, 16), (2.0, 32, 32), (3.0, 48, 48), (1.5, 24, 24)]:
+                payload = {
+                    "meta": {
+                        "tile_size": "16;16",
+                        "map_size": "10;10",
+                        "version": "1.1",
+                        "render_scale": rs_val,
+                    },
+                    "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "object"}]},
+                    "project_state": {"rules": [], "groups": []},
+                    "data": {
+                        "ongrid": {},
+                        "layers": [
+                            {
+                                "name": "Object Layer",
+                                "type": "object",
+                                "visible": True,
+                                "locked": False,
+                                "opacity": 1.0,
+                                "z_index": 0,
+                                "properties": {},
+                                "tiles": {},
+                                "objects": {
+                                    "1": {
+                                        "area": {"x": 10, "y": 20, "w": 16, "h": 16},
+                                        "ttype": 0,
+                                        "tileset_type": "object",
+                                        "variant": 0,
+                                        "properties": {},
+                                    },
+                                },
+                                "next_object_id": 2,
+                            },
+                        ],
+                    },
+                }
+                map_path = data_dir / "test_map.json"
+                with open(map_path, "w") as f:
+                    json.dump(payload, f, indent=2)
+
+                td = TilemapData.load(map_path)
+                objects = load_map_objects(td, collision_dir)
+                assert len(objects) == 1
+                obj = objects[0]
+                assert obj.surface.get_size() == (expected_w, expected_h), \
+                    f"rs={rs_val}: expected ({expected_w},{expected_h}) got {obj.surface.get_size()}"
+                assert obj.x == 10 * rs_val, f"rs={rs_val}: x={obj.x} != {10 * rs_val}"
+                assert obj.y == 20 * rs_val, f"rs={rs_val}: y={obj.y} != {20 * rs_val}"
+
+            # Fractional rs with odd dimensions to exercise surface truncation
+            odd_png = assets_dir / "odd_tileset.png"
+            odd_surf = pygame.Surface((17, 35))
+            odd_surf.fill((0, 255, 0))
+            pygame.image.save(odd_surf, str(odd_png))
+
+            odd_collision = {
+                "tileset_name": "odd_tileset",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [0, 0, 17, 35],
+                        "name": "R",
+                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [17, 0], [17, 35], [0, 35]], "one_way": False}],
+                        "properties": {},
+                    },
+                },
+            }
+            odd_coll_path = collision_dir / "odd_tileset.object_collision.json"
+            with open(odd_coll_path, "w") as f:
+                json.dump(odd_collision, f, indent=2)
+
+            payload_odd = {
+                "meta": {
+                    "tile_size": "16;16",
+                    "map_size": "10;10",
+                    "version": "1.1",
+                    "render_scale": 1.5,
+                },
+                "resources": {"tilesets": [{"path": "../assets/odd_tileset.png", "type": "object"}]},
+                "project_state": {"rules": [], "groups": []},
+                "data": {
+                    "ongrid": {},
+                    "layers": [
+                        {
+                            "name": "Object Layer",
+                            "type": "object",
+                            "visible": True,
+                            "locked": False,
+                            "opacity": 1.0,
+                            "z_index": 0,
+                            "properties": {},
+                            "tiles": {},
+                            "objects": {
+                                "1": {
+                                    "area": {"x": 11, "y": 21, "w": 17, "h": 35},
+                                    "ttype": 0,
+                                    "tileset_type": "object",
+                                    "variant": 0,
+                                    "properties": {},
+                                },
+                            },
+                            "next_object_id": 2,
+                        },
+                    ],
+                },
+            }
+            odd_map_path = data_dir / "odd_test_map.json"
+            with open(odd_map_path, "w") as f:
+                json.dump(payload_odd, f, indent=2)
+
+            td_odd = TilemapData.load(odd_map_path)
+            objects_odd = load_map_objects(td_odd, collision_dir)
+            assert len(objects_odd) == 1
+            obj = objects_odd[0]
+            assert obj.x == 11 * 1.5, f"fractional x: {obj.x} != {11 * 1.5}"
+            assert obj.y == 21 * 1.5, f"fractional y: {obj.y} != {21 * 1.5}"
+            assert obj.surface.get_size() == (25, 52), \
+                f"truncated surface: {obj.surface.get_size()} != (25, 52)  [int(17*1.5)=25, int(35*1.5)=52]"
+
+    def test_render_scale_collision_consistency(self):
+        """At render_scale=3.0, a loaded object collides with a manually-placed
+        probe object if and only if they overlap in effective (scaled) space."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            assets_dir = tmp / "assets"
+            data_dir = tmp / "data"
+            collision_dir = tmp / "data" / "collision"
+            assets_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+            collision_dir.mkdir(parents=True)
+
+            png = assets_dir / "tileset.png"
+            _make_minimal_png(png, (32, 16))
+
+            # Collision region at (0,0) with a 16x16 square polygon
+            collision_payload = {
+                "tileset_name": "tileset",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [0, 0, 16, 16],
+                        "name": "R",
+                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "properties": {},
+                    },
+                },
+            }
+            coll_path = collision_dir / "tileset.object_collision.json"
+            with open(coll_path, "w") as f:
+                json.dump(collision_payload, f, indent=2)
+
+            payload = {
+                "meta": {
+                    "tile_size": "16;16",
+                    "map_size": "10;10",
+                    "version": "1.1",
+                    "render_scale": 3.0,
+                },
+                "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "object"}]},
+                "project_state": {"rules": [], "groups": []},
+                "data": {
+                    "ongrid": {},
+                    "layers": [
+                        {
+                            "name": "Object Layer",
+                            "type": "object",
+                            "visible": True,
+                            "locked": False,
+                            "opacity": 1.0,
+                            "z_index": 0,
+                            "properties": {},
+                            "tiles": {},
+                            "objects": {
+                                "1": {
+                                    "area": {"x": 100, "y": 200, "w": 16, "h": 16},
+                                    "ttype": 0,
+                                    "tileset_type": "object",
+                                    "variant": 0,
+                                    "properties": {},
+                                },
+                            },
+                            "next_object_id": 2,
+                        },
+                    ],
+                },
+            }
+            map_path = data_dir / "test_map.json"
+            with open(map_path, "w") as f:
+                json.dump(payload, f, indent=2)
+
+            td = TilemapData.load(map_path)
+            objects = load_map_objects(td, collision_dir)
+            assert len(objects) == 1
+            loaded = objects[0]
+
+            # Loaded object position = (300, 600) in effective space
+            # Collision polygon covers (300, 600) to (300+48, 600+48) = (348, 648)
+            assert loaded.x == 300
+            assert loaded.y == 600
+
+            # Probe at (310, 610) with a 16x16 rect in effective space must collide
+            probe_surf = pygame.Surface((16, 16))
+            probe_shape = CollisionPolygon(vertices=[(0, 0), (16, 0), (16, 16), (0, 16)])
+            probe = MapObject(x=310, y=610, surface=probe_surf, collision_shape=probe_shape)
+
+            from tilemap_parser.runtime.object_collision import check_collision
+
+            hit = check_collision(loaded, probe)
+            assert hit is not None, "expected collision in effective space"
+
+            # Probe far away must NOT collide
+            probe_far = MapObject(x=1000, y=1000, surface=probe_surf, collision_shape=probe_shape)
+            hit_far = check_collision(loaded, probe_far)
+            assert hit_far is None, "no collision expected for far probe"
+
+    def test_render_scale_region_offset_scaled(self):
+        """Non-zero region_rect offset is scaled by render_scale."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            assets_dir = tmp / "assets"
+            data_dir = tmp / "data"
+            collision_dir = tmp / "data" / "collision"
+            assets_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+            collision_dir.mkdir(parents=True)
+
+            png = assets_dir / "tileset.png"
+            _make_minimal_png(png, (32, 16))
+
+            # region_rect offset of (5,10), polygon at origin within that region
+            collision_payload = {
+                "tileset_name": "tileset",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [5, 10, 16, 16],
+                        "name": "R",
+                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [8, 0], [8, 8], [0, 8]], "one_way": False}],
+                        "properties": {},
+                    },
+                },
+            }
+            coll_path = collision_dir / "tileset.object_collision.json"
+            with open(coll_path, "w") as f:
+                json.dump(collision_payload, f, indent=2)
+
+            payload = {
+                "meta": {
+                    "tile_size": "16;16",
+                    "map_size": "10;10",
+                    "version": "1.1",
+                    "render_scale": 3.0,
+                },
+                "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "object"}]},
+                "project_state": {"rules": [], "groups": []},
+                "data": {
+                    "ongrid": {},
+                    "layers": [
+                        {
+                            "name": "Object Layer",
+                            "type": "object",
+                            "visible": True,
+                            "locked": False,
+                            "opacity": 1.0,
+                            "z_index": 0,
+                            "properties": {},
+                            "tiles": {},
+                            "objects": {
+                                "1": {
+                                    "area": {"x": 100, "y": 200, "w": 16, "h": 16},
+                                    "ttype": 0,
+                                    "tileset_type": "object",
+                                    "variant": 0,
+                                    "properties": {},
+                                },
+                            },
+                            "next_object_id": 2,
+                        },
+                    ],
+                },
+            }
+            map_path = data_dir / "test_map.json"
+            with open(map_path, "w") as f:
+                json.dump(payload, f, indent=2)
+
+            td = TilemapData.load(map_path)
+            objects = load_map_objects(td, collision_dir)
+            assert len(objects) == 1
+            obj = objects[0]
+
+            # Position scaled: (300, 600)
+            # region_rect offset scaled: ox=15, oy=30
+            # Vertices scaled: (0,0)→(0,0), (8,0)→(24,0), (8,8)→(24,24), (0,8)→(0,24)
+            # World: (15, 30), (39, 30), (39, 54), (15, 54)
+            verts = obj.collision_shape.vertices
+            assert verts[0] == pytest.approx((15.0, 30.0))
+            assert verts[1] == pytest.approx((39.0, 30.0))
+            assert verts[2] == pytest.approx((39.0, 54.0))
+            assert verts[3] == pytest.approx((15.0, 54.0))
+
+            # Probe at object center must collide
+            probe_surf = pygame.Surface((16, 16))
+            probe_shape = CollisionPolygon(vertices=[(0, 0), (16, 0), (16, 16), (0, 16)])
+            # Loaded world AABB: (300+15, 600+30) to (300+39, 600+54) = (315, 630) to (339, 654)
+            probe = MapObject(x=315, y=630, surface=probe_surf, collision_shape=probe_shape)
+
+            from tilemap_parser.runtime.object_collision import check_collision
+
+            hit = check_collision(obj, probe)
+            assert hit is not None, "expected collision with region offset"
+
+    def test_render_scale_visual_collision_alignment(self):
+        """At render_scale=N, collision AABB is fully inside visual rect
+        and vertex positions are pixel-accurate for known values."""
+        from tilemap_parser.runtime.map_object import load_map_objects
+        from tilemap_parser.runtime.map_loader import TilemapData
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            assets_dir = tmp / "assets"
+            data_dir = tmp / "data"
+            collision_dir = tmp / "data" / "collision"
+            assets_dir.mkdir(parents=True)
+            data_dir.mkdir(parents=True)
+            collision_dir.mkdir(parents=True)
+
+            # Tileset: 64x96 with a known shape
+            tileset_surf = pygame.Surface((64, 96))
+            tileset_surf.fill((0, 255, 0))
+            png = assets_dir / "tree.png"
+            pygame.image.save(tileset_surf, str(png))
+
+            # Collision: region_rect=[0,3,64,93] with polygon
+            collision_payload = {
+                "tileset_name": "tree",
+                "regions": {
+                    "region_r": {
+                        "region_id": "region_r",
+                        "region_rect": [0, 3, 64, 93],
+                        "name": "R",
+                        "shapes": [
+                            {
+                                "type": "polygon",
+                                "vertices": [[32.0, 2.75], [8.0, 30.0], [10.5, 58.75],
+                                             [22.5, 65.25], [20.0, 88.25], [33.5, 81.75],
+                                             [47.5, 87.75], [41.5, 65.75], [58.5, 48.75],
+                                             [52.0, 25.0]],
+                                "one_way": False,
+                            }
+                        ],
+                        "properties": {"collision_layer": 1, "collision_mask": 65535},
+                    },
+                },
+            }
+            coll_path = collision_dir / "tree.object_collision.json"
+            with open(coll_path, "w") as f:
+                json.dump(collision_payload, f, indent=2)
+
+            for rs_val in [1.0, 2.0, 3.0, 4.0]:
+                payload = {
+                    "meta": {
+                        "tile_size": "16;16",
+                        "map_size": "10;10",
+                        "version": "1.1",
+                        "render_scale": rs_val,
+                    },
+                    "resources": {"tilesets": [{"path": "../assets/tree.png", "type": "object"}]},
+                    "project_state": {"rules": [], "groups": []},
+                    "data": {
+                        "ongrid": {},
+                        "layers": [
+                            {
+                                "name": "Objects",
+                                "type": "object",
+                                "visible": True,
+                                "locked": False,
+                                "opacity": 1.0,
+                                "z_index": 0,
+                                "properties": {},
+                                "tiles": {},
+                                "objects": {
+                                    "1": {
+                                        "area": {"x": 27, "y": 82, "w": 64, "h": 96},
+                                        "ttype": 0,
+                                        "tileset_type": "object",
+                                        "variant": 0,
+                                        "properties": {},
+                                    },
+                                },
+                                "next_object_id": 2,
+                            },
+                        ],
+                    },
+                }
+                map_path = data_dir / "test_map.json"
+                with open(map_path, "w") as f:
+                    json.dump(payload, f, indent=2)
+
+                td = TilemapData.load(map_path)
+                objects = load_map_objects(td, collision_dir)
+                assert len(objects) == 1, f"rs={rs_val}: expected 1 object"
+                obj = objects[0]
+
+                # Verify surface size is pixel-accurate at integer render_scale
+                expected_w = int(64 * rs_val)
+                expected_h = int(96 * rs_val)
+                assert obj.surface.get_size() == (expected_w, expected_h), \
+                    f"rs={rs_val}: surface {obj.surface.get_size()} != ({expected_w},{expected_h})"
+
+                # Verify position is pixel-accurate (float)
+                assert obj.x == 27 * rs_val, f"rs={rs_val}: x={obj.x} != {27 * rs_val}"
+                assert obj.y == 82 * rs_val, f"rs={rs_val}: y={obj.y} != {82 * rs_val}"
+
+                # Verify every collision vertex is pixel-accurate for known values
+                shape = obj.collision_shapes[0]
+                # First vertex: (32.0, 2.75) + region_rect (0, 3) = world (32*rs, (3+2.75)*rs)
+                expected_v0 = (32.0 * rs_val, (3.0 + 2.75) * rs_val)
+                actual_v0 = shape.vertices[0]
+                assert abs(actual_v0[0] - expected_v0[0]) < 0.001, \
+                    f"rs={rs_val}: vertex[0].x {actual_v0[0]} != {expected_v0[0]}"
+                assert abs(actual_v0[1] - expected_v0[1]) < 0.001, \
+                    f"rs={rs_val}: vertex[0].y {actual_v0[1]} != {expected_v0[1]}"
+
+                # Verify collision AABB is inside visual rect
+                xs = [v[0] for v in shape.vertices]
+                ys = [v[1] for v in shape.vertices]
+                coll_min_x = obj.x + min(xs)
+                coll_max_x = obj.x + max(xs)
+                coll_min_y = obj.y + min(ys)
+                coll_max_y = obj.y + max(ys)
+
+                vis_left = obj.x
+                vis_top = obj.y
+                vis_right = obj.x + expected_w
+                vis_bottom = obj.y + expected_h
+
+                margin = -0.001  # allow 0px floating point tolerance
+                assert coll_min_x >= vis_left + margin, \
+                    f"rs={rs_val}: collision left {coll_min_x} < visual left {vis_left}"
+                assert coll_min_y >= vis_top + margin, \
+                    f"rs={rs_val}: collision top {coll_min_y} < visual top {vis_top}"
+                assert coll_max_x <= vis_right - margin, \
+                    f"rs={rs_val}: collision right {coll_max_x} > visual right {vis_right}"
+                assert coll_max_y <= vis_bottom - margin, \
+                    f"rs={rs_val}: collision bottom {coll_max_y} > visual bottom {vis_bottom}"
+
     def test_invalid_tileset_index_skipped(self):
         """Object with ttype out of range is skipped."""
         with tempfile.TemporaryDirectory() as tmp:
