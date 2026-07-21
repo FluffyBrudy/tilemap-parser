@@ -23,12 +23,13 @@ from ..parser.collision import (
     RectangleShape,
     TilesetCollision,
 )
+from .protocols import ICollidable
 
 Point = Tuple[float, float]
 Vector2 = Tuple[float, float]
 
 
-class ICollidableSprite(Protocol):
+class ICollidableSprite(ICollidable, Protocol):
     """
     Interface that any sprite/character class must implement to use collision runners.
 
@@ -303,7 +304,7 @@ def _circle_polygon_collision_offset(
     return False
 
 
-def get_shape_bounds(sprite: ICollidableSprite) -> Tuple[float, float, float, float]:
+def get_shape_bounds(sprite: ICollidable) -> Tuple[float, float, float, float]:
     """Get AABB bounds for sprite (left, top, right, bottom)"""
     shape = sprite.collision_shape
     if isinstance(shape, RectangleShape):
@@ -328,7 +329,7 @@ def get_shape_bounds(sprite: ICollidableSprite) -> Tuple[float, float, float, fl
 
 
 def check_sprite_polygon_collision(
-    sprite: ICollidableSprite, polygon: CollisionPolygon
+    sprite: ICollidable, polygon: CollisionPolygon
 ) -> bool:
     """Check if sprite collides with a world-space polygon (legacy / public API)."""
     shape = sprite.collision_shape
@@ -349,7 +350,7 @@ def check_sprite_polygon_collision(
 
 
 def _check_sprite_polygon_offset(
-    sprite: ICollidableSprite,
+    sprite: ICollidable,
     polygon: CollisionPolygon,
     ox: float,
     oy: float,
@@ -489,7 +490,7 @@ class CollisionRunner:
         self,
         tileset_collision: TilesetCollision,
         tile_map: dict,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         margin: int = 1,
     ) -> List[CollisionPolygon]:
         """
@@ -529,7 +530,7 @@ class CollisionRunner:
 
     def _collides_at(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         tileset_collision: TilesetCollision,
         tile_map: dict,
         margin: int = 1,
@@ -567,7 +568,7 @@ class CollisionRunner:
 
     def _first_colliding_shape(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         tileset_collision: TilesetCollision,
         tile_map: dict,
         margin: int = 1,
@@ -603,7 +604,7 @@ class CollisionRunner:
 
     def move_and_slide(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         tileset_collision: TilesetCollision,
         tile_map: dict,
         delta_x: float,
@@ -729,7 +730,7 @@ class CollisionRunner:
 
     def _get_collision_normal_from_motion(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         polygon: CollisionPolygon,
         ox: float,
         oy: float,
@@ -1745,7 +1746,7 @@ class CollisionRunner:
 
     def move_rpg(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         tileset_collision: TilesetCollision,
         tile_map: dict,
         delta_x: float,
@@ -1814,7 +1815,7 @@ class CollisionRunner:
 
     def move(
         self,
-        sprite: ICollidableSprite,
+        sprite: ICollidable,
         tileset_collision: TilesetCollision,
         tile_map: dict,
         delta_x: float = 0.0,

@@ -20,6 +20,7 @@ __all__ = [
     "CollisionPolygon",
     "CollisionResult",
     "CollisionRunner",
+    "ICollidable",
     "ICollidableObject",
     "ICollidableSprite",
     "LayerRenderStats",

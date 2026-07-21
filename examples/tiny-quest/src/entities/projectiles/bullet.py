@@ -2,13 +2,10 @@ from typing import Callable, List, Optional, Set, TypedDict, Unpack
 
 import pygame
 from tilemap_parser import (
-    ICollidableObject,
-    ICollidableSprite,
+    ICollidable,
     RectangleShape,
     check_collision,
 )
-
-from src.settings import WHITE
 
 
 class BulletType(TypedDict, total=False):
@@ -34,14 +31,14 @@ class Bullet:
         self.vx = vx
 
         self.surface = pygame.Surface(size, pygame.SRCALPHA)
-        self.surface.fill(WHITE)
+        self.surface.fill((255, 255, 255))
         self.range = Bullet.MAX_RANGE
 
     def __hash__(self) -> int:
         return id(self)
 
     @classmethod
-    def check_collision_with(cls, obj: ICollidableObject | ICollidableSprite):
+    def check_collision_with(cls, obj: ICollidable):
         surviving_bullets = set()
 
         for bullet in cls.bullet_group:

@@ -18,6 +18,7 @@ from .tile_collision import (
     MovementMode,
     rect_vs_tilemap,
 )
+from .protocols import ICollidable
 from .map_loader import TilemapData, load_map
 from .object_collision import (
     CollisionHit,
@@ -45,6 +46,7 @@ __all__ = [
     "CollisionHit",
     "CollisionResult",
     "CollisionRunner",
+    "ICollidable",
     "ICollidableObject",
     "ICollidableSprite",
     "LayerRenderStats",

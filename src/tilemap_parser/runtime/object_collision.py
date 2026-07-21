@@ -33,26 +33,19 @@ from ..utils.geometry import (
     rect_vs_circle,
     rect_vs_rect,
 )
+from .protocols import ICollidable
 
 
-class ICollidableObject(Protocol):
+class ICollidableObject(ICollidable, Protocol):
     """
     Protocol for objects that can collide.
 
-    Required attributes:
-        x: World X position
-        y: World Y position
-        collision_shape: Shape for collision
-            (RectangleShape, CircleShape, CapsuleShape, or CollisionPolygon)
+    All required attributes (x, y, collision_shape) are inherited from ICollidable.
 
     Optional attributes (with defaults):
         collision_layer: Layer this object is on (default: 1)
         collision_mask: Layers to collide with (default: 0xFFFFFFFF)
     """
-
-    x: float
-    y: float
-    collision_shape: Union[RectangleShape, CircleShape, CapsuleShape, CollisionPolygon]
 
 
 @dataclass(slots=True)

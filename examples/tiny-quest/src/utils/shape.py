@@ -1,9 +1,8 @@
-from math import hypot, sqrt
 from typing import Tuple
 
-from tilemap_parser import ICollidableObject, ICollidableSprite, get_shape_aabb
+from tilemap_parser import ICollidable, get_shape_aabb
 
-TShapeSprite = ICollidableSprite | ICollidableObject
+TShapeSprite = ICollidable
 
 
 def get_sprite_center(sprite: TShapeSprite):
