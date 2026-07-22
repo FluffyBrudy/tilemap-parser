@@ -159,6 +159,8 @@ class ParsedLayer:
     locked: bool
     opacity: float
     z_index: int
+    y_sort: bool = False
+    y_sort_origin: int = 0
     properties: JsonDict = field(default_factory=dict)
     tiles: Dict[Point, ParsedTile] = field(default_factory=dict)
     objects: Dict[int, ParsedObject] = field(default_factory=dict)
@@ -285,6 +287,8 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
         locked=_coerce_bool(layer_obj.get("locked", False), f"{ctx}.locked"),
         opacity=_coerce_float(layer_obj.get("opacity", 1.0), f"{ctx}.opacity"),
         z_index=_coerce_int(layer_obj.get("z_index", layer_id), f"{ctx}.z_index"),
+        y_sort=_coerce_bool(layer_obj.get("y_sort", False), f"{ctx}.y_sort"),
+        y_sort_origin=layer_obj.get("y_sort_origin", 0),
         properties=_optional_dict(layer_obj.get("properties"), f"{ctx}.properties")
         or {},
     )
@@ -409,6 +413,7 @@ def _expand_ongrid_to_layer(data_obj: JsonDict, ctx: str) -> List[ParsedLayer]:
         locked=False,
         opacity=1.0,
         z_index=0,
+        y_sort=False, y_sort_origin=0,
         properties={},
     )
     for loc_str, tile_data in raw_ongrid.items():

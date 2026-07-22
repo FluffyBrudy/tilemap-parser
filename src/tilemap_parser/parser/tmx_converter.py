@@ -268,6 +268,7 @@ def _parse_tile_layer(
         locked=False,
         opacity=opacity,
         z_index=0,
+        y_sort=False, y_sort_origin=0,
     )
 
     layer.properties = _parse_properties(layer_elem)
