@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
 
 import pygame
 from pygame import Rect, Surface, transform
 
 from .map_loader import TilemapData
+from .protocols import ExtraObject
 
 CHUNK_SIZE = 32
 
@@ -19,19 +20,15 @@ class LayerRenderStats:
 
 
 class TileLayerRenderer:
-    def __init__(
-        self, data: TilemapData, *, include_hidden_layers: bool = False
-    ) -> None:
+    def __init__(self, data: TilemapData, *, include_hidden_layers: bool = False) -> None:
         self.data = data
-        self.tile_layers = data.get_tile_layers_dict(
-            include_hidden=include_hidden_layers
-        )
+        self.tile_layers = data.get_tile_layers_dict(include_hidden=include_hidden_layers)
         self._sorted_layer_ids = sorted(
             self.tile_layers.keys(),
             key=lambda lid: (self.tile_layers[lid].z_index, lid),
         )
 
-        self._variant_cache: Dict[Tuple[int, int], Optional[Surface]] = {}
+        self._variant_cache: dict[tuple[int, int], Surface | None] = {}
 
         self._tile_w, self._tile_h = data.tile_size
         self._rs = data.render_scale
@@ -45,7 +42,7 @@ class TileLayerRenderer:
                 f"got tile_size=({self._tile_w}, {self._tile_h}) render_scale={self._rs}"
             )
 
-        self._tileset_animations: Dict[int, dict] = {}
+        self._tileset_animations: dict[int, dict] = {}
         for ts_idx, ts in enumerate(data.parsed.tilesets):
             if ts.animation is not None:
                 self._tileset_animations[ts_idx] = {
@@ -56,9 +53,9 @@ class TileLayerRenderer:
                     "animation_mode": ts.animation.animation_mode,
                 }
 
-        self._layer_chunks: Dict[int, Dict[Tuple[int, int], List[Tuple[int, int]]]] = {}
+        self._layer_chunks: dict[int, dict[tuple[int, int], list[tuple[int, int]]]] = {}
         for layer_id, layer in self.tile_layers.items():
-            chunks: Dict[Tuple[int, int], List[Tuple[int, int]]] = {}
+            chunks: dict[tuple[int, int], list[tuple[int, int]]] = {}
             for (x, y), tile in layer.tiles.items():
                 if not isinstance(tile.ttype, int):
                     continue
@@ -69,10 +66,10 @@ class TileLayerRenderer:
                 chunks[chunk_key].append((x, y))
             self._layer_chunks[layer_id] = chunks
 
-    def get_layer_dict(self) -> Dict[int, object]:
+    def get_layer_dict(self) -> dict[int, object]:
         return dict(self.tile_layers)
 
-    def _get_cached_variant(self, ttype: int, variant: int) -> Optional[Surface]:
+    def _get_cached_variant(self, ttype: int, variant: int) -> Surface | None:
         key = (ttype, variant)
         if key not in self._variant_cache:
             cell = self.data.get_tile_surface(ttype, variant, copy_surface=True)
@@ -121,17 +118,21 @@ class TileLayerRenderer:
     def render(
         self,
         target: Surface,
-        camera_xy: Union[Tuple[float, float], Tuple[int, int]] = (0, 0),
-        viewport_size: Optional[Tuple[int, int]] = None,
+        camera_xy: tuple[float, float] | tuple[int, int] = (0, 0),
+        viewport_size: tuple[int, int] | None = None,
         *,
-        current_time_ms: Optional[float] = None,
+        extra_objects: Sequence[ExtraObject] | None = None,
+        current_time_ms: float | None = None,
     ) -> LayerRenderStats:
-        """Render visible tile layers.
+        """Render visible tile layers, optionally merged with extra objects.
 
-        Note: ``skipped_tiles`` is a debugging indicator, not a whole-map
-        accumulated count. It tracks null surfaces and invalid tiles within
-        the active chunk range — enough to spot rendering issues without
-        the cost of a full scan.
+        When *extra_objects* is provided, each item must have ``surface``,
+        ``x``, and ``y`` attributes (duck-typed). Extras are blitted after
+        all tile layers, preserving caller order.
+
+        Tiles are blitted per layer in natural chunk order.  When
+        ``layer.y_sort`` is enabled, tiles within each chunk are sorted by
+        their tile-space Y coordinate before blitting.
         """
         cam_x, cam_y = float(camera_xy[0]), float(camera_xy[1])
         if viewport_size is None:
@@ -171,11 +172,14 @@ class TileLayerRenderer:
                     if not chunk:
                         continue
 
-                    for x, y in chunk:
+                    tile_iter = chunk
+                    if layer.y_sort:
+                        origin = layer.y_sort_origin
+                        tile_iter = sorted(chunk, key=lambda p: p[1] * self._eff_h + origin)
+
+                    for x, y in tile_iter:
                         tile = layer.tiles[(x, y)]
-                        display_variant = self._compute_display_variant(
-                            tile.variant, tile.ttype, x, y, time_ms
-                        )
+                        display_variant = self._compute_display_variant(tile.variant, tile.ttype, x, y, time_ms)
                         cell = self._get_cached_variant(tile.ttype, display_variant)
                         if cell is None:
                             skipped += 1
@@ -187,6 +191,15 @@ class TileLayerRenderer:
                         )
                         drawn += 1
 
-        return LayerRenderStats(
-            drawn_tiles=drawn, skipped_tiles=skipped, visible_layers=visible_layers
-        )
+        if extra_objects:
+            for obj in extra_objects:
+                surf = obj.surface
+                if surf is None:
+                    continue
+                target.blit(surf, (obj.x - cam_x, obj.y - cam_y))
+
+        return LayerRenderStats(drawn_tiles=drawn, skipped_tiles=skipped, visible_layers=visible_layers)
+
+    @property
+    def sorted_layer_ids(self) -> list[int]:
+        return list(self._sorted_layer_ids)

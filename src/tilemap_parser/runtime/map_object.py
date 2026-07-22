@@ -56,6 +56,7 @@ class MapObject:
         "collision_shapes",
         "collision_layer",
         "collision_mask",
+        "y_sort_origin",
     )
 
     def __init__(
@@ -68,6 +69,7 @@ class MapObject:
         collision_shapes: Optional[List[CollisionPolygon]] = None,
         collision_layer: int = 1,
         collision_mask: int = 0xFFFFFFFF,
+        y_sort_origin: Optional[int] = None,
     ) -> None:
         self.x = x
         self.y = y
@@ -76,6 +78,7 @@ class MapObject:
         self.collision_shape = self.collision_shapes[0]
         self.collision_layer = collision_layer
         self.collision_mask = collision_mask
+        self.y_sort_origin = y_sort_origin
 
 
 def _resolve_object_collision_filename(tileset_path: Union[str, Path]) -> str:

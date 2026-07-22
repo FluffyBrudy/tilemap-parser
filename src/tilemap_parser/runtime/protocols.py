@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Protocol, Union
+from typing import Protocol
+
+import pygame
+from pygame import Surface
 
 from ..parser.collision import (
     CapsuleShape,
@@ -8,6 +11,12 @@ from ..parser.collision import (
     CollisionPolygon,
     RectangleShape,
 )
+
+
+class ExtraObject(Protocol):
+    surface: Surface | None
+    x: float
+    y: float
 
 
 class ICollidable(Protocol):
@@ -25,4 +34,4 @@ class ICollidable(Protocol):
 
     x: float
     y: float
-    collision_shape: Union[RectangleShape, CircleShape, CapsuleShape, CollisionPolygon]
+    collision_shape: RectangleShape | CircleShape | CapsuleShape | CollisionPolygon
