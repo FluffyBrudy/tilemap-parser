@@ -63,8 +63,8 @@ class MapObject:
         self,
         x: float,
         y: float,
-        surface: Surface,
-        collision_shape: CollisionPolygon,
+        surface: Optional[Surface] = None,
+        collision_shape: Optional[CollisionPolygon] = None,
         *,
         collision_shapes: Optional[List[CollisionPolygon]] = None,
         collision_layer: int = 1,
@@ -74,11 +74,22 @@ class MapObject:
         self.x = x
         self.y = y
         self.surface = surface
-        self.collision_shapes = collision_shapes or [collision_shape]
-        self.collision_shape = self.collision_shapes[0]
+        if collision_shapes is not None:
+            self.collision_shapes = collision_shapes
+            self.collision_shape = collision_shapes[0] if collision_shapes else None
+        elif collision_shape is not None:
+            self.collision_shapes = [collision_shape]
+            self.collision_shape = collision_shape
+        else:
+            self.collision_shapes = []
+            self.collision_shape = None
         self.collision_layer = collision_layer
         self.collision_mask = collision_mask
         self.y_sort_origin = y_sort_origin
+
+    @property
+    def has_collision(self) -> bool:
+        return len(self.collision_shapes) > 0
 
 
 def _resolve_object_collision_filename(tileset_path: Union[str, Path]) -> str:
@@ -94,8 +105,9 @@ def load_map_objects(
     collision_dir: Union[str, Path],
     *,
     cache: Optional[CollisionCache] = None,
+    require_collision: bool = True,
 ) -> List[MapObject]:
-    """Load all collidable objects from a tilemap.
+    """Load objects from a tilemap.
 
     Iterates every object layer in *tilemap_data*, resolves the
     corresponding ``.object_collision.json`` from *collision_dir*, and
@@ -129,13 +141,12 @@ def load_map_objects(
             files (typically ``<map_path>/collision/``).
         cache: Optional :class:`CollisionCache` for caching parsed
             collision data across calls.
+        require_collision: If True (default), only objects with matching
+            collision regions are returned. If False, visual-only objects
+            without collision are also included.
 
     Returns:
-        List of :class:`MapObject` instances, one per map object that
-        has both a valid surface and a matching collision region.
-        When a region contains multiple collision polygons, all shapes
-        are preserved in :attr:`MapObject.collision_shapes` and the
-        collision system checks each shape pair during narrowphase.
+        List of :class:`MapObject` instances.
     """
     collision_dir = Path(collision_dir)
     objects: List[MapObject] = []
@@ -167,6 +178,16 @@ def load_map_objects(
 
             collision_data = loaded_collision[ttype]
             if collision_data is None:
+                if require_collision:
+                    continue
+                game_obj = MapObject(
+                    x=x,
+                    y=y,
+                    surface=surf,
+                    collision_shape=None,
+                    collision_shapes=[],
+                )
+                objects.append(game_obj)
                 continue
 
             world_shapes = []
@@ -180,6 +201,16 @@ def load_map_objects(
                 oy = region.region_rect[1] * rs
                 world_shapes.extend(shape.transform(ox, oy, rs) for shape in region.shapes)
             if not world_shapes:
+                if require_collision:
+                    continue
+                game_obj = MapObject(
+                    x=x,
+                    y=y,
+                    surface=surf,
+                    collision_shape=None,
+                    collision_shapes=[],
+                )
+                objects.append(game_obj)
                 continue
 
             game_obj = MapObject(

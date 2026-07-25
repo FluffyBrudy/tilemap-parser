@@ -8,11 +8,18 @@ from ..parser.node_parse import ParsedNode
 
 
 class AreaNode:
-    def __init__(self, parsed: ParsedNode) -> None:
+    def __init__(self, parsed: ParsedNode, render_scale: float = 1.0) -> None:
         self.node_id = parsed.node_id
         self.name = parsed.name
         self.node_type = parsed.node_type
-        self._rect = Rect(parsed.area.x, parsed.area.y, parsed.area.w, parsed.area.h)
+        self.render_scale = render_scale
+        rs = render_scale
+        self._rect = Rect(
+            int(parsed.area.x * rs),
+            int(parsed.area.y * rs),
+            int(parsed.area.w * rs),
+            int(parsed.area.h * rs),
+        )
         self.layer_name = parsed.layer_name
         self.properties = dict(parsed.properties)
         self.group = parsed.group

@@ -109,7 +109,11 @@ class TilemapData:
         origin_offset = _normalize_origin(parsed)
         result = cls(parsed, surfaces, resolved_paths, warnings, map_path=p)
         result.origin_offset = origin_offset
-        result.area_nodes = [AreaNode(n) for n in parsed.nodes if n.node_type == "area"]
+        result.area_nodes = [
+            AreaNode(n, render_scale=result.render_scale)
+            for n in parsed.nodes
+            if n.node_type == "area"
+        ]
         result.particle_emitters = [
             ParticleEmitterNode(n) for n in parsed.nodes if n.node_type == "particle_emitter"
         ]
@@ -275,8 +279,8 @@ class TilemapData:
         return self.get_tile_surface(tile.ttype, tile.variant)
 
     def get_object_surface_by_id(
-        self, layer_id_or_name: Union[int, str], object_id: int, *, copy_surface: bool = True
-    ) -> Optional[Tuple[Surface, int, int]]:
+        self, layer_id_or_name: Union[int, str], object_id: int, *, copy_surface: bool = True, scaled: bool = False
+    ) -> Optional[Tuple[Surface, float, float]]:
         layer = self.get_layer(layer_id_or_name)
         if layer is None or layer.layer_type != "object":
             return None
@@ -286,19 +290,31 @@ class TilemapData:
         surf = self.get_object_surface(obj, copy_surface=copy_surface)
         if surf is None:
             return None
-        return surf, obj.area.x, obj.area.y
+        rs = self.render_scale if scaled else 1.0
+        x = obj.area.x * rs
+        y = obj.area.y * rs
+        if scaled and rs != 1.0:
+            w, h = surf.get_size()
+            surf = pygame.transform.scale(surf, (int(w * rs), int(h * rs)))
+        return surf, x, y
 
     def get_object_surfaces(
-        self, layer_id_or_name: Union[int, str], *, copy_surface: bool = True
-    ) -> List[Tuple[Surface, int, int, int]]:
+        self, layer_id_or_name: Union[int, str], *, copy_surface: bool = True, scaled: bool = False
+    ) -> List[Tuple[Surface, float, float, int]]:
         layer = self.get_layer(layer_id_or_name)
         if layer is None or layer.layer_type != "object":
             return []
-        result: List[Tuple[Surface, int, int, int]] = []
+        result: List[Tuple[Surface, float, float, int]] = []
+        rs = self.render_scale if scaled else 1.0
         for oid, obj in layer.objects.items():
             surf = self.get_object_surface(obj, copy_surface=copy_surface)
             if surf is not None:
-                result.append((surf, obj.area.x, obj.area.y, oid))
+                x = obj.area.x * rs
+                y = obj.area.y * rs
+                if scaled and rs != 1.0:
+                    w, h = surf.get_size()
+                    surf = pygame.transform.scale(surf, (int(w * rs), int(h * rs)))
+                result.append((surf, x, y, oid))
         return result
 
     def get_tileset_animation(self, ttype: int) -> Optional[dict]:
