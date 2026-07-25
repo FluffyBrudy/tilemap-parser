@@ -346,3 +346,102 @@ class TestNodeLoading:
         assert pe.config.lifetime_min == 0.5
         assert pe.config.lifetime_max == 2.0
         assert pe.config.gravity_y == 30.0
+
+    def test_get_object_surfaces_scaled(self, map_data):
+        _, data_dir, _, _ = map_data
+        # Create map with render_scale = 2.0 and object layer
+        map_path = data_dir / "test_map_obj.json"
+        payload = {
+            "meta": {
+                "tile_size": "16;16",
+                "map_size": "10;10",
+                "version": "1.1",
+                "render_scale": 2.0,
+            },
+            "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "object"}]},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "ongrid": {},
+                "layers": [
+                    {
+                        "name": "Obj",
+                        "type": "object",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "properties": {},
+                        "tiles": {},
+                        "objects": {
+                            "1": {
+                                "area": {"x": 32, "y": 64, "w": 16, "h": 16},
+                                "ttype": 0,
+                                "tileset_type": "object",
+                                "variant": 0,
+                                "properties": {},
+                            }
+                        },
+                    }
+                ],
+            },
+        }
+        with open(map_path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+        td = TilemapData.load(map_path)
+        # Unscaled
+        unscaled = td.get_object_surfaces("Obj", scaled=False)
+        assert len(unscaled) == 1
+        surf_u, x_u, y_u, _ = unscaled[0]
+        assert (x_u, y_u) == (32, 64)
+        assert surf_u.get_size() == (16, 16)
+
+        # Scaled
+        scaled = td.get_object_surfaces("Obj", scaled=True)
+        assert len(scaled) == 1
+        surf_s, x_s, y_s, _ = scaled[0]
+        assert (x_s, y_s) == (64, 128)
+        assert surf_s.get_size() == (32, 32)
+
+    def test_area_node_scaled(self, map_data):
+        _, data_dir, _, _ = map_data
+        map_path = data_dir / "test_map_scaled_nodes.json"
+        payload = {
+            "meta": {
+                "tile_size": "16;16",
+                "map_size": "10;10",
+                "version": "1.1",
+                "render_scale": 3.0,
+            },
+            "resources": {"tilesets": [{"path": "../assets/tileset.png", "type": "tile"}]},
+            "project_state": {"rules": [], "groups": []},
+            "data": {"ongrid": {}, "layers": []},
+        }
+        with open(map_path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+        nodes_path = data_dir / "test_map_scaled_nodes.nodes.json"
+        nodes_payload = {
+            "nodes": [
+                {
+                    "node_id": "area_1",
+                    "name": "Zone",
+                    "node_type": "area",
+                    "area": {"x": 10, "y": 20, "w": 30, "h": 40},
+                    "layer_name": "main",
+                    "properties": {},
+                    "group": "",
+                }
+            ],
+            "groups": [],
+        }
+        with open(nodes_path, "w") as f:
+            json.dump(nodes_payload, f, indent=2)
+
+        td = TilemapData.load(map_path)
+        assert len(td.area_nodes) == 1
+        an = td.area_nodes[0]
+        assert an.rect == pygame.Rect(30, 60, 90, 120)
+
+
+

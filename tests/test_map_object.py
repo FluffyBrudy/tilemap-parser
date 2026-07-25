@@ -1299,4 +1299,26 @@ class TestLoadMapObjects:
             objects = load_map_objects(td, collision_dir)
             assert objects == []
 
+    def test_load_visual_only_objects(self, map_no_collision_file):
+        td, collision_dir = map_no_collision_file
+        # With require_collision=False, objects without collision files are returned
+        objects = load_map_objects(td, collision_dir, require_collision=False)
+        assert len(objects) == 1
+        obj = objects[0]
+        assert obj.has_collision is False
+        assert obj.collision_shape is None
+        assert obj.collision_shapes == []
+        assert isinstance(obj.surface, pygame.Surface)
+
+    def test_map_object_optional_collision(self):
+        surf = pygame.Surface((16, 16))
+        obj = MapObject(x=10, y=20, surface=surf)
+        assert obj.x == 10
+        assert obj.y == 20
+        assert obj.surface is surf
+        assert obj.collision_shape is None
+        assert obj.collision_shapes == []
+        assert obj.has_collision is False
+
+
 
