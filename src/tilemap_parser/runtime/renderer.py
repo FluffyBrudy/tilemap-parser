@@ -178,6 +178,8 @@ class TileLayerRenderer:
                         tile_iter = sorted(chunk, key=lambda p: p[1] * self._eff_h + origin)
 
                     for x, y in tile_iter:
+                        if not (min_x <= x <= max_x and min_y <= y <= max_y):
+                            continue
                         tile = layer.tiles[(x, y)]
                         display_variant = self._compute_display_variant(tile.variant, tile.ttype, x, y, time_ms)
                         cell = self._get_cached_variant(tile.ttype, display_variant)
