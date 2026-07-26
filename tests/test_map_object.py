@@ -8,13 +8,12 @@ Covers:
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 
 import pygame
 import pytest
-
-import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -250,14 +249,14 @@ def map_multiple_objects():
                                 "ttype": 0,
                                 "tileset_type": "object",
                                 "variant": 0,
-                            "properties": {},
-                        },
-                        "2": {
-                            "area": {"x": 300, "y": 400, "w": 16, "h": 16},
-                            "ttype": 0,
-                            "tileset_type": "object",
-                            "variant": 1,
-                            "properties": {},
+                                "properties": {},
+                            },
+                            "2": {
+                                "area": {"x": 300, "y": 400, "w": 16, "h": 16},
+                                "ttype": 0,
+                                "tileset_type": "object",
+                                "variant": 1,
+                                "properties": {},
                             },
                         },
                         "next_object_id": 3,
@@ -415,6 +414,7 @@ class TestLoadMapObjects:
             nonlocal call_count
             call_count += 1
             from tilemap_parser.parser.collision_loader import load_object_collision
+
             return load_object_collision(path)
 
         monkeypatch.setattr(
@@ -438,6 +438,7 @@ class TestLoadMapObjects:
             nonlocal call_count
             call_count += 1
             from tilemap_parser.parser.collision_loader import load_object_collision
+
             return load_object_collision(path)
 
         # CollisionCache.get_object_collision calls its own module-level
@@ -506,21 +507,27 @@ class TestLoadMapObjects:
                         "region_id": "region_top",
                         "region_rect": [0, 0, 32, 16],
                         "name": "Top",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [32, 0], [32, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [32, 0], [32, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                     "region_bot": {
                         "region_id": "region_bot",
                         "region_rect": [0, 16, 32, 16],
                         "name": "Bottom",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [32, 0], [32, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [32, 0], [32, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                     "region_extra": {
                         "region_id": "region_extra",
                         "region_rect": [0, 0, 16, 32],
                         "name": "Extra",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 32], [0, 32]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 32], [0, 32]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -546,7 +553,7 @@ class TestLoadMapObjects:
         surf = pygame.Surface((16, 16))
         # shape_a: 0-10, 0-10
         shape_a = CollisionPolygon(vertices=[(0, 0), (10, 0), (10, 10), (0, 10)])
-        # shape_b: 20-30, 0-10  
+        # shape_b: 20-30, 0-10
         shape_b = CollisionPolygon(vertices=[(20, 0), (30, 0), (30, 10), (20, 10)])
 
         obj1 = MapObject(x=0, y=0, surface=surf, collision_shape=shape_a, collision_shapes=[shape_a, shape_b])
@@ -627,7 +634,9 @@ class TestLoadMapObjects:
                         "region_id": "region_r",
                         "region_rect": [5, 10, 16, 16],
                         "name": "R",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -671,8 +680,8 @@ class TestLoadMapObjects:
 
     def test_render_scale_3x(self):
         """render_scale=3.0 scales positions and polygon vertices."""
-        from tilemap_parser.runtime.map_object import load_map_objects
         from tilemap_parser.runtime.map_loader import TilemapData
+        from tilemap_parser.runtime.map_object import load_map_objects
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -693,7 +702,9 @@ class TestLoadMapObjects:
                         "region_id": "region_r",
                         "region_rect": [5, 10, 16, 16],
                         "name": "R",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -792,7 +803,9 @@ class TestLoadMapObjects:
                         "region_id": "region_r",
                         "region_rect": [0, 0, 16, 16],
                         "name": "R",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -845,8 +858,9 @@ class TestLoadMapObjects:
                 objects = load_map_objects(td, collision_dir)
                 assert len(objects) == 1
                 obj = objects[0]
-                assert obj.surface.get_size() == (expected_w, expected_h), \
+                assert obj.surface.get_size() == (expected_w, expected_h), (
                     f"rs={rs_val}: expected ({expected_w},{expected_h}) got {obj.surface.get_size()}"
+                )
                 assert obj.x == 10 * rs_val, f"rs={rs_val}: x={obj.x} != {10 * rs_val}"
                 assert obj.y == 20 * rs_val, f"rs={rs_val}: y={obj.y} != {20 * rs_val}"
 
@@ -863,7 +877,9 @@ class TestLoadMapObjects:
                         "region_id": "region_r",
                         "region_rect": [0, 0, 17, 35],
                         "name": "R",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [17, 0], [17, 35], [0, 35]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [17, 0], [17, 35], [0, 35]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -917,8 +933,9 @@ class TestLoadMapObjects:
             obj = objects_odd[0]
             assert obj.x == 11 * 1.5, f"fractional x: {obj.x} != {11 * 1.5}"
             assert obj.y == 21 * 1.5, f"fractional y: {obj.y} != {21 * 1.5}"
-            assert obj.surface.get_size() == (25, 52), \
+            assert obj.surface.get_size() == (25, 52), (
                 f"truncated surface: {obj.surface.get_size()} != (25, 52)  [int(17*1.5)=25, int(35*1.5)=52]"
+            )
 
     def test_render_scale_collision_consistency(self):
         """At render_scale=3.0, a loaded object collides with a manually-placed
@@ -943,7 +960,9 @@ class TestLoadMapObjects:
                         "region_id": "region_r",
                         "region_rect": [0, 0, 16, 16],
                         "name": "R",
-                        "shapes": [{"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}],
+                        "shapes": [
+                            {"type": "polygon", "vertices": [[0, 0], [16, 0], [16, 16], [0, 16]], "one_way": False}
+                        ],
                         "properties": {},
                     },
                 },
@@ -1115,8 +1134,8 @@ class TestLoadMapObjects:
     def test_render_scale_visual_collision_alignment(self):
         """At render_scale=N, collision AABB is fully inside visual rect
         and vertex positions are pixel-accurate for known values."""
-        from tilemap_parser.runtime.map_object import load_map_objects
         from tilemap_parser.runtime.map_loader import TilemapData
+        from tilemap_parser.runtime.map_object import load_map_objects
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -1144,10 +1163,18 @@ class TestLoadMapObjects:
                         "shapes": [
                             {
                                 "type": "polygon",
-                                "vertices": [[32.0, 2.75], [8.0, 30.0], [10.5, 58.75],
-                                             [22.5, 65.25], [20.0, 88.25], [33.5, 81.75],
-                                             [47.5, 87.75], [41.5, 65.75], [58.5, 48.75],
-                                             [52.0, 25.0]],
+                                "vertices": [
+                                    [32.0, 2.75],
+                                    [8.0, 30.0],
+                                    [10.5, 58.75],
+                                    [22.5, 65.25],
+                                    [20.0, 88.25],
+                                    [33.5, 81.75],
+                                    [47.5, 87.75],
+                                    [41.5, 65.75],
+                                    [58.5, 48.75],
+                                    [52.0, 25.0],
+                                ],
                                 "one_way": False,
                             }
                         ],
@@ -1207,8 +1234,9 @@ class TestLoadMapObjects:
                 # Verify surface size is pixel-accurate at integer render_scale
                 expected_w = int(64 * rs_val)
                 expected_h = int(96 * rs_val)
-                assert obj.surface.get_size() == (expected_w, expected_h), \
+                assert obj.surface.get_size() == (expected_w, expected_h), (
                     f"rs={rs_val}: surface {obj.surface.get_size()} != ({expected_w},{expected_h})"
+                )
 
                 # Verify position is pixel-accurate (float)
                 assert obj.x == 27 * rs_val, f"rs={rs_val}: x={obj.x} != {27 * rs_val}"
@@ -1219,10 +1247,12 @@ class TestLoadMapObjects:
                 # First vertex: (32.0, 2.75) + region_rect (0, 3) = world (32*rs, (3+2.75)*rs)
                 expected_v0 = (32.0 * rs_val, (3.0 + 2.75) * rs_val)
                 actual_v0 = shape.vertices[0]
-                assert abs(actual_v0[0] - expected_v0[0]) < 0.001, \
+                assert abs(actual_v0[0] - expected_v0[0]) < 0.001, (
                     f"rs={rs_val}: vertex[0].x {actual_v0[0]} != {expected_v0[0]}"
-                assert abs(actual_v0[1] - expected_v0[1]) < 0.001, \
+                )
+                assert abs(actual_v0[1] - expected_v0[1]) < 0.001, (
                     f"rs={rs_val}: vertex[0].y {actual_v0[1]} != {expected_v0[1]}"
+                )
 
                 # Verify collision AABB is inside visual rect
                 xs = [v[0] for v in shape.vertices]
@@ -1238,14 +1268,16 @@ class TestLoadMapObjects:
                 vis_bottom = obj.y + expected_h
 
                 margin = -0.001  # allow 0px floating point tolerance
-                assert coll_min_x >= vis_left + margin, \
+                assert coll_min_x >= vis_left + margin, (
                     f"rs={rs_val}: collision left {coll_min_x} < visual left {vis_left}"
-                assert coll_min_y >= vis_top + margin, \
-                    f"rs={rs_val}: collision top {coll_min_y} < visual top {vis_top}"
-                assert coll_max_x <= vis_right - margin, \
+                )
+                assert coll_min_y >= vis_top + margin, f"rs={rs_val}: collision top {coll_min_y} < visual top {vis_top}"
+                assert coll_max_x <= vis_right - margin, (
                     f"rs={rs_val}: collision right {coll_max_x} > visual right {vis_right}"
-                assert coll_max_y <= vis_bottom - margin, \
+                )
+                assert coll_max_y <= vis_bottom - margin, (
                     f"rs={rs_val}: collision bottom {coll_max_y} > visual bottom {vis_bottom}"
+                )
 
     def test_invalid_tileset_index_skipped(self):
         """Object with ttype out of range is skipped."""
@@ -1320,5 +1352,28 @@ class TestLoadMapObjects:
         assert obj.collision_shapes == []
         assert obj.has_collision is False
 
+    def test_ttype_default_minus_one(self):
+        """Direct MapObject creation without ttype defaults to -1."""
+        surf = pygame.Surface((16, 16))
+        obj = MapObject(x=0, y=0, surface=surf)
+        assert obj.ttype == -1
 
+    def test_ttype_set_on_construction(self):
+        """ttype is stored when passed to MapObject.__init__."""
+        surf = pygame.Surface((16, 16))
+        obj = MapObject(x=0, y=0, surface=surf, ttype=3)
+        assert obj.ttype == 3
 
+    def test_ttype_on_loaded_object(self, basic_map):
+        """load_map_objects sets ttype from ParsedObject.ttype."""
+        td, collision_dir, _ = basic_map
+        objects = load_map_objects(td, collision_dir)
+        assert len(objects) == 1
+        assert objects[0].ttype == 0
+
+    def test_ttype_on_visual_only_object(self, map_no_collision_file):
+        """Visual-only objects (require_collision=False) carry ttype."""
+        td, collision_dir = map_no_collision_file
+        objects = load_map_objects(td, collision_dir, require_collision=False)
+        assert len(objects) == 1
+        assert objects[0].ttype == 0

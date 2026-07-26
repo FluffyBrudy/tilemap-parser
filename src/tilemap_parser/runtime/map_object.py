@@ -16,7 +16,7 @@ Usage::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, final
 
 import pygame
 from pygame import Surface
@@ -25,6 +25,7 @@ from ..parser.collision import CollisionPolygon, ObjectCollisionData
 from ..parser.collision_loader import load_object_collision
 from .collision_cache import CollisionCache
 from .map_loader import TilemapData
+
 
 
 class MapObject:
@@ -48,28 +49,34 @@ class MapObject:
     shape pairs when either object has multiple shapes.
     """
 
-    __slots__ = (
-        "x",
-        "y",
-        "surface",
-        "collision_shape",
-        "collision_shapes",
-        "collision_layer",
-        "collision_mask",
-        "y_sort_origin",
+    __slots__ = tuple(
+        sorted(
+            (
+                "x",
+                "y",
+                "surface",
+                "collision_shape",
+                "collision_shapes",
+                "collision_layer",
+                "collision_mask",
+                "y_sort_origin",
+                "ttype",
+            )
+        )
     )
 
     def __init__(
         self,
         x: float,
         y: float,
-        surface: Optional[Surface] = None,
-        collision_shape: Optional[CollisionPolygon] = None,
+        surface: Surface | None = None,
+        collision_shape: CollisionPolygon | None = None,
         *,
-        collision_shapes: Optional[List[CollisionPolygon]] = None,
+        collision_shapes: list[CollisionPolygon] | None = None,
         collision_layer: int = 1,
         collision_mask: int = 0xFFFFFFFF,
-        y_sort_origin: Optional[int] = None,
+        y_sort_origin: int | None = None,
+        ttype: int = -1,
     ) -> None:
         self.x = x
         self.y = y
@@ -86,13 +93,14 @@ class MapObject:
         self.collision_layer = collision_layer
         self.collision_mask = collision_mask
         self.y_sort_origin = y_sort_origin
+        self.ttype = ttype
 
     @property
     def has_collision(self) -> bool:
         return len(self.collision_shapes) > 0
 
 
-def _resolve_object_collision_filename(tileset_path: Union[str, Path]) -> str:
+def _resolve_object_collision_filename(tileset_path: str | Path) -> str:
     """Extract the object collision filename for a given tileset path.
 
     Example: ``"building7.png"`` → ``"building7.object_collision.json"``
@@ -102,11 +110,11 @@ def _resolve_object_collision_filename(tileset_path: Union[str, Path]) -> str:
 
 def load_map_objects(
     tilemap_data: TilemapData,
-    collision_dir: Union[str, Path],
+    collision_dir: str | Path,
     *,
-    cache: Optional[CollisionCache] = None,
+    cache: CollisionCache | None = None,
     require_collision: bool = True,
-) -> List[MapObject]:
+) -> list[MapObject]:
     """Load objects from a tilemap.
 
     Iterates every object layer in *tilemap_data*, resolves the
@@ -149,10 +157,10 @@ def load_map_objects(
         List of :class:`MapObject` instances.
     """
     collision_dir = Path(collision_dir)
-    objects: List[MapObject] = []
+    objects: list[MapObject] = []
     object_layers = tilemap_data.get_layers(layer_type="object")
 
-    loaded_collision: Dict[int, Optional[ObjectCollisionData]] = {}
+    loaded_collision: dict[int, ObjectCollisionData | None] = {}
 
     for layer in object_layers:
         for obj_id, obj in layer.objects.items():
@@ -171,9 +179,7 @@ def load_map_objects(
 
             ttype = obj.ttype
             if ttype not in loaded_collision:
-                collision_data = _load_collision_for_tileset(
-                    tilemap_data, ttype, collision_dir, cache
-                )
+                collision_data = _load_collision_for_tileset(tilemap_data, ttype, collision_dir, cache)
                 loaded_collision[ttype] = collision_data
 
             collision_data = loaded_collision[ttype]
@@ -186,6 +192,7 @@ def load_map_objects(
                     surface=surf,
                     collision_shape=None,
                     collision_shapes=[],
+                    ttype=obj.ttype,
                 )
                 objects.append(game_obj)
                 continue
@@ -209,6 +216,7 @@ def load_map_objects(
                     surface=surf,
                     collision_shape=None,
                     collision_shapes=[],
+                    ttype=obj.ttype,
                 )
                 objects.append(game_obj)
                 continue
@@ -221,6 +229,7 @@ def load_map_objects(
                 collision_shapes=world_shapes,
                 collision_layer=region_layer,
                 collision_mask=region_mask,
+                ttype=obj.ttype,
             )
             objects.append(game_obj)
 
