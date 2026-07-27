@@ -28,6 +28,7 @@ from .object_collision import (
 )
 from .renderer import LayerRenderStats, TileLayerRenderer
 from .area_node import AreaNode
+from . import navigation
 from .particles import (
     Particle,
     ParticleEmitter,
