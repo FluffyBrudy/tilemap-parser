@@ -1,0 +1,490 @@
+---
+title: Parser API
+description: Reference for the TilemapParser class and methods.
+category: API
+order: 1
+keywords: [api, reference, parser, methods]
+---
+
+# Parser API
+
+Complete reference for the Tilemap Parser API.
+
+## TilemapParser
+
+The main parser class for loading and parsing tilemap data.
+
+### Constructor
+
+```python
+from tilemap_parser import TilemapParser
+
+parser = TilemapParser()
+```
+
+Creates a new parser instance with default configuration.
+
+### Methods
+
+#### parse_file()
+
+```python
+def parse_file(filepath: str) -> MapData:
+    """Parse a tilemap JSON file."""
+```
+
+Load and parse a tilemap from a JSON file.
+
+**Parameters:**
+- `filepath` (str): Path to the tilemap JSON file
+
+**Returns:** MapData object
+
+**Raises:** 
+- `FileNotFoundError`: If the file doesn't exist
+- `TilemapParserError`: If the file format is invalid
+
+**Example:**
+```python
+map_data = parser.parse_file('map.json')
+```
+
+#### parse_string()
+
+```python
+def parse_string(json_string: str) -> MapData:
+    """Parse tilemap data from a JSON string."""
+```
+
+Parse tilemap data from a JSON string.
+
+**Parameters:**
+- `json_string` (str): JSON string containing tilemap data
+
+**Returns:** MapData object
+
+**Example:**
+```python
+with open('map.json') as f:
+    map_data = parser.parse_string(f.read())
+```
+
+#### parse_dict()
+
+```python
+def parse_dict(data: dict) -> MapData:
+    """Parse tilemap data from a dictionary."""
+```
+
+Parse tilemap data from a Python dictionary.
+
+**Parameters:**
+- `data` (dict): Dictionary containing tilemap data
+
+**Returns:** MapData object
+
+**Example:**
+```python
+import json
+with open('map.json') as f:
+    data = json.load(f)
+map_data = parser.parse_dict(data)
+```
+
+## MapData
+
+Represents a complete tilemap with all layers, tilesets, and properties.
+
+### Properties
+
+#### width
+
+```python
+width: int
+```
+
+The width of the map in pixels.
+
+#### height
+
+```python
+height: int
+```
+
+The height of the map in pixels.
+
+#### tilewidth
+
+```python
+tilewidth: int
+```
+
+The width of individual tiles in pixels.
+
+#### tileheight
+
+```python
+tileheight: int
+```
+
+The height of individual tiles in pixels.
+
+#### layers
+
+```python
+layers: List[Layer]
+```
+
+List of all layers in the map.
+
+#### tilesets
+
+```python
+tilesets: List[Tileset]
+```
+
+List of all tilesets used by the map.
+
+#### properties
+
+```python
+properties: Dict[str, Any]
+```
+
+Custom properties attached to the map.
+
+### Methods
+
+#### get_layer()
+
+```python
+def get_layer(name: str) -> Optional[Layer]:
+    """Get a layer by name."""
+```
+
+Find and return a layer by its name.
+
+**Parameters:**
+- `name` (str): Name of the layer to retrieve
+
+**Returns:** Layer object or None if not found
+
+**Example:**
+```python
+collision_layer = map_data.get_layer('Collision')
+```
+
+#### get_tileset()
+
+```python
+def get_tileset(name: str) -> Optional[Tileset]:
+    """Get a tileset by name."""
+```
+
+Find and return a tileset by its name.
+
+**Parameters:**
+- `name` (str): Name of the tileset
+
+**Returns:** Tileset object or None if not found
+
+## Layer
+
+Base class for map layers.
+
+### Properties
+
+#### name
+
+```python
+name: str
+```
+
+The name of the layer.
+
+#### type
+
+```python
+type: str
+```
+
+The type of layer: 'tilelayer', 'objectgroup', or 'imagelayer'.
+
+#### visible
+
+```python
+visible: bool
+```
+
+Whether the layer is visible.
+
+#### opacity
+
+```python
+opacity: float
+```
+
+Layer opacity from 0.0 to 1.0.
+
+#### x
+
+```python
+x: float
+```
+
+X offset of the layer.
+
+#### y
+
+```python
+y: float
+```
+
+Y offset of the layer.
+
+#### properties
+
+```python
+properties: Dict[str, Any]
+```
+
+Custom properties of the layer.
+
+## TileLayer
+
+Represents a layer of tiles.
+
+### Properties
+
+#### width
+
+```python
+width: int
+```
+
+Width of the layer in tiles.
+
+#### height
+
+```python
+height: int
+```
+
+Height of the layer in tiles.
+
+#### data
+
+```python
+data: List[int]
+```
+
+Tile data as a flat list of tile IDs.
+
+### Methods
+
+#### get_tile()
+
+```python
+def get_tile(x: int, y: int) -> int:
+    """Get tile ID at coordinates."""
+```
+
+Get the tile ID at the specified tile coordinates.
+
+**Parameters:**
+- `x` (int): X coordinate in tiles
+- `y` (int): Y coordinate in tiles
+
+**Returns:** Tile ID (0 if empty)
+
+**Example:**
+```python
+tile_id = tile_layer.get_tile(5, 10)
+```
+
+## ObjectLayer
+
+Represents a layer containing objects.
+
+### Properties
+
+#### objects
+
+```python
+objects: List[Object]
+```
+
+List of objects in this layer.
+
+## Object
+
+Represents an object in an object layer.
+
+### Properties
+
+#### id
+
+```python
+id: int
+```
+
+Unique identifier for the object.
+
+#### name
+
+```python
+name: str
+```
+
+Name of the object.
+
+#### type
+
+```python
+type: str
+```
+
+Type of the object (user-defined).
+
+#### x
+
+```python
+x: float
+```
+
+X position in pixels.
+
+#### y
+
+```python
+y: float
+```
+
+Y position in pixels.
+
+#### width
+
+```python
+width: float
+```
+
+Width in pixels.
+
+#### height
+
+```python
+height: float
+```
+
+Height in pixels.
+
+#### properties
+
+```python
+properties: Dict[str, Any]
+```
+
+Custom properties of the object.
+
+## Tileset
+
+Represents a tileset used by the map.
+
+### Properties
+
+#### name
+
+```python
+name: str
+```
+
+Name of the tileset.
+
+#### firstgid
+
+```python
+firstgid: int
+```
+
+First global tile ID for this tileset.
+
+#### tilecount
+
+```python
+tilecount: int
+```
+
+Number of tiles in the tileset.
+
+#### tilewidth
+
+```python
+tilewidth: int
+```
+
+Width of tiles in this tileset.
+
+#### tileheight
+
+```python
+tileheight: int
+```
+
+Height of tiles in this tileset.
+
+#### image
+
+```python
+image: str
+```
+
+Path to the tileset image.
+
+#### tiles
+
+```python
+tiles: List[Tile]
+```
+
+List of individual tiles with properties.
+
+## Tile
+
+Represents an individual tile in a tileset.
+
+### Properties
+
+#### id
+
+```python
+id: int
+```
+
+Local tile ID within the tileset.
+
+#### properties
+
+```python
+properties: Dict[str, Any]
+```
+
+Custom properties for this tile.
+
+#### animation
+
+```python
+animation: Optional[List[Dict]]
+```
+
+Animation frames if the tile is animated.
+
+## Exceptions
+
+### TilemapParserError
+
+```python
+class TilemapParserError(Exception):
+    """Base exception for parser errors."""
+```
+
+Raised when there's an error parsing tilemap data.

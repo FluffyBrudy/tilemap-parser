@@ -1,0 +1,194 @@
+---
+title: Sprite Animations
+description: Work with animated tile sprites from tilesets.
+category: Guide
+order: 4
+keywords: [animation, sprites, tilesets, frames]
+---
+
+# Sprite Animations
+
+Learn how to work with animated sprite data in Tilemap Parser.
+
+## Animation basics
+
+Tilesets can define animations for individual tiles. These animations cycle through multiple tile IDs to create the illusion of movement.
+
+## Accessing animations
+
+Retrieve animation data from tilesets:
+
+```python
+for tileset in map_data.tilesets:
+    print(f"Tileset: {tileset.name}")
+    
+    for tile in tileset.tiles:
+        if hasattr(tile, 'animation') and tile.animation:
+            print(f"Tile {tile.id} has {len(tile.animation)} frames")
+            
+            for frame in tile.animation:
+                tile_id = frame['tileid']
+                duration = frame['duration']
+                print(f"  Frame: tile {tile_id}, duration {duration}ms")
+```
+
+## Animation controller
+
+Track and update animations:
+
+```python
+class AnimationController:
+    def __init__(self, map_data):
+        self.map_data = map_data
+        self.animations = {}
+        self.animation_state = {}
+        
+        self._build_animation_map()
+    
+    def _build_animation_map(self):
+        """Build a map of tile ID to animation data."""
+        for tileset in self.map_data.tilesets:
+            for tile in tileset.tiles:
+                if hasattr(tile, 'animation') and tile.animation:
+                    tile_id = tileset.firstgid + tile.id
+                    self.animations[tile_id] = tile.animation
+                    self.animation_state[tile_id] = {
+                        'frame': 0,
+                        'elapsed': 0
+                    }
+    
+    def get_frame(self, tile_id, elapsed_ms):
+        """Get the current frame for an animated tile."""
+        if tile_id not in self.animations:
+            return tile_id
+        
+        animation = self.animations[tile_id]
+        frames = animation
+        
+        # Calculate total animation duration
+        total_duration = sum(frame['duration'] for frame in frames)
+        
+        # Loop time through animation cycle
+        cycle_time = elapsed_ms % total_duration
+        
+        # Find current frame
+        elapsed = 0
+        for frame in frames:
+            elapsed += frame['duration']
+            if cycle_time < elapsed:
+                return frame['tileid']
+        
+        return frames[0]['tileid']
+```
+
+## Rendering animations
+
+Render animated tiles correctly:
+
+```python
+def render_animated_tilemap(screen, map_data, animation_controller, elapsed_time):
+    """Render tilemap with animation support."""
+    tile_layer = map_data.get_layer('Tiles')
+    
+    for y in range(tile_layer.height):
+        for x in range(tile_layer.width):
+            tile_id = tile_layer.get_tile(x, y)
+            
+            if tile_id > 0:
+                # Get current frame if animated
+                display_id = animation_controller.get_frame(tile_id, elapsed_time)
+                
+                # Render tile
+                render_tile(screen, display_id, x, y, map_data)
+```
+
+## Performance optimization
+
+For large numbers of animated tiles, consider caching:
+
+```python
+class OptimizedAnimationController(AnimationController):
+    def __init__(self, map_data):
+        super().__init__(map_data)
+        self.frame_cache = {}
+        self.last_time = 0
+    
+    def get_frame_cached(self, tile_id, elapsed_ms):
+        """Get frame with caching for performance."""
+        cache_key = (tile_id, elapsed_ms // 16)  # Cache per 16ms
+        
+        if cache_key in self.frame_cache:
+            return self.frame_cache[cache_key]
+        
+        frame = self.get_frame(tile_id, elapsed_ms)
+        self.frame_cache[cache_key] = frame
+        
+        # Limit cache size
+        if len(self.frame_cache) > 10000:
+            self.frame_cache.clear()
+        
+        return frame
+```
+
+## Advanced animation
+
+Handle complex animation scenarios:
+
+```python
+class AdvancedAnimationController(AnimationController):
+    def __init__(self, map_data):
+        super().__init__(map_data)
+        self.paused_animations = set()
+        self.animation_speeds = {}
+    
+    def pause_animation(self, tile_id):
+        """Pause animation for a specific tile."""
+        self.paused_animations.add(tile_id)
+    
+    def resume_animation(self, tile_id):
+        """Resume animation."""
+        self.paused_animations.discard(tile_id)
+    
+    def set_speed(self, tile_id, speed):
+        """Set animation speed multiplier."""
+        self.animation_speeds[tile_id] = speed
+    
+    def get_frame(self, tile_id, elapsed_ms):
+        """Get frame with speed multiplier support."""
+        if tile_id in self.paused_animations:
+            # Return first frame of animation
+            return self.animations[tile_id][0]['tileid']
+        
+        # Apply speed multiplier
+        speed = self.animation_speeds.get(tile_id, 1.0)
+        adjusted_elapsed = elapsed_ms * speed
+        
+        return super().get_frame(tile_id, adjusted_elapsed)
+```
+
+## Integration example
+
+Complete animation system integration:
+
+```python
+class GameEngine:
+    def __init__(self, map_data):
+        self.map_data = map_data
+        self.animation_controller = AnimationController(map_data)
+        self.elapsed_time = 0
+    
+    def update(self, delta_time_ms):
+        """Update game state."""
+        self.elapsed_time += delta_time_ms
+    
+    def render(self, screen):
+        """Render game frame."""
+        render_animated_tilemap(
+            screen,
+            self.map_data,
+            self.animation_controller,
+            self.elapsed_time
+        )
+```
+
+Animations bring tilemaps to life. With proper animation handling, you can create dynamic, visually interesting environments.

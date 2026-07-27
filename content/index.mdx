@@ -1,0 +1,111 @@
+---
+title: Documentation
+description: Complete guide to Tilemap Parser.
+category: Overview
+order: 0
+keywords: [documentation, guide, reference]
+---
+
+# Tilemap Parser Documentation
+
+Welcome to the comprehensive guide for Tilemap Parser, a lightweight production-ready parser for tilemap-editor JSON maps with full runtime support.
+
+## Getting Started
+
+If you're new to Tilemap Parser, start with these fundamental topics:
+
+- **[Installation](./getting-started/installation)** - Get the library installed and verify it's working
+- **[Quick Start](./getting-started/quick-start)** - Load your first map in under 5 minutes
+- **[Map Parsing](./guide/map-parsing)** - Understand how maps are structured and parsed
+
+## Learn the Fundamentals
+
+Dive deeper into core concepts:
+
+### Guide Topics
+
+- **[Collision Detection](./guide/collision-detection)** - Implement solid platforms and collision systems
+- **[Camera System](./guide/camera-system)** - Build viewport and camera systems
+- **[Sprite Animations](./guide/sprite-animations)** - Work with animated tiles
+- **[Particle Effects](./guide/particle-effects)** - Create particle systems from map data
+
+### Practical Examples
+
+- **[Basic Map Rendering](./examples/basic-rendering)** - Render a tilemap using Pygame
+- **[Collision Handling](./examples/collision-handling)** - Complete collision detection example
+- **[Advanced Usage](./examples/advanced-usage)** - Complex patterns and optimization
+
+## API Reference
+
+Complete technical reference:
+
+- **[Parser API](./api/parser)** - TilemapParser class and methods
+- **[Map Objects](./api/map-object)** - Map, Layer, and Object API
+- **[Collision API](./api/collision)** - Collision detection utilities
+
+## Reference
+
+Detailed specifications and formats:
+
+- **[JSON Format](./reference/json-format)** - Tilemap JSON structure specification
+- **[JSON Schema](./reference/json-schema)** - JSON Schema for validation
+
+## Architecture & Internals
+
+Understand the design:
+
+- **[Architecture](./internals/architecture)** - How Tilemap Parser is structured
+- **[Design Decisions](./internals/design-decisions)** - Why certain choices were made
+
+## Common Patterns
+
+### Quick Load
+
+```python
+from tilemap_parser import TilemapParser
+
+parser = TilemapParser()
+map_data = parser.parse_file('map.json')
+```
+
+### Access Layers
+
+```python
+collision_layer = map_data.get_layer('Collision')
+for layer in map_data.layers:
+    print(f"{layer.name}: {layer.type}")
+```
+
+### Check Collisions
+
+```python
+if collision_layer.get_tile(x, y) > 0:
+    print("Tile is solid!")
+```
+
+### Work with Objects
+
+```python
+object_layer = map_data.get_layer('Spawns')
+for obj in object_layer.objects:
+    print(f"{obj.name} at ({obj.x}, {obj.y})")
+```
+
+## Project Links
+
+- **[GitHub Repository](https://github.com/FluffyBrudy/tilemap-parser)** - Source code and issues
+- **[PyPI Package](https://pypi.org/project/tilemap-parser/)** - Install via pip
+- **[Issue Tracker](https://github.com/FluffyBrudy/tilemap-parser/issues)** - Report bugs and request features
+
+## Support
+
+Having trouble? Check these resources:
+
+- Review the [Quick Start](./getting-started/quick-start) guide
+- Read the relevant [API Reference](./api/parser)
+- Check [Examples](./examples/basic-rendering) for code patterns
+- Open an issue on [GitHub](https://github.com/FluffyBrudy/tilemap-parser/issues)
+
+---
+
+**Tilemap Parser** is a modern, efficient library for working with tilemap-editor maps at runtime. Built with simplicity and performance in mind, it provides everything you need to load, parse, and interact with tilemap data in your Python projects.

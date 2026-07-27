@@ -1,0 +1,207 @@
+---
+title: Basic Map Rendering
+description: A simple example of rendering a tilemap using Tilemap Parser.
+category: Examples
+order: 1
+keywords: [example, rendering, pygame, display]
+---
+
+# Basic Map Rendering
+
+Render a tilemap to the screen using Pygame.
+
+## Complete example
+
+This example loads a tilemap and renders it using Pygame:
+
+```python
+import pygame
+from tilemap_parser import TilemapParser
+from PIL import Image
+
+# Initialize Pygame
+pygame.init()
+
+# Parse the map
+parser = TilemapParser()
+map_data = parser.parse_file('map.json')
+
+# Create display
+tile_width = map_data.tilewidth
+tile_height = map_data.tileheight
+screen_width = map_data.width
+screen_height = map_data.height
+screen = pygame.display.set_mode((screen_width, screen_height))
+pygame.display.set_caption('Tilemap Renderer')
+
+# Load tileset image
+def load_tileset(image_path):
+    """Load tileset image and split into tiles."""
+    image = pygame.image.load(image_path).convert()
+    tiles = {}
+    
+    # Assuming tileset is arranged in a grid
+    tileset = map_data.tilesets[0]
+    cols = image.get_width() // tile_width
+    
+    tile_id = 1
+    for row in range(image.get_height() // tile_height):
+        for col in range(cols):
+            x = col * tile_width
+            y = row * tile_height
+            rect = pygame.Rect(x, y, tile_width, tile_height)
+            tiles[tile_id] = image.subsurface(rect)
+            tile_id += 1
+    
+    return tiles
+
+# Load all tilesets
+all_tiles = {}
+for tileset in map_data.tilesets:
+    tiles = load_tileset(tileset.image)
+    all_tiles.update(tiles)
+
+# Render loop
+clock = pygame.time.Clock()
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    # Clear screen
+    screen.fill((0, 0, 0))
+    
+    # Draw all tile layers
+    for layer in map_data.layers:
+        if layer.type == 'tilelayer' and layer.visible:
+            for y in range(layer.height):
+                for x in range(layer.width):
+                    tile_id = layer.get_tile(x, y)
+                    
+                    if tile_id > 0 and tile_id in all_tiles:
+                        pos = (x * tile_width, y * tile_height)
+                        screen.blit(all_tiles[tile_id], pos)
+    
+    # Update display
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
+```
+
+## Key concepts
+
+### Tile ID mapping
+
+Each tile layer stores tile IDs. Map these to visual tiles from tilesets:
+
+```python
+# Get tile ID from layer
+tile_id = layer.get_tile(x, y)
+
+# Find which tileset this belongs to
+for tileset in map_data.tilesets:
+    if tileset.firstgid <= tile_id < tileset.firstgid + tileset.tilecount:
+        # This tile belongs to this tileset
+        local_id = tile_id - tileset.firstgid
+        break
+```
+
+### Layer visibility
+
+Respect layer visibility settings:
+
+```python
+for layer in map_data.layers:
+    if not layer.visible:
+        continue  # Skip invisible layers
+    
+    # Adjust rendering based on opacity
+    alpha = int(255 * layer.opacity)
+```
+
+### Scrolling camera
+
+Implement a camera that follows a player:
+
+```python
+class Camera:
+    def __init__(self, width, height):
+        self.x = 0
+        self.y = 0
+        self.width = width
+        self.height = height
+    
+    def follow(self, target_x, target_y, map_width, map_height):
+        """Center camera on target."""
+        self.x = target_x - self.width // 2
+        self.y = target_y - self.height // 2
+        
+        # Clamp to map boundaries
+        self.x = max(0, min(self.x, map_width - self.width))
+        self.y = max(0, min(self.y, map_height - self.height))
+    
+    def apply(self, x, y):
+        """Convert world coordinates to screen coordinates."""
+        return (x - self.x, y - self.y)
+```
+
+## Performance optimization
+
+For large maps, consider these optimizations:
+
+### Chunk-based rendering
+
+Only render visible tiles:
+
+```python
+def render_visible_tiles(screen, camera, layer, all_tiles):
+    """Only render tiles within camera view."""
+    # Calculate visible tile range
+    min_x = camera.x // tile_width
+    max_x = (camera.x + camera.width) // tile_width + 1
+    min_y = camera.y // tile_height
+    max_y = (camera.y + camera.height) // tile_height + 1
+    
+    # Clamp to layer bounds
+    min_x = max(0, min(min_x, layer.width))
+    max_x = min(layer.width, max_x + 1)
+    min_y = max(0, min(min_y, layer.height))
+    max_y = min(layer.height, max_y + 1)
+    
+    # Render only visible tiles
+    for y in range(min_y, max_y):
+        for x in range(min_x, max_x):
+            tile_id = layer.get_tile(x, y)
+            if tile_id > 0 and tile_id in all_tiles:
+                screen_pos = camera.apply(x * tile_width, y * tile_height)
+                screen.blit(all_tiles[tile_id], screen_pos)
+```
+
+### Tile caching
+
+Cache rendered chunks instead of redrawing each frame:
+
+```python
+import pygame
+
+class TileCache:
+    def __init__(self, chunk_size=256):
+        self.chunk_size = chunk_size
+        self.cache = {}
+    
+    def get_chunk(self, chunk_x, chunk_y):
+        """Get or create a cached chunk."""
+        key = (chunk_x, chunk_y)
+        if key not in self.cache:
+            self.cache[key] = self.render_chunk(chunk_x, chunk_y)
+        return self.cache[key]
+    
+    def render_chunk(self, chunk_x, chunk_y):
+        """Render a chunk of tiles to a surface."""
+        surface = pygame.Surface((self.chunk_size, self.chunk_size))
+        # Render tiles for this chunk
+        return surface
+```

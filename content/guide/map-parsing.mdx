@@ -1,0 +1,173 @@
+---
+title: Map Parsing
+description: Understand how Tilemap Parser processes map data from JSON files.
+category: Guide
+order: 1
+keywords: [parsing, maps, json, layers, tilesets]
+---
+
+# Map Parsing
+
+Learn how Tilemap Parser processes and exposes tilemap data.
+
+## Overview
+
+Tilemap Parser reads JSON files created by tilemap-editor and converts them into Python objects with a clean, intuitive API. The parsing process validates the structure and extracts relevant data for runtime use.
+
+## Basic structure
+
+A parsed map has the following structure:
+
+```python
+from tilemap_parser import TilemapParser
+
+parser = TilemapParser()
+map_data = parser.parse_file('map.json')
+
+# Core properties
+print(map_data.width)        # Map width in pixels
+print(map_data.height)       # Map height in pixels
+print(map_data.tilewidth)    # Individual tile width
+print(map_data.tileheight)   # Individual tile height
+print(map_data.layers)       # List of all layers
+print(map_data.tilesets)     # List of all tilesets
+print(map_data.properties)   # Custom properties (if any)
+```
+
+## Working with layers
+
+Layers are the building blocks of your map. Each layer can be a tile layer, object layer, or image layer.
+
+### Layer types
+
+```python
+for layer in map_data.layers:
+    print(f"Name: {layer.name}")
+    print(f"Type: {layer.type}")  # 'tilelayer', 'objectgroup', 'imagelayer'
+    print(f"Visible: {layer.visible}")
+    print(f"Opacity: {layer.opacity}")
+```
+
+### Tile layers
+
+Access tile data from tile layers:
+
+```python
+tile_layer = map_data.get_layer('Tiles')
+
+# Dimensions
+print(f"Width: {tile_layer.width} tiles")
+print(f"Height: {tile_layer.height} tiles")
+
+# Get individual tiles
+tile_id = tile_layer.get_tile(x=0, y=0)
+
+# Get all tiles
+tiles = tile_layer.data  # List of tile IDs
+```
+
+### Object layers
+
+Work with objects placed on object layers:
+
+```python
+object_layer = map_data.get_layer('Spawns')
+
+for obj in object_layer.objects:
+    print(f"Object: {obj.name}")
+    print(f"  Position: ({obj.x}, {obj.y})")
+    print(f"  Size: {obj.width}x{obj.height}")
+    print(f"  Type: {obj.type}")
+    print(f"  Properties: {obj.properties}")
+```
+
+### Image layers
+
+Access image layer data:
+
+```python
+if image_layer.type == 'imagelayer':
+    print(f"Image: {image_layer.image}")
+    print(f"Position: ({image_layer.offsetx}, {image_layer.offsety})")
+```
+
+## Working with tilesets
+
+Tilesets define the visual appearance and properties of tiles.
+
+```python
+for tileset in map_data.tilesets:
+    print(f"Name: {tileset.name}")
+    print(f"Tile size: {tileset.tilewidth}x{tileset.tileheight}")
+    print(f"First GID: {tileset.firstgid}")
+    print(f"Tile count: {tileset.tilecount}")
+    print(f"Image: {tileset.image}")
+```
+
+### Tile properties
+
+Access properties of individual tiles in a tileset:
+
+```python
+tileset = map_data.tilesets[0]
+
+for tile in tileset.tiles:
+    print(f"Tile ID: {tile.id}")
+    print(f"  Properties: {tile.properties}")
+    if hasattr(tile, 'animation'):
+        print(f"  Animations: {tile.animation}")
+```
+
+## Custom properties
+
+tilemap-editor allows adding custom properties to maps, layers, and objects.
+
+```python
+# Map properties
+print(map_data.properties)
+
+# Layer properties
+layer = map_data.get_layer('MyLayer')
+print(layer.properties)
+
+# Object properties
+for obj in object_layer.objects:
+    print(obj.properties)
+    # Access individual properties
+    if 'health' in obj.properties:
+        health = obj.properties['health']
+```
+
+## Error handling
+
+Parser handles invalid data gracefully:
+
+```python
+from tilemap_parser import TilemapParserError
+
+try:
+    map_data = parser.parse_file('map.json')
+except TilemapParserError as e:
+    print(f"Parsing error: {e}")
+except FileNotFoundError:
+    print("Map file not found")
+```
+
+## Performance considerations
+
+For large maps, consider these optimization strategies:
+
+- **Lazy loading**: Parse only the layers you need
+- **Caching**: Store parsed data instead of re-parsing
+- **Streaming**: Process large tile data in chunks
+
+```python
+# Example: Process large tilemap in chunks
+tile_layer = map_data.get_layer('Tiles')
+chunk_size = 16
+
+for chunk_y in range(0, tile_layer.height, chunk_size):
+    for chunk_x in range(0, tile_layer.width, chunk_size):
+        # Process chunk of tiles
+        pass
+```

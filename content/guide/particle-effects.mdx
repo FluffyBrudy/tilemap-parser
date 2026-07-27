@@ -1,0 +1,225 @@
+---
+title: Particle Effects
+description: Create particle systems using tilemap data.
+category: Guide
+order: 5
+keywords: [particles, effects, visual, emitter]
+---
+
+# Particle Effects
+
+Build particle systems from tilemap data for visual effects.
+
+## Basic particle system
+
+A simple particle emitter:
+
+```python
+import random
+import math
+
+class Particle:
+    def __init__(self, x, y, vx, vy, lifetime):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.lifetime = lifetime
+        self.age = 0
+    
+    def update(self, delta):
+        self.age += delta
+        self.x += self.vx * delta
+        self.y += self.vy * delta
+        self.vy += 0.1  # gravity
+    
+    def is_alive(self):
+        return self.age < self.lifetime
+    
+    def get_opacity(self):
+        return 1.0 - (self.age / self.lifetime)
+
+class ParticleEmitter:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.particles = []
+    
+    def emit(self, count=5):
+        """Emit particles."""
+        for _ in range(count):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(1, 3)
+            
+            vx = math.cos(angle) * speed
+            vy = math.sin(angle) * speed
+            
+            particle = Particle(
+                self.x, self.y,
+                vx, vy,
+                lifetime=2000  # 2 seconds
+            )
+            self.particles.append(particle)
+    
+    def update(self, delta):
+        """Update all particles."""
+        for particle in self.particles[:]:
+            particle.update(delta)
+            if not particle.is_alive():
+                self.particles.remove(particle)
+    
+    def render(self, screen, tile_id):
+        """Render particles."""
+        for particle in self.particles:
+            opacity = particle.get_opacity()
+            render_particle(
+                screen, tile_id,
+                particle.x, particle.y,
+                opacity
+            )
+```
+
+## Tile-based particles
+
+Use specific tiles as particles:
+
+```python
+class TileParticleSystem:
+    def __init__(self, map_data):
+        self.map_data = map_data
+        self.emitters = []
+        self.particle_tiles = {}
+        
+        # Load particle tile definitions from object layer
+        particle_layer = map_data.get_layer('Particles')
+        if particle_layer:
+            for obj in particle_layer.objects:
+                self.particle_tiles[obj.name] = obj.properties.get('tile_id', 1)
+    
+    def create_emitter(self, particle_type, x, y, count=10):
+        """Create particle emitter at position."""
+        tile_id = self.particle_tiles.get(particle_type, 1)
+        
+        emitter = ParticleEmitter(x, y)
+        emitter.emit(count)
+        emitter.tile_id = tile_id
+        
+        self.emitters.append(emitter)
+    
+    def update(self, delta):
+        """Update all emitters."""
+        for emitter in self.emitters[:]:
+            emitter.update(delta)
+            if not emitter.particles:
+                self.emitters.remove(emitter)
+    
+    def render(self, screen):
+        """Render all particles."""
+        for emitter in self.emitters:
+            emitter.render(screen, emitter.tile_id)
+```
+
+## Effect triggers
+
+Trigger effects from game events:
+
+```python
+class EffectSystem:
+    def __init__(self, map_data):
+        self.particle_system = TileParticleSystem(map_data)
+        self.effects = {}
+        
+        # Load effect definitions
+        self._load_effects(map_data)
+    
+    def _load_effects(self, map_data):
+        """Load effect definitions from map."""
+        effects_layer = map_data.get_layer('Effects')
+        if effects_layer:
+            for obj in effects_layer.objects:
+                self.effects[obj.name] = {
+                    'type': obj.properties.get('type'),
+                    'particle_type': obj.properties.get('particle_type'),
+                    'duration': obj.properties.get('duration', 500),
+                    'count': obj.properties.get('count', 10),
+                }
+    
+    def trigger_effect(self, effect_name, x, y):
+        """Trigger an effect at a location."""
+        if effect_name not in self.effects:
+            return
+        
+        effect = self.effects[effect_name]
+        self.particle_system.create_emitter(
+            effect['particle_type'],
+            x, y,
+            count=effect['count']
+        )
+    
+    def update(self, delta):
+        """Update effects."""
+        self.particle_system.update(delta)
+    
+    def render(self, screen):
+        """Render effects."""
+        self.particle_system.render(screen)
+```
+
+## Advanced effects
+
+Complex particle behaviors:
+
+```python
+class AdvancedParticle(Particle):
+    def __init__(self, x, y, vx, vy, lifetime, color=None):
+        super().__init__(x, y, vx, vy, lifetime)
+        self.color = color or (255, 255, 255)
+        self.scale = 1.0
+    
+    def update(self, delta):
+        super().update(delta)
+        
+        # Fade out and shrink
+        progress = self.age / self.lifetime
+        self.scale = 1.0 - progress * 0.5
+
+class ExplosionEffect:
+    def __init__(self, x, y, radius=100):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.particles = []
+        self.duration = 1000
+        self.age = 0
+    
+    def emit(self):
+        """Create explosion particles."""
+        count = int(self.radius / 10)
+        
+        for _ in range(count):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(self.radius * 0.5, self.radius)
+            
+            vx = math.cos(angle) * speed / 1000
+            vy = math.sin(angle) * speed / 1000
+            
+            particle = AdvancedParticle(
+                self.x, self.y,
+                vx, vy,
+                lifetime=self.duration
+            )
+            self.particles.append(particle)
+    
+    def update(self, delta):
+        """Update explosion."""
+        self.age += delta
+        
+        for particle in self.particles:
+            particle.update(delta)
+    
+    def is_active(self):
+        """Check if explosion is still active."""
+        return self.age < self.duration
+```
+
+Particle effects add visual polish and feedback to your game world.

@@ -1,0 +1,109 @@
+---
+title: Quick Start
+description: Load and parse a tilemap in less than 5 minutes.
+category: Getting Started
+order: 2
+keywords: [quickstart, basics, first map, example]
+---
+
+# Quick Start
+
+Get up and running with Tilemap Parser in minutes.
+
+## Load a map
+
+Create a Python file and load a tilemap JSON file:
+
+```python
+from tilemap_parser import TilemapParser
+
+# Load a map from file
+parser = TilemapParser()
+map_data = parser.parse_file('path/to/your/map.json')
+
+print(f"Map size: {map_data.width}x{map_data.height}")
+print(f"Layers: {len(map_data.layers)}")
+print(f"Tilesets: {len(map_data.tilesets)}")
+```
+
+## Access layers
+
+Interact with map layers:
+
+```python
+# Get a specific layer
+tile_layer = map_data.get_layer('Tiles')
+
+# Iterate through all layers
+for layer in map_data.layers:
+    print(f"Layer: {layer.name}, Type: {layer.type}")
+    if hasattr(layer, 'data'):
+        print(f"  Dimensions: {layer.width}x{layer.height}")
+```
+
+## Check collisions
+
+Work with collision data:
+
+```python
+# Get collision layer
+collision_layer = map_data.get_layer('Collision')
+
+# Check if a tile has collision
+if collision_layer:
+    has_collision = collision_layer.get_tile(x=5, y=5)
+    print(f"Tile at (5,5) has collision: {has_collision}")
+```
+
+## Parse animations
+
+Access sprite animation data:
+
+```python
+# Get animations from tileset
+for tileset in map_data.tilesets:
+    if hasattr(tileset, 'tiles'):
+        for tile in tileset.tiles:
+            if hasattr(tile, 'animation'):
+                print(f"Tile {tile.id}: {tile.animation}")
+```
+
+## What's next?
+
+- Explore [examples](../examples/basic-rendering) to see more patterns
+- Read the [Map Parsing guide](../guide/map-parsing) for deeper understanding
+- Check the [API reference](../api/parser) for all available methods
+
+## Common patterns
+
+### Rendering tiles
+
+```python
+map_data = parser.parse_file('map.json')
+for layer in map_data.layers:
+    if layer.type == 'tilelayer':
+        for y in range(layer.height):
+            for x in range(layer.width):
+                tile_id = layer.get_tile(x, y)
+                if tile_id > 0:
+                    render_tile(tile_id, x, y)
+```
+
+### Working with objects
+
+```python
+# Access object layer
+object_layer = map_data.get_layer('Objects')
+if object_layer:
+    for obj in object_layer.objects:
+        print(f"{obj.name} at ({obj.x}, {obj.y})")
+```
+
+### Handling multiple tilesets
+
+```python
+for tileset in map_data.tilesets:
+    print(f"Tileset: {tileset.name}")
+    print(f"  Tile size: {tileset.tilewidth}x{tileset.tileheight}")
+    print(f"  First GID: {tileset.firstgid}")
+```

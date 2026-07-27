@@ -1,0 +1,256 @@
+---
+title: JSON Format
+description: Tilemap JSON format specification and structure.
+category: Reference
+order: 1
+keywords: [json, format, specification, structure]
+---
+
+# JSON Format
+
+Complete reference for the tilemap JSON format.
+
+## Overview
+
+Tilemap JSON files follow the format created by tilemap-editor. The format uses a hierarchical structure to represent all map data including layers, tilesets, objects, and custom properties.
+
+## Root structure
+
+```json
+{
+  "compressionlevel": -1,
+  "height": 30,
+  "infinite": false,
+  "layers": [],
+  "nextlayerid": 4,
+  "nextobjectid": 12,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.9.0",
+  "tileheight": 32,
+  "tilesets": [],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.9"
+}
+```
+
+### Root properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `width` | integer | Map width in tiles |
+| `height` | integer | Map height in tiles |
+| `tilewidth` | integer | Width of tiles in pixels |
+| `tileheight` | integer | Height of tiles in pixels |
+| `orientation` | string | Map orientation (e.g., "orthogonal") |
+| `renderorder` | string | Render order ("right-down", "right-up", etc.) |
+| `layers` | array | Array of layer objects |
+| `tilesets` | array | Array of tileset objects |
+| `properties` | object | Custom properties (optional) |
+
+## Layers
+
+### Tile Layer
+
+```json
+{
+  "data": [1, 2, 0, 3, ...],
+  "height": 30,
+  "name": "Tiles",
+  "opacity": 1.0,
+  "type": "tilelayer",
+  "visible": true,
+  "width": 40,
+  "x": 0,
+  "y": 0
+}
+```
+
+### Object Layer
+
+```json
+{
+  "name": "Spawns",
+  "objects": [
+    {
+      "id": 1,
+      "name": "spawn_1",
+      "x": 100,
+      "y": 200,
+      "width": 32,
+      "height": 32,
+      "type": "spawn",
+      "properties": {
+        "level": 5
+      }
+    }
+  ],
+  "type": "objectgroup",
+  "visible": true
+}
+```
+
+### Layer properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | string | Layer name |
+| `type` | string | Layer type (tilelayer, objectgroup, imagelayer) |
+| `visible` | boolean | Layer visibility |
+| `opacity` | number | Layer opacity (0.0-1.0) |
+| `x` | integer | X offset |
+| `y` | integer | Y offset |
+
+## Tilesets
+
+```json
+{
+  "firstgid": 1,
+  "name": "terrain",
+  "tileheight": 32,
+  "tilewidth": 32,
+  "tilecount": 256,
+  "columns": 16,
+  "image": "terrain.png",
+  "imageheight": 512,
+  "imagewidth": 512,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": {
+        "solid": true
+      }
+    }
+  ]
+}
+```
+
+### Tileset properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | string | Tileset name |
+| `tilewidth` | integer | Tile width in pixels |
+| `tileheight` | integer | Tile height in pixels |
+| `tilecount` | integer | Number of tiles |
+| `columns` | integer | Number of columns |
+| `image` | string | Path to tileset image |
+| `firstgid` | integer | First global tile ID |
+
+## Objects
+
+```json
+{
+  "id": 1,
+  "name": "enemy_spawn",
+  "type": "spawn",
+  "x": 128,
+  "y": 192,
+  "width": 32,
+  "height": 32,
+  "rotation": 0,
+  "visible": true,
+  "properties": {
+    "enemy_type": "goblin",
+    "health": 20
+  }
+}
+```
+
+### Object properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | integer | Unique object ID |
+| `name` | string | Object name |
+| `type` | string | Object type |
+| `x` | number | X position in pixels |
+| `y` | number | Y position in pixels |
+| `width` | number | Object width |
+| `height` | number | Object height |
+| `properties` | object | Custom properties |
+
+## Properties
+
+Custom properties can be attached to maps, layers, and objects:
+
+```json
+{
+  "properties": [
+    {
+      "name": "weather",
+      "type": "string",
+      "value": "rain"
+    },
+    {
+      "name": "difficulty",
+      "type": "int",
+      "value": 5
+    }
+  ]
+}
+```
+
+### Property types
+
+| Type | Description |
+|------|-------------|
+| `string` | Text value |
+| `int` | Integer number |
+| `float` | Floating-point number |
+| `bool` | Boolean value |
+| `color` | Color value |
+| `file` | File reference |
+| `object` | Object reference |
+
+## Example complete map
+
+```json
+{
+  "height": 15,
+  "width": 20,
+  "tileheight": 32,
+  "tilewidth": 32,
+  "layers": [
+    {
+      "data": [1, 2, 3, ...],
+      "height": 15,
+      "name": "Ground",
+      "type": "tilelayer",
+      "visible": true,
+      "width": 20,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "data": [0, 0, 1, ...],
+      "height": 15,
+      "name": "Collision",
+      "type": "tilelayer",
+      "visible": false,
+      "width": 20,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "properties": {
+    "level": 1,
+    "name": "Intro"
+  },
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "image": "tiles.png",
+      "imageheight": 512,
+      "imagewidth": 512,
+      "name": "tiles",
+      "tilecount": 256,
+      "tileheight": 32,
+      "tilewidth": 32
+    }
+  ],
+  "type": "map",
+  "version": "1.9"
+}
+```

@@ -1,0 +1,160 @@
+---
+title: Camera System
+description: Implement viewport and camera control systems for your tilemap.
+category: Guide
+order: 3
+keywords: [camera, viewport, scrolling, follow]
+---
+
+# Camera System
+
+Learn how to implement camera and viewport systems for your tilemap.
+
+## Camera basics
+
+A camera defines what portion of the map is visible on screen. This guide covers implementing smooth camera movement and viewport management.
+
+## Simple camera
+
+A basic camera that follows a player:
+
+```python
+class Camera:
+    def __init__(self, width, height):
+        self.x = 0
+        self.y = 0
+        self.width = width
+        self.height = height
+    
+    def follow(self, target_x, target_y, map_width, map_height):
+        """Center camera on target."""
+        self.x = target_x - self.width // 2
+        self.y = target_y - self.height // 2
+        
+        # Clamp to map boundaries
+        self.x = max(0, min(self.x, map_width - self.width))
+        self.y = max(0, min(self.y, map_height - self.height))
+    
+    def get_visible_tiles(self, tile_width, tile_height):
+        """Get range of visible tiles."""
+        min_x = self.x // tile_width
+        max_x = (self.x + self.width) // tile_width + 1
+        min_y = self.y // tile_height
+        max_y = (self.y + self.height) // tile_height + 1
+        return min_x, max_x, min_y, max_y
+```
+
+## Smooth camera movement
+
+Implement easing for smooth camera transitions:
+
+```python
+class SmoothCamera(Camera):
+    def __init__(self, width, height, smoothing=0.1):
+        super().__init__(width, height)
+        self.target_x = 0
+        self.target_y = 0
+        self.smoothing = smoothing
+    
+    def set_target(self, target_x, target_y):
+        """Set camera target."""
+        self.target_x = target_x - self.width // 2
+        self.target_y = target_y - self.height // 2
+    
+    def update(self, map_width, map_height):
+        """Update camera position with easing."""
+        # Linear interpolation towards target
+        self.x += (self.target_x - self.x) * self.smoothing
+        self.y += (self.target_y - self.y) * self.smoothing
+        
+        # Clamp to boundaries
+        self.x = max(0, min(self.x, map_width - self.width))
+        self.y = max(0, min(self.y, map_height - self.height))
+```
+
+## Viewport rendering
+
+Render only visible tiles for performance:
+
+```python
+def render_viewport(screen, camera, map_data, tileset_data):
+    """Render tiles visible in camera view."""
+    min_x, max_x, min_y, max_y = camera.get_visible_tiles(
+        map_data.tilewidth, 
+        map_data.tileheight
+    )
+    
+    tile_layer = map_data.get_layer('Tiles')
+    
+    for y in range(min_y, max_y):
+        for x in range(min_x, max_x):
+            if x < 0 or y < 0 or x >= tile_layer.width or y >= tile_layer.height:
+                continue
+            
+            tile_id = tile_layer.get_tile(x, y)
+            if tile_id > 0:
+                # Convert tile coordinates to screen coordinates
+                screen_x = x * map_data.tilewidth - camera.x
+                screen_y = y * map_data.tileheight - camera.y
+                
+                # Draw tile
+                draw_tile(screen, tile_id, screen_x, screen_y, tileset_data)
+```
+
+## Viewport bounds
+
+Implement camera constraints:
+
+```python
+class BoundedCamera(Camera):
+    def __init__(self, width, height, map_width, map_height):
+        super().__init__(width, height)
+        self.map_width = map_width
+        self.map_height = map_height
+        self.min_x = 0
+        self.max_x = map_width - width
+        self.min_y = 0
+        self.max_y = map_height - height
+    
+    def set_position(self, x, y):
+        """Set camera position with bounds checking."""
+        self.x = max(self.min_x, min(x, self.max_x))
+        self.y = max(self.min_y, min(y, self.max_y))
+    
+    def set_bounds(self, min_x, max_x, min_y, max_y):
+        """Define restricted camera movement area."""
+        self.min_x = min_x
+        self.max_x = max(max_x - self.width, min_x)
+        self.min_y = min_y
+        self.max_y = max(max_y - self.height, min_y)
+```
+
+## Parallax scrolling
+
+Create depth effect with multiple layers:
+
+```python
+def render_parallax(screen, camera, map_data):
+    """Render with parallax effect for depth."""
+    layers = [
+        ('Background', 0.3),
+        ('MidGround', 0.6),
+        ('Foreground', 1.0),
+    ]
+    
+    for layer_name, speed in layers:
+        layer = map_data.get_layer(layer_name)
+        if not layer:
+            continue
+        
+        # Offset based on camera and parallax speed
+        offset_x = camera.x * speed
+        offset_y = camera.y * speed
+        
+        # Render layer at offset
+        render_layer(screen, layer, offset_x, offset_y, map_data)
+```
+
+## Performance optimization
+
+Culling improves rendering performance significantly by skipping off-screen tiles.

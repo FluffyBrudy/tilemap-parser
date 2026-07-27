@@ -1,0 +1,74 @@
+---
+title: Installation
+description: Get Tilemap Parser up and running in your project.
+category: Getting Started
+order: 1
+keywords: [installation, setup, npm, pip]
+---
+
+# Installation
+
+Tilemap Parser is available as a Python package. Choose your preferred package manager to get started.
+
+## Using pip
+
+The easiest way to install Tilemap Parser is with pip:
+
+```bash
+pip install tilemap-parser
+```
+
+## Using conda
+
+If you prefer conda:
+
+```bash
+conda install -c conda-forge tilemap-parser
+```
+
+## From source
+
+To install the development version from the GitHub repository:
+
+```bash
+git clone https://github.com/FluffyBrudy/tilemap-parser.git
+cd tilemap-parser
+pip install -e .
+```
+
+## Verify installation
+
+To verify that Tilemap Parser is installed correctly, run:
+
+```bash
+python -c "import tilemap_parser; print(tilemap_parser.__version__)"
+```
+
+You should see the version number printed without any errors.
+
+## Next steps
+
+- Read the [Quick Start guide](./quick-start) to learn the basics
+- Check out [examples](../examples/basic-rendering) for real-world usage
+- Explore the [API reference](../api/parser) for detailed documentation
+
+## Troubleshooting
+
+### ImportError when importing
+
+If you get an `ImportError` when trying to import the package, make sure you're using the correct module name:
+
+```python
+import tilemap_parser  # Correct
+# from tilemap-parser import ...  # Incorrect (dashes instead of underscores)
+```
+
+### Python version compatibility
+
+Tilemap Parser requires Python 3.8 or higher. Check your Python version with:
+
+```bash
+python --version
+```
+
+If you need to use an older Python version, consider using a virtual environment or conda to manage different Python versions.

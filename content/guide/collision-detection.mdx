@@ -1,0 +1,199 @@
+---
+title: Collision Detection
+description: Implement collision detection using Tilemap Parser.
+category: Guide
+order: 2
+keywords: [collision, physics, hitbox, solids]
+---
+
+# Collision Detection
+
+Learn how to use Tilemap Parser's collision detection features.
+
+## Overview
+
+Tilemap Parser provides utilities to work with collision data stored in your tilemap. This data is typically stored in a dedicated collision layer that marks which tiles are solid.
+
+## Basic collision layer
+
+Most tilemaps have a collision layer that indicates which tiles are solid:
+
+```python
+# Get the collision layer
+collision_layer = map_data.get_layer('Collision')
+
+if collision_layer:
+    # Check if a specific tile has collision
+    is_solid = collision_layer.get_tile(x=5, y=10)
+    print(f"Tile at (5, 10) is solid: {bool(is_solid)}")
+```
+
+## Collision checking
+
+### Point collision
+
+Check if a point collides with any solid tiles:
+
+```python
+def is_point_solid(x, y):
+    """Convert pixel coordinates to tile coordinates and check collision."""
+    tile_x = x // map_data.tilewidth
+    tile_y = y // map_data.tileheight
+    
+    tile_id = collision_layer.get_tile(tile_x, tile_y)
+    return tile_id > 0  # Non-zero means solid
+```
+
+### Rectangle collision
+
+Check if a rectangular area collides with solid tiles:
+
+```python
+def check_rect_collision(x, y, width, height):
+    """Check if a rectangle collides with any solid tiles."""
+    tile_x1 = x // map_data.tilewidth
+    tile_y1 = y // map_data.tileheight
+    tile_x2 = (x + width - 1) // map_data.tilewidth
+    tile_y2 = (y + height - 1) // map_data.tileheight
+    
+    for ty in range(tile_y1, tile_y2 + 1):
+        for tx in range(tile_x1, tile_x2 + 1):
+            if collision_layer.get_tile(tx, ty) > 0:
+                return True
+    return False
+```
+
+### Circle collision
+
+Approximate circle collision with point checks:
+
+```python
+import math
+
+def check_circle_collision(cx, cy, radius):
+    """Approximate circle collision detection."""
+    checks = int(2 * math.pi * radius / 4)  # Sample points around circle
+    
+    for i in range(checks):
+        angle = (2 * math.pi * i) / checks
+        px = cx + radius * math.cos(angle)
+        py = cy + radius * math.sin(angle)
+        
+        if is_point_solid(px, py):
+            return True
+    return False
+```
+
+## Multi-layer collision
+
+Use multiple collision layers for different types:
+
+```python
+collision_wall = map_data.get_layer('Collision_Wall')
+collision_water = map_data.get_layer('Collision_Water')
+collision_lava = map_data.get_layer('Collision_Lava')
+
+def get_tile_type(x, y):
+    """Determine what type of collision exists at a position."""
+    tile_x = x // map_data.tilewidth
+    tile_y = y // map_data.tileheight
+    
+    if collision_wall.get_tile(tile_x, tile_y) > 0:
+        return 'wall'
+    if collision_water.get_tile(tile_x, tile_y) > 0:
+        return 'water'
+    if collision_lava.get_tile(tile_x, tile_y) > 0:
+        return 'lava'
+    return None
+```
+
+## Movement with collision
+
+Implement basic character movement with collision handling:
+
+```python
+class Player:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.vel_x = 0
+        self.vel_y = 0
+    
+    def move(self, dx, dy):
+        """Move with collision detection."""
+        # Try horizontal movement
+        new_x = self.x + dx
+        if not check_rect_collision(new_x, self.y, self.width, self.height):
+            self.x = new_x
+        
+        # Try vertical movement
+        new_y = self.y + dy
+        if not check_rect_collision(self.x, new_y, self.width, self.height):
+            self.y = new_y
+    
+    def update(self):
+        """Update position each frame."""
+        # Apply gravity
+        self.vel_y += 0.5
+        
+        # Move with collision
+        self.move(self.vel_x, self.vel_y)
+        
+        # Apply friction
+        self.vel_x *= 0.9
+```
+
+## Object-based collision
+
+Use object layer collision areas:
+
+```python
+def get_collision_objects():
+    """Get all collision objects from the map."""
+    collision_layer = map_data.get_layer('Colliders')
+    
+    colliders = []
+    for obj in collision_layer.objects:
+        colliders.append({
+            'name': obj.name,
+            'x': obj.x,
+            'y': obj.y,
+            'width': obj.width,
+            'height': obj.height,
+            'type': obj.type
+        })
+    
+    return colliders
+
+def rect_collision(x1, y1, w1, h1, x2, y2, w2, h2):
+    """Check if two rectangles collide."""
+    return (x1 < x2 + w2 and
+            x1 + w1 > x2 and
+            y1 < y2 + h2 and
+            y1 + h1 > y2)
+```
+
+## Performance tips
+
+Optimize collision detection for large maps:
+
+```python
+class CollisionCache:
+    def __init__(self, map_data):
+        self.map_data = map_data
+        self.cache = {}
+    
+    def get_tile(self, x, y):
+        """Cached tile collision check."""
+        key = (x, y)
+        if key not in self.cache:
+            collision_layer = self.map_data.get_layer('Collision')
+            self.cache[key] = collision_layer.get_tile(x, y) > 0
+        return self.cache[key]
+    
+    def clear(self):
+        """Clear cache."""
+        self.cache.clear()
+```

@@ -1,0 +1,214 @@
+---
+title: Map Object API
+description: Reference for the Map and Layer objects.
+category: API
+order: 2
+keywords: [api, map, layer, reference]
+---
+
+# Map Object API
+
+Complete reference for Map and Layer types.
+
+## Map Properties
+
+The root map object contains all tilemap data and provides access to layers and tilesets.
+
+### Basic Properties
+
+```python
+map_data.width          # int: Map width in pixels
+map_data.height         # int: Map height in pixels
+map_data.tilewidth      # int: Tile width in pixels
+map_data.tileheight     # int: Tile height in pixels
+map_data.orientation    # str: Map orientation ("orthogonal", etc)
+map_data.renderorder    # str: Render order ("right-down", etc)
+map_data.properties     # dict: Custom properties
+```
+
+### Collections
+
+```python
+map_data.layers         # List[Layer]: All layers in order
+map_data.tilesets       # List[Tileset]: All tilesets
+```
+
+### Methods
+
+```python
+map_data.get_layer(name: str) -> Optional[Layer]
+map_data.get_tileset(name: str) -> Optional[Tileset]
+```
+
+## Layer Types
+
+### Base Layer Properties
+
+All layers share these properties:
+
+```python
+layer.name              # str: Layer name
+layer.type              # str: "tilelayer", "objectgroup", "imagelayer"
+layer.visible           # bool: Is layer visible
+layer.opacity           # float: Layer opacity (0.0-1.0)
+layer.x                 # float: X offset
+layer.y                 # float: Y offset
+layer.properties        # dict: Custom properties
+```
+
+### TileLayer
+
+Grid-based tile data layer.
+
+```python
+tile_layer.width        # int: Width in tiles
+tile_layer.height       # int: Height in tiles
+tile_layer.data         # List[int]: Tile IDs (flattened)
+
+# Methods
+tile_layer.get_tile(x: int, y: int) -> int  # Get tile ID at (x, y)
+```
+
+**Example:**
+```python
+for y in range(tile_layer.height):
+    for x in range(tile_layer.width):
+        tile_id = tile_layer.get_tile(x, y)
+        if tile_id > 0:
+            render_tile(tile_id, x, y)
+```
+
+### ObjectLayer
+
+Layer containing positioned objects.
+
+```python
+object_layer.objects    # List[Object]: Objects in layer
+
+# Methods
+for obj in object_layer.objects:
+    print(f"{obj.name} at ({obj.x}, {obj.y})")
+```
+
+### ImageLayer
+
+References to image assets.
+
+```python
+image_layer.image       # str: Path to image file
+image_layer.offsetx     # float: X offset
+image_layer.offsety     # float: Y offset
+```
+
+## Object Properties
+
+Objects in object layers represent entities, spawns, triggers, etc.
+
+```python
+obj.id                  # int: Unique ID
+obj.name                # str: Object name
+obj.type                # str: Object type
+obj.x                   # float: X position in pixels
+obj.y                   # float: Y position in pixels
+obj.width               # float: Width in pixels
+obj.height              # float: Height in pixels
+obj.rotation            # float: Rotation angle
+obj.visible             # bool: Is visible
+obj.properties          # dict: Custom properties
+```
+
+**Example:**
+```python
+spawns = map_data.get_layer('Spawns')
+for spawn in spawns.objects:
+    if spawn.type == 'enemy':
+        create_enemy(spawn.x, spawn.y, spawn.properties)
+```
+
+## Working with Properties
+
+All objects support custom properties defined in tilemap-editor:
+
+```python
+# Access properties
+if 'health' in obj.properties:
+    health = obj.properties['health']
+
+# Iterate properties
+for key, value in obj.properties.items():
+    print(f"{key}: {value}")
+
+# Common patterns
+for layer in map_data.layers:
+    if layer.type == 'objectgroup':
+        for obj in layer.objects:
+            props = obj.properties or {}
+            obj_type = props.get('type', 'unknown')
+```
+
+## Layer Iteration
+
+Safely iterate through layers:
+
+```python
+# All layers
+for layer in map_data.layers:
+    print(f"Layer: {layer.name} ({layer.type})")
+
+# Specific layer type
+for layer in map_data.layers:
+    if layer.type == 'tilelayer':
+        # Process tile layer
+        pass
+
+# By name
+collision_layer = map_data.get_layer('Collision')
+if collision_layer:
+    # Use collision layer
+    pass
+
+# Multiple tilesets
+for tileset in map_data.tilesets:
+    for tile in tileset.tiles:
+        if 'animation' in tile.properties:
+            setup_animation(tile)
+```
+
+## Data Access Patterns
+
+### Safe property access
+
+```python
+def get_prop(obj, key, default=None):
+    """Safely get object property."""
+    props = obj.properties or {}
+    return props.get(key, default)
+
+health = get_prop(player_obj, 'health', 100)
+```
+
+### Layer filtering
+
+```python
+def get_layers_by_type(map_data, layer_type):
+    """Get all layers of a specific type."""
+    return [l for l in map_data.layers if l.type == layer_type]
+
+tile_layers = get_layers_by_type(map_data, 'tilelayer')
+object_layers = get_layers_by_type(map_data, 'objectgroup')
+```
+
+### Hierarchical traversal
+
+```python
+def traverse_map(map_data, callback):
+    """Traverse all elements in map."""
+    for layer in map_data.layers:
+        callback('layer', layer)
+        
+        if layer.type == 'objectgroup':
+            for obj in layer.objects:
+                callback('object', obj)
+        elif layer.type == 'tilelayer':
+            callback('tiles', layer.data)
+```

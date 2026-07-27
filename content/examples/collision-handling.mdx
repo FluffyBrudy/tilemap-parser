@@ -1,0 +1,244 @@
+---
+title: Collision Handling
+description: Practical examples of implementing collision detection in games.
+category: Examples
+order: 2
+keywords: [collision, physics, movement, solid]
+---
+
+# Collision Handling
+
+Complete example of collision detection and handling.
+
+## Simple collision system
+
+```python
+from tilemap_parser import TilemapParser
+
+parser = TilemapParser()
+map_data = parser.parse_file('map.json')
+
+class CollisionSystem:
+    def __init__(self, map_data):
+        self.map_data = map_data
+        self.collision_layer = map_data.get_layer('Collision')
+    
+    def is_solid(self, x, y):
+        """Check if a tile is solid."""
+        if not self.collision_layer:
+            return False
+        
+        tile_x = int(x) // self.map_data.tilewidth
+        tile_y = int(y) // self.map_data.tileheight
+        
+        # Check bounds
+        if tile_x < 0 or tile_y < 0:
+            return True
+        if tile_x >= self.collision_layer.width or tile_y >= self.collision_layer.height:
+            return True
+        
+        tile_id = self.collision_layer.get_tile(tile_x, tile_y)
+        return tile_id > 0
+    
+    def check_rect_collision(self, x, y, width, height):
+        """Check if a rectangle collides with solid tiles."""
+        corners = [
+            (x, y),
+            (x + width, y),
+            (x, y + height),
+            (x + width, y + height)
+        ]
+        
+        for px, py in corners:
+            if self.is_solid(px, py):
+                return True
+        return False
+```
+
+## Entity movement
+
+Implement entity movement with collision response:
+
+```python
+class Entity:
+    def __init__(self, x, y, width, height, collision_system):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.collision_system = collision_system
+        self.vel_x = 0
+        self.vel_y = 0
+    
+    def try_move(self, dx, dy):
+        """Attempt to move, stopping at collisions."""
+        # Try X movement
+        new_x = self.x + dx
+        if not self.collision_system.check_rect_collision(
+            new_x, self.y, self.width, self.height
+        ):
+            self.x = new_x
+        
+        # Try Y movement
+        new_y = self.y + dy
+        if not self.collision_system.check_rect_collision(
+            self.x, new_y, self.width, self.height
+        ):
+            self.y = new_y
+    
+    def update(self):
+        """Update entity each frame."""
+        self.try_move(self.vel_x, self.vel_y)
+        
+        # Apply gravity if falling
+        if not self.is_grounded():
+            self.vel_y += 0.5
+        
+        # Apply friction
+        self.vel_x *= 0.9
+    
+    def is_grounded(self):
+        """Check if entity is standing on ground."""
+        return self.collision_system.check_rect_collision(
+            self.x, self.y + self.height + 1,
+            self.width, 1
+        )
+    
+    def jump(self, force):
+        """Jump if grounded."""
+        if self.is_grounded():
+            self.vel_y = -force
+```
+
+## Collision response
+
+Handle different collision types:
+
+```python
+class AdvancedCollisionSystem(CollisionSystem):
+    def __init__(self, map_data):
+        super().__init__(map_data)
+        self.layer_types = {}
+        
+        # Map layers to collision types
+        for i, layer in enumerate(map_data.layers):
+            if 'Wall' in layer.name:
+                self.layer_types[layer.name] = 'solid'
+            elif 'Water' in layer.name:
+                self.layer_types[layer.name] = 'water'
+            elif 'Spike' in layer.name:
+                self.layer_types[layer.name] = 'hazard'
+    
+    def get_collision_type(self, x, y):
+        """Get type of collision at position."""
+        for layer_name, col_type in self.layer_types.items():
+            layer = self.map_data.get_layer(layer_name)
+            if not layer:
+                continue
+            
+            tile_x = int(x) // self.map_data.tilewidth
+            tile_y = int(y) // self.map_data.tileheight
+            
+            if 0 <= tile_x < layer.width and 0 <= tile_y < layer.height:
+                if layer.get_tile(tile_x, tile_y) > 0:
+                    return col_type
+        
+        return None
+```
+
+## Sliding collision
+
+Implement slide-along-wall collision:
+
+```python
+class SlidingEntity(Entity):
+    def try_move_slide(self, dx, dy):
+        """Move with sliding against walls."""
+        # Try X movement
+        new_x = self.x + dx
+        can_move_x = not self.collision_system.check_rect_collision(
+            new_x, self.y, self.width, self.height
+        )
+        
+        # Try Y movement  
+        new_y = self.y + dy
+        can_move_y = not self.collision_system.check_rect_collision(
+            self.x, new_y, self.width, self.height
+        )
+        
+        # Apply successful movements (slide)
+        if can_move_x:
+            self.x = new_x
+        if can_move_y:
+            self.y = new_y
+```
+
+## Grid-based collision
+
+Optimized for grid-based movement:
+
+```python
+class GridBasedEntity:
+    def __init__(self, grid_x, grid_y, collision_system):
+        self.grid_x = grid_x
+        self.grid_y = grid_y
+        self.collision_system = collision_system
+    
+    @property
+    def x(self):
+        return self.grid_x * self.collision_system.map_data.tilewidth
+    
+    @property
+    def y(self):
+        return self.grid_y * self.collision_system.map_data.tileheight
+    
+    def can_move_to(self, grid_x, grid_y):
+        """Check if a grid cell is passable."""
+        return not self.collision_system.check_rect_collision(
+            grid_x * self.collision_system.map_data.tilewidth,
+            grid_y * self.collision_system.map_data.tileheight,
+            self.collision_system.map_data.tilewidth,
+            self.collision_system.map_data.tileheight
+        )
+    
+    def move(self, grid_dx, grid_dy):
+        """Move on the grid."""
+        new_x = self.grid_x + grid_dx
+        new_y = self.grid_y + grid_dy
+        
+        if self.can_move_to(new_x, new_y):
+            self.grid_x = new_x
+            self.grid_y = new_y
+            return True
+        return False
+```
+
+## Complete game loop
+
+Integration example:
+
+```python
+def game_loop(map_data):
+    collision_system = CollisionSystem(map_data)
+    player = Entity(100, 100, 32, 32, collision_system)
+    
+    running = True
+    while running:
+        # Handle input
+        keys = get_input()
+        if keys['left']:
+            player.vel_x = -5
+        if keys['right']:
+            player.vel_x = 5
+        if keys['up']:
+            player.jump(10)
+        
+        # Update
+        player.update()
+        
+        # Render
+        render_frame(player, map_data)
+        
+        # FPS cap
+        clock.tick(60)
+```
