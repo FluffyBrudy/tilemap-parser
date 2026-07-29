@@ -1,4 +1,4 @@
-from typing import Optional, cast
+from typing import Dict, List, Optional, Tuple, cast
 
 from pygame import Rect
 from tilemap_parser import (
@@ -25,6 +25,18 @@ from src.utils.pgdebug import Debug, pgdebug
 from src.utils.shape import get_sprite_center
 from src.utils.soundmanager import SoundManager
 from src.world_context import world_context
+
+_ENEMY_SPAWNS = [
+    (EyeFire, 400, 400),
+    (MutatedBat, 800, 1000),
+    (MutatedBat, 600, 600),
+    (MutatedBat, 1400, 500),
+    (Devilkin2, 1100, 0),
+    (Devilkin2, 100, 300),
+    (Devilkin2, 1500, 0),
+    (Devilkin2, 100, 800),
+    (EyeFire, 1000, 300),
+]
 
 
 class LevelScene:
@@ -72,7 +84,6 @@ class LevelScene:
             render_scale=mapdata.render_scale,
         )
 
-        node = mapdata.area_nodes[0]
         rs = mapdata.render_scale
 
         bullet_cfg = next(pn for pn in mapdata.particle_emitters if pn.name == "bulletEffect").config
@@ -95,8 +106,12 @@ class LevelScene:
         self.star = ParticleSystem(
             next(pn for pn in mapdata.particle_emitters if pn.name == "starysky").config,
         )
-        self.player = Player(node.rect.x , node.rect.top)
         self.tilemap = Tilemap(mapdata, self.collision_tileset)
+
+        self.player = Player(0, 0)
+        px, py = self._find_spawn_position()
+        self.player.x = px
+        self.player.y = py
 
         self.snow.config.apply_render_scale(self.tilemap.render_scale)
         self.star.config.apply_render_scale(self.tilemap.render_scale)
@@ -115,7 +130,7 @@ class LevelScene:
         self._spawn_enemies()
 
         self.camera = Camera(WIDTH, HEIGHT, mode="deadzone")
-        self.camera.lerp_speed = 1
+        self.camera.lerp_speed = 0
 
         self.transition = CircleTransition(WIDTH, HEIGHT)
         self.transition.start_open()
@@ -123,17 +138,27 @@ class LevelScene:
         self.exit_rect = self._find_exit_rect(mapdata, rs)
 
     def _spawn_enemies(self):
-        s = EnemyManager.spawn
         t = self.player
-        s(EyeFire, 400, 400, t)
-        s(MutatedBat, 800, 1000, t)
-        s(MutatedBat, 600, 600, t)
-        s(MutatedBat, 1400, 500, t)
-        s(Devilkin2, 1100, 0, t)
-        s(Devilkin2, 100, 300, t)
-        s(Devilkin2, 1500, 0, t)
-        s(Devilkin2, 100, 800, t)
-        s(EyeFire, 1000, 300, t)
+        for cls, x, y in _ENEMY_SPAWNS:
+            EnemyManager.spawn(cls, x, y, t)
+
+    def _find_spawn_position(self) -> Tuple[float, float]:
+        """Stand the player on the topmost solid tile near the first enemy."""
+        eff = self.tilemap.tilesize[0] * self.tilemap.render_scale
+        solid = {v for v, t in self.collision_tileset.tiles.items() if t.shapes}
+
+        by_col: Dict[int, List[int]] = {}
+        for (cx, cy), variant in self.tilemap.tilemap.items():
+            if variant in solid:
+                by_col.setdefault(cx, []).append(cy)
+
+        anchor_x = _ENEMY_SPAWNS[0][1]
+        col = min(by_col, key=lambda c: abs(c - anchor_x // eff))
+        top = min(by_col[col])
+
+        shape = self.player.collision_shape
+        bottom_offset = shape.offset[1] + shape.height + shape.radius
+        return (col + 0.5) * eff - shape.offset[0], top * eff - bottom_offset
 
     def _find_exit_rect(self, mapdata, rs: float) -> Optional[Rect]:
         for an in mapdata.area_nodes:
