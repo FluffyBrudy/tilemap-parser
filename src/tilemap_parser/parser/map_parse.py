@@ -165,6 +165,7 @@ class ParsedLayer:
     tiles: Dict[Point, ParsedTile] = field(default_factory=dict)
     objects: Dict[int, ParsedObject] = field(default_factory=dict)
     next_object_id: Optional[int] = None
+    ttypes: set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -301,6 +302,8 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
             _require_dict(layer_obj.get("objects", {}), f"{ctx}.objects"),
             f"{ctx}.objects",
         )
+        for obj in layer.objects.values():
+            layer.ttypes.add(obj.ttype)
         if "next_object_id" in layer_obj and layer_obj["next_object_id"] is not None:
             layer.next_object_id = _coerce_int(
                 layer_obj["next_object_id"], f"{ctx}.next_object_id"

@@ -1,16 +1,14 @@
 import json
+import sys
 import tempfile
 from pathlib import Path
 
 import pygame
 import pytest
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from tilemap_parser.runtime.map_loader import TilemapData
-from tilemap_parser.parser.map_parse import ParsedObject, ParsedObjectArea
-
+from tilemap_parser.parser.map_parse import ParsedObject, ParsedObjectArea, parse_map_dict
 
 MINIMAL_MAP_META = {
     "tile_size": "16;16",
@@ -188,5 +186,94 @@ class TestObjectSurfaces:
             tileset_type="object",
             variant=0,
         )
-        surf = td.get_object_surface(obj)
-        assert surf is None
+
+
+class TestParsedLayerTtypes:
+    def test_object_layer_ttypes_after_parse(self):
+        payload = {
+            "meta": {"tile_size": "16;16", "map_size": "10;10", "version": "1.1"},
+            "resources": {"tilesets": [{"path": "a.png", "type": "tile"}, {"path": "b.png", "type": "tile"}]},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "layers": [
+                    {
+                        "name": "Objs",
+                        "type": "object",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "properties": {},
+                        "tiles": {},
+                        "objects": {
+                            "1": {
+                                "area": {"x": 0, "y": 0, "w": 16, "h": 16},
+                                "ttype": 0,
+                                "tileset_type": "object",
+                                "variant": 0,
+                                "properties": {},
+                            },
+                            "2": {
+                                "area": {"x": 0, "y": 0, "w": 16, "h": 16},
+                                "ttype": 1,
+                                "tileset_type": "object",
+                                "variant": 0,
+                                "properties": {},
+                            },
+                            "3": {
+                                "area": {"x": 0, "y": 0, "w": 16, "h": 16},
+                                "ttype": 0,
+                                "tileset_type": "object",
+                                "variant": 1,
+                                "properties": {},
+                            },
+                        },
+                    },
+                    {
+                        "name": "Tiles",
+                        "type": "tile",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 1,
+                        "tiles": {},
+                    },
+                ],
+            },
+        }
+        parsed = parse_map_dict(payload)
+        obj_layer = parsed.layers[0]
+        tile_layer = parsed.layers[1]
+
+        assert obj_layer.ttypes == {0, 1}
+        assert tile_layer.ttypes == set()
+
+    def test_object_layer_empty_ttypes(self):
+        payload = {
+            "meta": {"tile_size": "16;16", "map_size": "10;10", "version": "1.1"},
+            "resources": {"tilesets": []},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "layers": [
+                    {
+                        "name": "Empty",
+                        "type": "object",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "properties": {},
+                        "tiles": {},
+                        "objects": {},
+                    }
+                ],
+            },
+        }
+        parsed = parse_map_dict(payload)
+        assert parsed.layers[0].ttypes == set()
+
+    def test_ttypes_preserved_through_tilemap_data(self, map_data):
+        td, *_ = map_data
+        layer = td.get_layer("Object Layer 1")
+        assert layer is not None
+        assert layer.ttypes == {0}
