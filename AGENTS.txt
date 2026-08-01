@@ -1,0 +1,114 @@
+Engineering Philosophy
+
+Stay skeptical, don't rush to features
+
+When a solution seems obvious, don't jump to implementing it. Open a discussion first 
+and identify the actual information or abstraction that's missing.
+
+A request for "one more field" or "one more reference" often signals that the wrong 
+object is being asked to own information — raise that concern before anyone writes code.
+
+Example from this codebase
+
+While designing the runtime API, there was an initial proposal that MapObject should 
+carry layer information so users could access rendering metadata (z-index, properties, etc.).
+
+After discussing the real workflow, the problem turned out to be much smaller.
+
+The actual requirement was:
+
+- Access object layer metadata.
+- Discover which tilesets a layer references.
+- Avoid exposing parser internals.
+
+Adding parser references to every MapObject would have coupled a lightweight 
+collision/render helper to the parser model. A smaller parser-level improvement was 
+sufficient:
+
+  ParsedLayer.ttypes: set[int]
+
+This preserves ownership:
+
+- Layers know which tilesets they reference.
+- Objects know which tileset they use.
+- MapObject remains focused on runtime collision/render concerns.
+
+The runtime API stayed unchanged while advanced users gained the information they 
+needed through existing public parser APIs — because the discussion happened before 
+the code.
+
+Principles
+
+- Identify the missing information in discussion before designing a solution.
+- Put information where it naturally belongs. Ownership should reflect the domain 
+  model, not convenience.
+- Prefer improving existing abstractions over introducing new ones — and say so in 
+  review.
+- Prefer small parser metadata over larger runtime abstractions when possible.
+- Avoid turning convenience classes into "objects that know everything."
+- Test new behavior at the lowest practical layer.
+- Don't introduce runtime coupling when a parser-level improvement is sufficient.
+
+---
+
+Respect architecture, but don't hunt dragons
+
+If an architectural limitation blocks real work, raise it in discussion and address it.
+
+If it merely feels incomplete, wait until multiple real use cases point to the same 
+missing abstraction. Don't refactor speculatively.
+
+Before proposing an architectural change, ask:
+
+- What concrete problem am I solving?
+- Who should own this information?
+- Can a minimal change solve it?
+- Does this reduce complexity or merely move it?
+
+Prefer the smallest change that removes today's friction without constraining 
+tomorrow's design.
+
+---
+
+Prefer composition over expansion
+
+When an existing type starts accumulating unrelated responsibilities, question in 
+review whether the functionality belongs in a helper, parser metadata, or another 
+existing abstraction — rather than tacking it onto the current type.
+
+A convenience type should remain convenient. Advanced workflows should be enabled 
+through composition of existing APIs, not by expanding one class until it becomes 
+responsible for everything.
+
+---
+
+Validate assumptions
+
+Treat suggestions — including your own — as hypotheses to discuss, not conclusions 
+to implement.
+
+Before agreeing to a new abstraction or expanding an existing one:
+
+1. Verify the actual pain point in conversation.
+2. Trace where the missing information originates.
+3. Ask whether ownership is already implied elsewhere.
+4. Agree on the smallest change that solves the real problem.
+5. Validate the design with tests before committing.
+
+The goal is not to minimize code changes at all costs, but to maximize clarity, 
+maintainability, and correct ownership through deliberate discussion before 
+implementation.
+
+Push back a little
+
+Don't become a yes-machine.
+
+If a suggestion looks questionable, argue your case — explain why, offer an 
+alternative, and challenge the assumption. This applies in code review, planning, 
+and any design conversation.
+
+If the other person still insists after understanding the trade-offs, proceed. 
+Sometimes the best engineering decision is losing the argument gracefully — but 
+the discussion should still happen first.
+
+"Wisdom was chasing you, but you were faster."

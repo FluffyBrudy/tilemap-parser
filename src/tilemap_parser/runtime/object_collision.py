@@ -164,8 +164,7 @@ def _check_pair(
     aabb_a: tuple[float, float, float, float],
     aabb_b: tuple[float, float, float, float],
 ) -> Optional[CollisionInfo]:
-    """Run narrowphase for a single shape pair.  (Extracted from
-    :func:`check_collision` for reuse in the multi-shape loop.)"""
+    """Run narrowphase for a single shape pair."""
     if isinstance(shape_a, CircleShape) and isinstance(shape_b, CircleShape):
         ca = (obj_a.x + shape_a.offset[0], obj_a.y + shape_a.offset[1])
         cb = (obj_b.x + shape_b.offset[0], obj_b.y + shape_b.offset[1])
@@ -343,9 +342,8 @@ class ObjectCollisionManager:
         - All-vs-all and one-vs-all queries
         - Layer filtering
 
-    Uses a uniform-grid spatial broadphase and exact shape narrowphase.
-    The grid is rebuilt for each query so moved objects are always indexed
-    at their current world positions.
+    Uses a uniform-grid spatial broadphase for all-vs-all queries
+    (rebuilt per query) and a linear scan for single-object queries.
     """
 
     def __init__(
@@ -475,15 +473,13 @@ class ObjectCollisionManager:
 
     def check_object(self, obj: ICollidableObject) -> List[CollisionHit]:
         """
-        Check one object against all others.
+        Check one object against all others using a linear scan.
 
         The queried object does not need to be managed. If it is managed,
         comparison with itself is skipped by identity.
         """
-        objects, grid = self._build_spatial_index()
         hits: List[CollisionHit] = []
-        for index in sorted(self._candidate_indices(obj, grid)):
-            other = objects[index]
+        for other in self.objects:
             if other is obj:
                 continue
             hit = check_collision(obj, other)
@@ -495,15 +491,11 @@ class ObjectCollisionManager:
         """
         Check one object against all others and return the first collision hit.
 
-        The queried object does not need to be managed. If it is managed,
-        comparison with itself is skipped by identity.
-
-        Candidate iteration follows insertion order among the spatially relevant
-        managed objects.
+        Iterates managed objects in insertion order. The queried object
+        does not need to be managed; if it is managed, comparison with
+        itself is skipped by identity.
         """
-        objects, grid = self._build_spatial_index()
-        for index in sorted(self._candidate_indices(obj, grid)):
-            other = objects[index]
+        for other in self.objects:
             if other is obj:
                 continue
             hit = check_collision(obj, other)
