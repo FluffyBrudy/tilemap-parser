@@ -209,7 +209,7 @@ class TilemapData:
         use_gids: bool = False,
     ) -> Dict[Tuple[int, int], int]:
         """Build a ``{(col, row): tile_id}`` dict for use with
-        :class:`tilemap_parser.runtime.tile_collision.CollisionRunner`.
+        :class:`tilemap_parser.runtime.movement.CollisionRunner`.
 
         Only tile layers are scanned; object layers are skipped
         automatically.  Pass *exclude_layers* to skip specific tile

@@ -1,9 +1,9 @@
 benchmarks/
-
+node_modules/
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyc 
+*.pyc
 *.so
 
 .Python
@@ -50,6 +50,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# runtime-generated assets for the full use case examples
+examples/full-physics-world/generated/
+
 *.log
 
 .env
@@ -74,3 +77,5 @@ coverage/
 
 *.local.txt
 
+# temp notes (gitignored, safe to delete)
+local-files/

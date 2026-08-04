@@ -16,14 +16,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import tilemap_parser.runtime.object_collision as object_collision_runtime
+import tilemap_parser.runtime.collision.manager as collision_manager_runtime
 from tilemap_parser.parser.collision import (
     CapsuleShape,
     CircleShape,
     CollisionPolygon,
     RectangleShape,
 )
-from tilemap_parser.runtime.object_collision import (
+from tilemap_parser.runtime.collision import (
     CollisionHit,
     ObjectCollisionManager,
     check_collision,
@@ -362,7 +362,7 @@ class TestManagerCheckAll:
             return None
 
         monkeypatch.setattr(
-            object_collision_runtime,
+            collision_manager_runtime,
             "check_collision",
             fake_check_collision,
         )

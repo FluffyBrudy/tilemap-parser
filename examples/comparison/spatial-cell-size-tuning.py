@@ -6,7 +6,7 @@ from typing import Dict, List, Set, Tuple
 import pygame
 
 from tilemap_parser.parser.collision import CircleShape
-from tilemap_parser.runtime.object_collision import ObjectCollisionManager
+from tilemap_parser.runtime.collision import ObjectCollisionManager
 from tilemap_parser.utils.geometry import aabb_overlap, get_shape_aabb
 
 SCREEN_W, SCREEN_H = 1200, 700

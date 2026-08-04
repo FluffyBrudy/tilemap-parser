@@ -11,7 +11,7 @@ from tilemap_parser.parser.collision import (
     TilesetCollision,
 )
 from tilemap_parser.runtime.navigation import NavGrid, Pathfinder, PathFollower
-from tilemap_parser.runtime.tile_collision import CollisionRunner
+from tilemap_parser.runtime.movement import CollisionRunner
 
 TILE_W, TILE_H = 32, 32
 COLS, ROWS = 20, 15

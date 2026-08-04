@@ -21,9 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from tilemap_parser.parser.collision import CollisionPolygon, TilesetCollision, TileCollisionData, RectangleShape, CircleShape, CapsuleShape
 from tilemap_parser.parser.map_parse import ParsedMeta, parse_map_dict
-from tilemap_parser.runtime.tile_collision import (
-    CollisionRunner,
-    MovementMode,
+from tilemap_parser.runtime.movement import CollisionRunner, MovementMode
+from tilemap_parser.runtime.polygon_query import (
     _point_in_polygon_offset,
     _rect_polygon_collision_offset,
     _circle_polygon_collision_offset,
