@@ -1,7 +1,7 @@
 import pygame
 from tilemap_parser import load_character_collision
 from tilemap_parser.runtime.collision_cache import CollisionCache
-from tilemap_parser.runtime.tile_collision import CollisionRunner
+from tilemap_parser.runtime.movement import CollisionRunner
 
 from .entities.player import Player
 from .settings import BASE_PATH_, SCREEN_WIDTH, SCREEN_HEIGHT

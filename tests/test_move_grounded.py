@@ -24,7 +24,7 @@ from tilemap_parser.parser.collision import (
     TileCollisionData,
     TilesetCollision,
 )
-from tilemap_parser.runtime.tile_collision import CollisionRunner
+from tilemap_parser.runtime.movement import CollisionRunner
 
 FULL_TILE_POLY = [(0.0, 0.0), (32.0, 0.0), (32.0, 32.0), (0.0, 32.0)]
 HALF_TILE_POLY = [(0.0, 16.0), (32.0, 16.0), (32.0, 32.0), (0.0, 32.0)]

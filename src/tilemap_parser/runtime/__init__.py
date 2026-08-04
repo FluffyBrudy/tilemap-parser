@@ -1,5 +1,7 @@
 from .camera import Camera
 from .animation_player import AnimationPlayer, SpriteAnimationSet
+from .body import Body
+from .world import PhysicsWorld
 from .collision_cache import (
     CollisionCache,
     clear_collision_cache,
@@ -11,18 +13,12 @@ from .collision_cache import (
     load_tileset_collision,
 )
 from .map_object import MapObject, load_map_objects
-from .tile_collision import (
-    CollisionResult,
-    CollisionRunner,
-    ICollidableSprite,
-    MovementMode,
-    rect_vs_tilemap,
-)
-from .protocols import ICollidable
+from .movement import CollisionResult, CollisionRunner, MovementMode
+from .polygon_query import rect_vs_tilemap
+from .protocols import ICollidable, ICollidableObject, ICollidableSprite
 from .map_loader import TilemapData, load_map
-from .object_collision import (
+from .collision import (
     CollisionHit,
-    ICollidableObject,
     ObjectCollisionManager,
     check_collision,
 )
@@ -42,6 +38,7 @@ from .particles import (
 __all__ = [
     "AnimationPlayer",
     "AreaNode",
+    "Body",
     "Camera",
     "CollisionCache",
     "CollisionHit",
@@ -72,6 +69,7 @@ __all__ = [
     "ParticleEmitterNode",
     "ParticleRenderer",
     "ParticleSystem",
+    "PhysicsWorld",
     "rect_vs_tilemap",
     "SpriteBatchRenderer",
     "clear_texture_caches",

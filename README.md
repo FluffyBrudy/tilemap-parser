@@ -66,6 +66,40 @@ particle_config = ParticleSystemConfig(
 particles = ParticleSystem(particle_config)
 ```
 
+## Physics bodies
+
+A `PhysicsWorld` is a single space holding the tile layer plus solid `Body` objects (static walls, kinematic crates). Attach a `CollisionRunner` to the world once and every move method resolves tiles and bodies through it — no per-call tile arguments.
+
+> Full contract — object↔world↔`move_*`↔tiles↔rendering: see [docs/physics-world.md](docs/physics-world.md) and `examples/physics-crate/main.py`.
+
+```python
+from tilemap_parser import (
+    Body, PhysicsWorld, CollisionRunner, RectangleShape,
+    TilemapData, TilesetCollision, CollisionCache,
+)
+
+cache = CollisionCache()
+tileset = cache.get_tileset_collision("data/collision/tileset.collision.json")
+world = PhysicsWorld.from_map(game_data, tileset)   # adopts tile_size / render_scale
+
+crate = Body(RectangleShape(width=16, height=16), x=320, y=480, mode="kinematic")
+world.add_body(crate)
+
+runner = CollisionRunner.from_world(world)          # or runner.attach(world)
+```
+
+Pushable crates are just kinematic bodies moved with an explicit velocity (gravity is skipped when `velocity=` is given):
+
+```python
+# player pressed against the crate -> hand the player's vx over
+crate.vx = player.vx
+result = runner.move_grounded(crate, None, None, dt, velocity=(crate.vx, 0))
+if result.hit_wall_x:
+    crate.vx = 0  # crate stopped against a tile wall or another body
+```
+
+`Body` accepts primitive shapes only (`RectangleShape`, `CircleShape`, `CapsuleShape`); use `MapObject` for polygon solids. Collision pairs honor both sides' `collision_layer` / `collision_mask`, and bodies are landing surfaces for platformer step-up (small crates are climbed, tall ones block like walls).
+
 ## Links
 
 - **Docs**: [https://deepwiki.com/FluffyBrudy/tilemap-parser](https://deepwiki.com/FluffyBrudy/tilemap-parser)

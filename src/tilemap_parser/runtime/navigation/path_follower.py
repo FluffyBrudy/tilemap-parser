@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from ...parser.collision import TilesetCollision
 from ..protocols import ICollidable
-from ..tile_collision import CollisionRunner
+from ..movement import CollisionRunner
 
 
 class PathFollower:

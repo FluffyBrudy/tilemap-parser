@@ -9,7 +9,7 @@ from tilemap_parser.parser.collision import (
     TileCollisionData,
     TilesetCollision,
 )
-from tilemap_parser.runtime.tile_collision import CollisionRunner
+from tilemap_parser.runtime.movement import CollisionRunner
 
 SCREEN_W, SCREEN_H = 900, 700
 FPS = 60

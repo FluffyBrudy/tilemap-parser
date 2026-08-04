@@ -23,9 +23,8 @@ from tilemap_parser.parser.collision import (
 )
 from tilemap_parser.runtime.collision_cache import load_tileset_collision
 
-from tilemap_parser.runtime.tile_collision import (
-    CollisionRunner,
-    MovementMode,
+from tilemap_parser.runtime.movement import CollisionRunner, MovementMode
+from tilemap_parser.runtime.polygon_query import (
     point_in_polygon,
     rect_polygon_collision,
     circle_polygon_collision,

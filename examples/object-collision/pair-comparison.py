@@ -11,7 +11,7 @@ from tilemap_parser.parser.collision import (
     CollisionPolygon,
     RectangleShape,
 )
-from tilemap_parser.runtime.object_collision import check_collision
+from tilemap_parser.runtime.collision import check_collision
 
 
 SCREEN_W, SCREEN_H = 1000, 700

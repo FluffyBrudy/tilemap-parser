@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from tilemap_parser.parser.collision import CollisionPolygon
 from tilemap_parser.runtime.map_loader import TilemapData
 from tilemap_parser.runtime.map_object import MapObject, load_map_objects
-from tilemap_parser.runtime.object_collision import ObjectCollisionManager
+from tilemap_parser.runtime.collision import ObjectCollisionManager
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -562,7 +562,7 @@ class TestLoadMapObjects:
         shape_c = CollisionPolygon(vertices=[(0, 0), (10, 0), (10, 10), (0, 10)])
         obj2 = MapObject(x=25, y=0, surface=surf, collision_shape=shape_c)
 
-        from tilemap_parser.runtime.object_collision import check_collision
+        from tilemap_parser.runtime.collision import check_collision
 
         hit = check_collision(obj1, obj2)
         # obj1.shape_b (world 20,0-30,10) overlaps with obj2.shape_c (world 25,0-35,10)
@@ -579,7 +579,7 @@ class TestLoadMapObjects:
         obj1 = MapObject(x=0, y=0, surface=surf, collision_shape=shape_a, collision_shapes=[shape_a, shape_b])
         obj2 = MapObject(x=100, y=100, surface=surf, collision_shape=shape_a)
 
-        from tilemap_parser.runtime.object_collision import check_collision
+        from tilemap_parser.runtime.collision import check_collision
 
         hit = check_collision(obj1, obj2)
         assert hit is None
@@ -613,7 +613,7 @@ class TestLoadMapObjects:
 
         Uses a non-zero region_rect offset to verify position is not double-applied.
         """
-        from tilemap_parser.runtime.object_collision import check_collision
+        from tilemap_parser.runtime.collision import check_collision
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -1025,7 +1025,7 @@ class TestLoadMapObjects:
             probe_shape = CollisionPolygon(vertices=[(0, 0), (16, 0), (16, 16), (0, 16)])
             probe = MapObject(x=310, y=610, surface=probe_surf, collision_shape=probe_shape)
 
-            from tilemap_parser.runtime.object_collision import check_collision
+            from tilemap_parser.runtime.collision import check_collision
 
             hit = check_collision(loaded, probe)
             assert hit is not None, "expected collision in effective space"
@@ -1126,7 +1126,7 @@ class TestLoadMapObjects:
             # Loaded world AABB: (300+15, 600+30) to (300+39, 600+54) = (315, 630) to (339, 654)
             probe = MapObject(x=315, y=630, surface=probe_surf, collision_shape=probe_shape)
 
-            from tilemap_parser.runtime.object_collision import check_collision
+            from tilemap_parser.runtime.collision import check_collision
 
             hit = check_collision(obj, probe)
             assert hit is not None, "expected collision with region offset"
