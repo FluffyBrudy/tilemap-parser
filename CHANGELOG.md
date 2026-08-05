@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.0.1 — 2026-08-05
+
+### Major Features Added
+- **Physics world and bodies**: `PhysicsWorld` (tile layer + bodies + one-way platforms), `Body` (static/kinematic modes, shape + collision layer/mask), world-bound movement via `CollisionRunner.attach()` / `from_world()`, `collides_with_body()`, `move_grounded()` and `MovementMode.GROUNDED`
+- **Pathfinding**: `NavGrid`, `Pathfinder` (A*), `PathFollower`, and grid erosion for inflated walls
+- **TMX/TSX tileset support** with a Tiled-format converter
+- **Global id (gid) system** with flip flags aligned to the Tiled spec
+- **Y-sort rendering**: depth-based draw order with `extra_objects`
+- **Linear-scan one-vs-all collision queries** in `ObjectCollisionManager`
+
+### Updates
+- Object collision bridge: `load_map_objects()` with per-region layer/mask, object scaling, and non-collidable objects
+- Collision protocols unified under `ICollidable`
+- Track referenced tilesets per object layer
+- Webdocs revamp: new site UI plus physics, pathfinding, and particle guides
+
+### Bug fixes
+- Tile rendering bound check in edge chunks
+- Strict gid validation, multiline properties, Tiled flip-flag alignment
+- Capsule polygon duplicate vertices, polygon-shaped sprite collision (`get_shape_bounds`), crate friction in examples, dead code removal
+
+### Examples
+- `full-physics-world`, `physics-crate`, `full-collision`, `full-pathfinding`
+
 ## 4.0.0 — 2026-07-11
 
 ### Major Features Added
