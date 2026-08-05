@@ -18,13 +18,14 @@ export default function CameraGuide() {
 
       <CodeBlock
         title="camera_setup.py"
-        code={`from tilemap_parser import Camera
+        code={`import pygame
+from tilemap_parser import Camera
 
 # 800x600 viewport
 camera = Camera(800, 600, mode="deadzone")
 
 # Set the deadzone rectangle (x, y, w, h)
-camera.set_deadzone(300, 200, 200, 200)
+camera.deadzone = pygame.Rect(300, 200, 200, 200)
 
 # Optional: clamp the camera so it never views outside the map boundaries
 # camera.set_bounds(0, 0, map_width_px, map_height_px)`}
@@ -38,19 +39,20 @@ camera.set_deadzone(300, 200, 200, 200)
 
       <CodeBlock
         title="camera_update.py"
-        code={`# 1. Target must have x, y attributes
+        code={`# 1. Target needs x, y and collision_shape attributes
 camera.follow(player)
 
 # 2. Update camera physics (smoothing, shake)
 camera.update(dt)
 
-# 3. Use camera.offset to draw
+# 3. Use camera.offset to draw (a (x, y) tuple)
 # TileLayerRenderer accepts the offset directly:
 renderer.render(screen, camera.offset)
 
 # For sprites, subtract the offset:
-draw_x = player.x - camera.offset.x
-draw_y = player.y - camera.offset.y
+ox, oy = camera.offset
+draw_x = player.x - ox
+draw_y = player.y - oy
 screen.blit(player_img, (draw_x, draw_y))`}
       />
 

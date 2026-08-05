@@ -57,7 +57,7 @@ from tilemap_parser.runtime.navigation import NavGrid, Pathfinder
 
 game_data = load_map("data/map.json")
 tile_map = game_data.build_tile_map()           # {(col, row): tile_id}
-tileset  = load_tileset_collision("data/map.collision.json")
+tileset  = load_tileset_collision("data/collision/terrain.collision.json")
 
 base = NavGrid(tile_map, tileset, (32, 32), map_size=(24, 14))
 nav  = base.erode(1.0)                          # inflate walls 1 tile

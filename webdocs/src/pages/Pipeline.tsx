@@ -90,8 +90,6 @@ SCREEN_W, SCREEN_H = COLS * TILE, ROWS * TILE
 FLOOR_ROW = 12
 PUSH_SPEED = 260.0
 
-FULL_TILE = [(0.0, 0.0), (32.0, 0.0), (32.0, 32.0), (0.0, 32.0)]
-
 
 class Player:
     def __init__(self, x, y):
@@ -173,6 +171,10 @@ def main():
                 crate_result = runner.move_grounded(crate, None, None, dt, velocity=(crate.vx, crate.vy))
                 if crate_result.hit_wall_x:
                     crate.vx = 0.0
+                else:
+                    crate.vx *= 0.9
+                    if abs(crate.vx) < 1.0:
+                        crate.vx = 0.0
 
         # 4. draw: world, then sprites at (x, y)
         screen.fill((35, 35, 45))

@@ -165,8 +165,9 @@ export default function RunnerGuide() {
         <code>
           runner.move(sprite, tileset, tile_map, delta_x, delta_y, dt, ...)
         </code>{" "}
-        dispatches on the configured mode (slide → <code>move_and_slide</code>,
-        platformer → <code>move_platformer</code>, rpg → <code>move_rpg</code>).
+        dispatches on the configured mode (slide →{" "}
+        <code>move_and_slide</code>, platformer → <code>move_platformer</code>,
+        rpg → <code>move_rpg</code>, grounded → <code>move_grounded</code>).
       </p>
 
       <h2 id="tunables">TUNABLES</h2>
@@ -265,7 +266,10 @@ export default function RunnerGuide() {
             <td>
               <code>0.1</code>
             </td>
-            <td>validated config value (must be in [0, 1])</td>
+            <td>
+              accepted for editor/game-type compatibility; no movement method
+              reads it (must be in [0, 1])
+            </td>
             <td>—</td>
           </tr>
           <tr>

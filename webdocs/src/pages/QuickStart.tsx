@@ -106,10 +106,26 @@ pygame.quit()`}
         <Link to="/physics">Physics &amp; Bodies</Link> guide.
       </p>
 
-      <Callout kind="warn" title="TOPLEFT VS CENTER">
+      <Callout kind="warn" title="TOPLEFT VS CENTER" id="top-left-vs-center">
         <code>RectangleShape</code> anchors <code>(x, y)</code> at its top-left.
-        Circles and capsules anchor at their center. Your collision box and your
-        visual box are the same rectangle; draw at <code>(x, y)</code>.
+        <code>CircleShape</code> anchors <code>(x, y)</code> at its center;{" "}
+        <code>CapsuleShape</code> anchors <code>(x, y)</code> at its <em>top
+        cap's</em> center. Widths are always full sizes:{" "}
+        <code>RectangleShape(width, height)</code> uses your values as-is,
+        while <code>CircleShape(radius)</code> and{" "}
+        <code>CapsuleShape(radius, height)</code> are half-widths. So when you
+        draw (or check bounds):
+        <ul>
+          <li>rectangle → draw the box at <code>(x, y)</code>, size{" "}
+            <code>w × h</code>;</li>
+          <li>circle → draw the box at <code>(x - radius, y - radius)</code>,
+            size <code>2r × 2r</code>;</li>
+          <li>capsule → draw the box at <code>(x - radius, y - radius)</code>,
+            size <code>2r × (2r + height)</code>.</li>
+        </ul>
+        Never halve a rectangle's width, and never draw a circle/capsule at{" "}
+        <code>(x, y)</code> — that shifts it up and left by one radius. Swap
+        conventions and your sprite teleports half its size into the floor.
       </Callout>
     </div>
   );

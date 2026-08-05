@@ -55,7 +55,8 @@ configs[0].apply_render_scale(render_scale)`}
 explosion.update(dt, 320.0, 240.0, 32.0, 32.0)
 
 # draw(screen, offset_x, offset_y, zoom)  # camera offset, not rect
-explosion.draw(screen, camera.offset_x, camera.offset_y, zoom)`}
+ox, oy = camera.offset
+explosion.draw(screen, ox, oy, zoom)`}
       />
 
       <h2 id="burst">BURSTS AND CONTINUOUS EMISSION</h2>

@@ -1,6 +1,7 @@
 import CodeBlock from "../components/CodeBlock";
 import Callout from "../components/Callout";
 import Toc from "../components/Toc";
+import { Link } from "react-router-dom";
 
 const TOC = [
   { id: "three-jobs", label: "Three jobs, three owners" },
@@ -55,7 +56,11 @@ for crate in world.bodies:
     if crate.vx:
         crate_result = runner.move_grounded(crate, None, None, dt, velocity=(crate.vx, crate.vy))
         if crate_result.hit_wall_x:
-            crate.vx = 0.0                        # crate meets crate/tile wall -> stop`;
+            crate.vx = 0.0                        # crate meets crate/tile wall -> stop
+        else:
+            crate.vx *= 0.9                       # friction: sliding crates slow down
+            if abs(crate.vx) < 1.0:
+                crate.vx = 0.0`;
 
 const PROBE = `def body_ahead(world, sprite, axis, probe=8.0):
     s = copy.copy(sprite)
@@ -164,7 +169,8 @@ export default function PhysicsBodies() {
             <td>yes</td>
             <td>
               position; shape origin: top-left for <code>RectangleShape</code>,
-              center for <code>CircleShape</code>/<code>CapsuleShape</code>
+              center for <code>CircleShape</code>, top cap center for{" "}
+              <code>CapsuleShape</code>
             </td>
           </tr>
           <tr>
@@ -573,9 +579,12 @@ for crate in crates:
         </li>
         <li>
           <strong>Rectangles:</strong> <code>(x, y)</code> is the top-left (plus
-          the shape's <code>offset</code>).{" "}
-          <strong>Circles and capsules:</strong> <code>(x, y)</code> is the
-          center.
+          the shape's <code>offset</code>). <strong>Circles:</strong>{" "}
+          <code>(x, y)</code> is the center. <strong>Capsules:</strong>{" "}
+          <code>(x, y)</code> is the <em>top cap's</em> center — the draw box is{" "}
+          <code>(x - radius, y - radius)</code> sized{" "}
+          <code>2r × (2r + height)</code>, and the capsule is vertical-only
+          (there is no horizontal capsule).
         </li>
         <li>
           <strong>Bodies are never one-way.</strong>{" "}
@@ -590,7 +599,11 @@ for crate in crates:
       <ol>
         <li>
           <strong>Rectangle top-left vs circle center.</strong> Swap coordinate
-          conventions and your sprite teleports half its size into the floor.
+          conventions and your sprite teleports half its size into the floor.{" "}
+          <Link to="/quick-start#top-left-vs-center">
+            The Quick Start warning covers anchoring and width in full
+          </Link>
+          .
         </li>
         <li>
           <strong>Attach before you move.</strong> A runner without{" "}

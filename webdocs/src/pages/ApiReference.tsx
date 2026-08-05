@@ -234,8 +234,8 @@ export default function ApiReference() {
         </Entry>
         <Entry name="move(sprite, tileset, tiles, delta_x, delta_y, dt, **kwargs)">
           <p>
-            Dispatches on <code>self.mode</code> (SLIDE/PLATFORMER/RPG), handy
-            for one generic call.
+            Dispatches on <code>self.mode</code> (SLIDE/PLATFORMER/RPG/GROUNDED),
+            handy for one generic call.
           </p>
         </Entry>
       </Group>
@@ -260,7 +260,11 @@ export default function ApiReference() {
         </Entry>
         <Entry name="MovementMode">
           <p>
-            Enum: <code>SLIDE</code>, <code>PLATFORMER</code>, <code>RPG</code>.
+            Enum: <code>SLIDE</code>, <code>PLATFORMER</code>, <code>RPG</code>,{" "}
+            <code>GROUNDED</code> (moves via <code>move_grounded</code>;
+            reachable through the raw{" "}
+            <code>CollisionRunner(tile_size, mode=...)</code> constructor, not
+            through the <code>from_game_type</code> presets).
           </p>
         </Entry>
       </Group>
