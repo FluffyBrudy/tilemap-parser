@@ -102,6 +102,7 @@ if result.hit_wall_x:
 
 ## Links
 
-- **Docs**: [https://deepwiki.com/FluffyBrudy/tilemap-parser](https://deepwiki.com/FluffyBrudy/tilemap-parser)
+- **Docs**: [https://tilemap-parser.vercel.app/](https://tilemap-parser.vercel.app/)
+- **Docs (deepwiki)**: [https://deepwiki.com/FluffyBrudy/tilemap-parser](https://deepwiki.com/FluffyBrudy/tilemap-parser)
 - **Editor**: https://pypi.org/project/tilemap-editor/
 - **Repository**: https://github.com/FluffyBrudy/tilemap-parser
