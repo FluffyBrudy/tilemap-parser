@@ -1,167 +1,210 @@
-import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import FlowDiagram, { type FlowEdge, type FlowNode } from "../components/FlowDiagram";
+import { HeroSprite } from "../components/PixelSprite";
+import { REPO, VERSION } from "../nav";
 
-const capabilities = [
+const MAP_NODES: FlowNode[] = [
   {
-    title: "Load editor maps",
-    text: "Parse tilemap-editor JSON files and keep access to layers, tilesets, object data, and raw map metadata.",
+    id: "parser",
+    x: 0,
+    y: 0,
+    w: 256,
+    h: 80,
+    title: "tilemap_parser",
+    lines: ["map, tileset, object", "loaders"],
+    accent: "amber",
+    link: "/map-parsing",
   },
   {
-    title: "Render what matters",
-    text: "Use TileLayerRenderer with camera coordinates and viewport culling instead of hand-slicing tile surfaces every frame.",
+    id: "world",
+    x: 260,
+    y: 0,
+    w: 256,
+    h: 80,
+    title: "PhysicsWorld",
+    lines: ["tile_map + bodies", "collision layers"],
+    accent: "teal",
+    link: "/physics",
   },
   {
-    title: "Ship collision data",
-    text: "Pair tile maps with collision shapes for top-down or platformer movement. Also detect object-to-object collisions between dynamic entities with mixed shapes and layer filtering.",
+    id: "runner",
+    x: 520,
+    y: 0,
+    w: 256,
+    h: 80,
+    title: "CollisionRunner",
+    lines: ["five move modes", "presets + tunables"],
+    accent: "blue",
+    link: "/runner",
   },
   {
-    title: "Play sprite animations",
-    text: "Load animation JSON, switch clips, and retrieve pygame surfaces from a compact AnimationPlayer API.",
+    id: "sprite",
+    x: 520,
+    y: 208,
+    w: 256,
+    h: 80,
+    title: "Your Sprite",
+    lines: ["x, y, collision_shape", "(+ vx, vy, on_ground)"],
+    accent: "purple",
+    link: "/physics",
+  },
+  {
+    id: "nav",
+    x: 260,
+    y: 208,
+    w: 256,
+    h: 80,
+    title: "NavGrid",
+    lines: ["A* over walkability", "PathFollower steering"],
+    accent: "red",
+    link: "/pathfinding",
   },
 ];
 
-const parseTargets = [
+const MAP_EDGES: FlowEdge[] = [
+  { from: "parser", to: "world", fromSide: "right", toSide: "left" },
+  { from: "world", to: "runner", fromSide: "right", toSide: "left" },
+  { from: "runner", to: "sprite" },
   {
-    title: "Map JSON",
-    text: "Layers, z-index ordering, tile positions, tile variants, tileset references, object layers, custom properties, and raw map metadata from tilemap-editor saves.",
-  },
-  {
-    title: "Sprite animation JSON",
-    text: "Animation libraries exported by the tilemap-editor animation tool, including clip names, frame timing, playback state, and spritesheet-backed pygame surfaces.",
-  },
-  {
-    title: "Collision JSON",
-    text: "Tileset and character collision data used by CollisionCache and CollisionRunner for rectangles, circles, capsules, polygons, slopes, and movement response.",
+    from: "world",
+    to: "nav",
+    fromSide: "right",
+    fromOffset: 0.85,
+    toSide: "top",
+    toOffset: 0.5,
   },
 ];
 
-const docsFlow = [
-  { label: "Install", to: "/installation" },
-  { label: "Load a map", to: "/quickstart" },
-  { label: "Run the demo", to: "/examples/full-game" },
-  { label: "Check the API", to: "/api" },
+const FEATURES = [
+  [
+    "MAP PARSING",
+    "Load and query tilemaps, layers, objects and autotiles from tilemap-editor JSON.",
+  ],
+  [
+    "TILE COLLISION",
+    "Slide, platformer and RPG movement modes resolved against tile polygons.",
+  ],
+  [
+    "PHYSICS BODIES",
+    "A PhysicsWorld: tiles + solid Body objects, kinematic crates you push around.",
+  ],
+  [
+    "OBJECT COLLISION",
+    "Sprite-vs-sprite lane: spatial-grid, mixed shapes, layer filtering.",
+  ],
+  [
+    "CHUNKED RENDERING",
+    "TileLayerRenderer culls to the viewport, chunk-by-chunk.",
+  ],
+  [
+    "CAMERA + FX",
+    "Centered/deadzone follow, lerp, screen-shake, bounds clamp.",
+  ],
+  [
+    "ANIMATION",
+    "Frame-based AnimationPlayer over tilemap-editor animation JSON.",
+  ],
+  [
+    "PARTICLES",
+    "ParticleSystem with shapes, color transitions, alpha fade, batch rendering.",
+  ],
+  ["PATHFINDING", "NavGrid, Pathfinder and PathFollower for RPG-style AI."],
+  [
+    "CAPSULES + HITS",
+    "Capsule collision against every shape, and CollisionHit.resolve() helpers.",
+  ],
 ];
 
-export function Home() {
+export default function Home() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-6xl space-y-14"
-    >
-      <section>
-        <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">
-          Python tools for tile-based games
-        </p>
-        <h1 className="max-w-4xl text-4xl font-semibold text-zinc-50 md:text-5xl">
-          Load tilemap-editor exports in your pygame project.
+    <div className="content">
+      <section className="pixel-bands border-2 border-line-2 p-6 shadow-hard sm:p-8">
+        <div className="flex items-center gap-2">
+          <span className="font-pixel text-[9px] text-red">PRESS START</span>
+          <span className="animate-blink text-[10px] text-red">▮</span>
+        </div>
+        <h1 className="mt-3 text-[#0d0b13]">
+          <span className="block">tilemap-parser</span>
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-zinc-400">
-          tilemap-parser reads map, animation, and collision JSON produced by
-          tilemap-editor, then gives you runtime helpers for layers, surfaces,
-          rendering, animation playback, and collision movement.
+        <p className="font-retro text-[26px] leading-tight text-amber">
+          standalone map parser + pygame collision runtime for game developers
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            to="/quickstart"
-            className="rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/10 hover:bg-cyan-400"
-          >
-            Start building
+        <p className="text-mute">
+          Python {">="} 3.10 · pygame-ce · version{" "}
+          <span className="border-2 border-line-2 bg-raise px-1.5 py-0.5 font-pixel text-[8px] text-amber">
+            v{VERSION}
+          </span>
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to="/quick-start" className="btn-pixel" data-accent="amber">
+            QUICK START ▸
           </Link>
-          <Link
-            to="/examples/full-game"
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-zinc-100 hover:border-zinc-600 hover:bg-zinc-800"
-          >
-            View full demo
+          <Link to="/physics" className="btn-pixel">
+            PHYSICS & BODIES
           </Link>
+          <a href={REPO} className="btn-pixel">
+            GITHUB
+          </a>
         </div>
       </section>
 
-      <section>
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-semibold text-zinc-100">
-              What the package covers
-            </h2>
-            <p className="mt-2 text-zinc-400">
-              The docs are organized around the systems you wire together in an actual game loop.
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          {capabilities.map((item) => (
-            <div key={item.title} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
-              <h3 className="text-base font-semibold text-zinc-100">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">{item.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="mt-6 flex justify-center border-2 border-line-2 bg-panel p-4 shadow-hard">
+        <HeroSprite className="w-72 sm:w-80" />
+        <div className="hidden self-end pb-2 font-pixel text-[8px] text-mute sm:block"></div>
+      </div>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-950 p-6">
-        <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-          <div>
-            <p className="mb-3 text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">
-              Parser target
-            </p>
-            <h2 className="text-2xl font-semibold text-zinc-100">
-              Built for tilemap-editor output
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">
-              tilemap-parser is the runtime-side package for projects built
-              with tilemap-editor. The editor is the pygame tool for creating
-              maps and sprite animations; this package loads those exported
-              JSON files in your game code.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <a
-                href="https://pypi.org/project/tilemap-editor/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-cyan-700/60 hover:bg-zinc-900"
-              >
-                tilemap-editor on PyPI
-              </a>
-              <a
-                href="https://github.com/FluffyBrudy/tilemap-editor"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:border-cyan-700/60 hover:bg-zinc-900"
-              >
-                tilemap-editor on GitHub
-              </a>
-            </div>
+      <h2 id="what">WHAT YOU GET</h2>
+      <p>
+        Everything hangs off one spine: load data, build a world, resolve
+        movement through the runner. The rooms below are the whole engine.
+      </p>
+      <FlowDiagram title="engine map" nodes={MAP_NODES} edges={MAP_EDGES} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {FEATURES.map(([title, body]) => (
+          <div
+            key={title}
+            className="border-2 border-line-2 bg-panel p-4 hover:bg-panel-2"
+          >
+            <div className="font-pixel mb-2 text-[9px] text-teal">{title}</div>
+            <p className="m-0 text-[14px] text-text">{body}</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-1">
-            {parseTargets.map((item) => (
-              <div key={item.title} className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
-                <h3 className="text-sm font-semibold text-zinc-100">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">{item.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        ))}
+      </div>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-950 p-6">
-        <h2 className="text-xl font-semibold text-zinc-100">Recommended path</h2>
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          {docsFlow.map((step, index) => (
-            <Link
-              key={step.to}
-              to={step.to}
-              className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-4 hover:border-cyan-700/60 hover:bg-zinc-800"
-            >
-              <span className="text-xs font-medium text-cyan-300">
-                Step {index + 1}
-              </span>
-              <span className="mt-2 block text-sm font-semibold text-zinc-100">
-                {step.label}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </motion.div>
+      <h2 id="jump">WHERE TO START</h2>
+      <ul>
+        <li>
+          <Link to="/install">Installation</Link>: two pip commands and you're
+          running.
+        </li>
+        <li>
+          <Link to="/quick-start">Quick Start</Link>: the smallest playable
+          program.
+        </li>
+        <li>
+          <Link to="/physics">Physics & Bodies</Link>: collision, explained
+          without the fog of war. Includes the sliding-box walkthrough.
+        </li>
+        <li>
+          <Link to="/pipeline">The Pipeline</Link>: map → world → runner →
+          player → crate → screen, one script.
+        </li>
+        <li>
+          <Link to="/examples">Examples</Link>: nine working demos, from
+          pushable crates to RPG pathfinding.
+        </li>
+      </ul>
+
+      <p className="font-retro text-[24px] text-mute">
+        Author maps and collision with the companion editor:{" "}
+        <a
+          href="https://pypi.org/project/tilemap-editor/"
+          className="border-b-2"
+        >
+          tilemap-editor
+        </a>
+        .
+      </p>
+    </div>
   );
 }

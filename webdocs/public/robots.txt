@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://tilemap-parser.vercel.app/sitemap.xml

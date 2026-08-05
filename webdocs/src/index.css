@@ -1,87 +1,403 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+:root {
+    --ink: #0d0b13; /* page background            */
+    --panel: #14111d; /* panels                     */
+    --panel-2: #1b1726; /* raised panels / hover      */
+    --raise: #251f33; /* buttons                    */
+    --line: #322a49; /* hairline borders           */
+    --line-2: #443a63; /* chunky borders             */
+    --text: #e9e5f5; /* primary text               */
+    --mute: #948db0; /* secondary text             */
+    --red: #ff5d5d;
+    --amber: #ffc857;
+    --teal: #3ee6c4;
+    --blue: #7aa2ff;
+    --purple: #b48cff;
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #18181b;
+@layer base {
+    * {
+        border-radius: 0;
+    }
+    html {
+        scroll-behavior: smooth;
+    }
+    body {
+        background: var(--ink);
+        color: var(--text);
+        font-family: "Space Mono", ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 1.7;
+        -webkit-font-smoothing: none;
+    }
+    ::selection {
+        background: var(--teal);
+        color: var(--ink);
+    }
+    :focus-visible {
+        outline: 3px solid var(--amber);
+        outline-offset: 2px;
+    }
+    img,
+    svg {
+        image-rendering: pixelated;
+    }
+
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    ::-webkit-scrollbar-track {
+        background: var(--panel);
+        border: 2px solid var(--line);
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--line-2);
+        border: 2px solid var(--line);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--teal);
+    }
 }
 
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@layer components {
+    /* ---- panels ---------------------------------------------------- */
+    .panel {
+        background: var(--panel);
+        border: 2px solid var(--line-2);
+        box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.45);
+    }
+    .panel-flat {
+        background: var(--panel);
+        border: 2px solid var(--line-2);
+    }
+
+    /* checker dither, used sparingly (hero, headers) */
+    .dither {
+        background-image: repeating-conic-gradient(
+            rgba(255, 255, 255, 0.035) 0% 25%,
+            transparent 0% 50%
+        );
+        background-size: 4px 4px;
+    }
+    /* faint scanline, subtle — readability first */
+    .raster {
+        background-image: repeating-linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.025) 0 2px,
+            transparent 2px 4px
+        );
+    }
+    /* hard stepped color bands, no gradients */
+    .pixel-bands {
+        background-image: linear-gradient(
+            to bottom,
+            var(--panel) 0,
+            var(--panel) 24px,
+            var(--ink) 24px,
+            var(--ink) 26px,
+            var(--panel-2) 26px,
+            var(--panel-2) 52px,
+            var(--ink) 52px,
+            var(--ink) 54px,
+            var(--panel) 54px,
+            var(--panel) 100%
+        );
+    }
+
+    /* ---- pixel button: hard shadow, color-flip hover, press squash -- */
+    .btn-pixel {
+        display: inline-block;
+        border: 2px solid var(--line-2);
+        background: var(--raise);
+        color: var(--text);
+        box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.5);
+        font-family: "Space Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        padding: 5px 12px;
+        text-decoration: none;
+        transition: none;
+        cursor: pointer;
+    }
+    .btn-pixel:hover {
+        background: var(--teal);
+        color: var(--ink);
+        border-color: var(--teal);
+        box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.5);
+        transform: translate(-1px, -1px);
+    }
+    .btn-pixel:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0 0 rgba(0, 0, 0, 0.5);
+    }
+    .btn-pixel[data-accent="amber"]:hover {
+        background: var(--amber);
+        border-color: var(--amber);
+    }
+    .btn-pixel[data-accent="red"]:hover {
+        background: var(--red);
+        border-color: var(--red);
+    }
+
+    /* ---- hero sprite bob ------------------------------------------- */
+    .animate-bob {
+        animation: bob 0.9s steps(2, end) infinite;
+    }
+    @keyframes bob {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-3px);
+        }
+    }
+    .animate-blink {
+        animation: blink 1.2s steps(1, end) infinite;
+    }
+    @keyframes blink {
+        0%,
+        60% {
+            opacity: 1;
+        }
+        61%,
+        100% {
+            opacity: 0;
+        }
+    }
 }
 
-*::-webkit-scrollbar-track {
-  background: #18181b;
+@layer utilities {
+    .font-pixel {
+        font-family: "Press Start 2P", monospace;
+        letter-spacing: 0.06em;
+    }
+    .font-retro {
+        font-family: "VT323", monospace;
+        letter-spacing: 0.02em;
+    }
 }
 
-*::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 4px;
+/* ---- prose (the `.content` wrapper used by every page) ------------ */
+.content h1 {
+    font-family: "Press Start 2P", monospace;
+    font-size: clamp(16px, 2.4vw, 22px);
+    line-height: 1.5;
+    color: var(--text);
+    margin: 8px 0 24px;
+}
+.content h2 {
+    font-family: "Press Start 2P", monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--teal);
+    margin: 64px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--line-2);
+    scroll-margin-top: 84px;
+}
+.content h2::before {
+    content: "▸ ";
+    color: var(--red);
+}
+.content h3 {
+    font-family: "VT323", monospace;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--amber);
+    margin: 34px 0 10px;
+    scroll-margin-top: 84px;
+}
+.content h4 {
+    font-family: "Press Start 2P", monospace;
+    font-size: 9px;
+    color: var(--mute);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 30px 0 8px;
+    scroll-margin-top: 84px;
+}
+.content p {
+    margin: 14px 0;
+}
+.content ul,
+.content ol {
+    margin: 14px 0 14px 4px;
+}
+.content ul {
+    list-style: none;
+}
+.content ul > li {
+    padding-left: 18px;
+    position: relative;
+    margin: 7px 0;
+}
+.content ul > li::before {
+    content: "▮";
+    position: absolute;
+    left: 0;
+    color: var(--teal);
+}
+.content ol {
+    list-style: none;
+    counter-reset: px;
+}
+.content ol > li {
+    counter-increment: px;
+    padding-left: 26px;
+    position: relative;
+    margin: 7px 0;
+}
+.content ol > li::before {
+    content: counter(px, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 2px;
+    font-family: "Press Start 2P", monospace;
+    font-size: 8px;
+    color: var(--red);
+}
+.content a {
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 2px solid var(--line-2);
+}
+.content a:hover {
+    background: var(--blue);
+    color: var(--ink);
+    border-bottom-color: var(--blue);
+}
+.content code {
+    font-family: "Space Mono", monospace;
+    font-size: 0.88em;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 1px 5px;
+    color: var(--amber);
+}
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 13px;
+}
+.content th {
+    font-family: "Press Start 2P", monospace;
+    font-size: 8px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--teal);
+    border: 2px solid var(--line-2);
+    padding: 10px 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+.content td {
+    border: 2px solid var(--line);
+    padding: 8px 10px;
+    vertical-align: top;
+}
+.content tbody tr:nth-child(even) td {
+    background: var(--panel-2);
+}
+.content tbody tr:hover td {
+    background: var(--raise);
+}
+.content blockquote {
+    border-left: 4px solid var(--amber);
+    background: var(--panel);
+    padding: 10px 18px;
+    margin: 18px 0;
+    color: var(--mute);
+}
+.content hr {
+    border: none;
+    border-top: 3px solid var(--line-2);
+    margin: 44px 0;
+}
+.content pre {
+    margin: 0;
+}
+.content .code-scroll {
+    overflow-x: auto;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+/* ---- flow diagrams ------------------------------------------------ */
+.flow-node {
+    position: absolute;
+    background: var(--panel);
+    border: 3px solid var(--line-2);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
 }
-
-::selection {
-  background: #3b82f6;
-  color: white;
+.flow-node:hover {
+    border-color: var(--teal);
 }
-
-html {
-  scroll-behavior: smooth;
+.flow-node-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--panel-2);
+    border-bottom: 2px solid var(--line);
+    font-family: "Press Start 2P", monospace;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    text-transform: uppercase;
 }
-
-body {
-  font-feature-settings: "liga" 1, "calt" 1;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.flow-node-cursor {
+    width: 8px;
+    height: 11px;
+    background: var(--teal);
+    flex: none;
 }
-
-/* Better focus styles */
-*:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
+.flow-node-body {
+    padding: 7px 8px;
+    font-family: "Space Mono", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--mute);
 }
-
-/* Smooth transitions for interactive elements */
-button, a {
-  transition: all 0.2s ease;
+.flow-edge {
+    fill: none;
+    stroke: var(--teal);
+    stroke-width: 2;
+    stroke-linecap: square;
+    stroke-dasharray: 8 6;
+    animation: flow-march 1.4s linear infinite;
 }
-
-/* Code blocks */
-pre {
-  font-variant-ligatures: none;
+.flow-arrow {
+    fill: var(--teal);
 }
-
-/* Improved link styles */
-a {
-  text-decoration: none;
+.flow-label {
+    font-family: "VT323", monospace;
+    font-size: 15px;
+    fill: var(--mute);
+    paint-order: stroke;
+    stroke: var(--ink);
+    stroke-width: 4px;
 }
-
-/* Better heading spacing */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 600;
-  line-height: 1.2;
+@keyframes flow-march {
+    to {
+        stroke-dashoffset: -14;
+    }
 }
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+@media (prefers-reduced-motion: reduce) {
+    .flow-edge {
+        animation: none;
+    }
+    .animate-bob {
+        animation: none;
+    }
+    .animate-blink {
+        animation: none;
+    }
+    html {
+        scroll-behavior: auto;
+    }
 }
