@@ -44,5 +44,5 @@ export const NAV: NavGroup[] = [
 ]
 
 export const FLAT: NavItem[] = NAV.flatMap((g) => g.items)
-export const VERSION = '4.2.8'
+export const VERSION = '5.0.1'
 export const REPO = 'https://github.com/FluffyBrudy/tilemap-parser'
