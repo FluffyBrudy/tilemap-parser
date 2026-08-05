@@ -100,9 +100,6 @@ if result.hit_wall_x:
 
 `Body` accepts primitive shapes only (`RectangleShape`, `CircleShape`, `CapsuleShape`); use `MapObject` for polygon solids. Collision pairs honor both sides' `collision_layer` / `collision_mask`, and bodies are landing surfaces for platformer step-up (small crates are climbed, tall ones block like walls).
 
-## Links
+## Docs
 
-- **Docs**: [https://tilemap-parser.vercel.app/](https://tilemap-parser.vercel.app/)
-- **Docs (deepwiki)**: [https://deepwiki.com/FluffyBrudy/tilemap-parser](https://deepwiki.com/FluffyBrudy/tilemap-parser)
-- **Editor**: https://pypi.org/project/tilemap-editor/
-- **Repository**: https://github.com/FluffyBrudy/tilemap-parser
+Full documentation: [https://tilemap-parser.vercel.app/](https://tilemap-parser.vercel.app/)
