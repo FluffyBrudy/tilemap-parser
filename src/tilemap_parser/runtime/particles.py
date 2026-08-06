@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 import random
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
 import pygame
 from pygame import Rect, Surface
@@ -13,12 +14,17 @@ _MAX_TINTED_CACHE = 500
 _MAX_SCALED_CACHE = 2000
 
 from ..parser.node_parse import ParsedNode
-from ..parser.particle import ParticleSystemConfig
+from ..parser.particle import FieldQuality, ParticleShape, ParticleSystemConfig
 
 PARTICLE_TEXTURE_SIZE = 24
 MAX_DT = 0.05
 
-_SYMMETRIC_SHAPES = frozenset({"circle", "square", "diamond", "star", "sparkle", "smoke"})
+_SYMMETRIC_SHAPES = frozenset({"circle", "square", "diamond", "star", "sparkle", "smoke", "fog"})
+
+#: Field drift direction: compass degrees (0 = right, 90 = down, 180 = left,
+#: 270 = up) or the string "random" for omnidirectional drift. The low-level
+#: ``ParticleSystemConfig.direction < 0`` sentinel is hidden behind "random".
+Direction = Union[float, Literal["random"]]
 
 _ALPHA_FADE_MAP = {
     "none": 0,
@@ -36,9 +42,7 @@ class ParticleEmitterNode:
         self._rect = Rect(parsed.area.x, parsed.area.y, parsed.area.w, parsed.area.h)
         self.layer_name = parsed.layer_name
         self.group = parsed.group
-        self.config = ParticleSystemConfig.from_dict(
-            parsed.properties, name=parsed.name
-        )
+        self.config = ParticleSystemConfig.from_dict(parsed.properties, name=parsed.name)
 
     @property
     def rect(self) -> Rect:
@@ -131,6 +135,34 @@ def _make_smoke_texture() -> Surface:
     return s
 
 
+def _make_fog_texture() -> Surface:
+    """Flat soft-edged square with a uniform core.
+
+    Unlike the ``smoke`` disc (bright center, dark rim), this shape has
+    roughly constant alpha across most of its canvas and only fades at the
+    rim.  Densely overlapping fog particles therefore tile like stacked
+    translucent sheets, producing one continuous haze instead of a field
+    of individual circles.
+    """
+    s = Surface((PARTICLE_TEXTURE_SIZE, PARTICLE_TEXTURE_SIZE), pygame.SRCALPHA)
+    half = PARTICLE_TEXTURE_SIZE / 2
+    core = 0.55  # flat up to this normalized distance, then soft edge
+    rim = 0.45  # edge width (normalized) over which alpha falls to 0
+    for y in range(PARTICLE_TEXTURE_SIZE):
+        dy = abs(y + 0.5 - half) / half
+        for x in range(PARTICLE_TEXTURE_SIZE):
+            dx = abs(x + 0.5 - half) / half
+            d = max(dx, dy)
+            if d <= core:
+                a = 110
+            else:
+                t = min(1.0, (d - core) / rim)
+                a = int(110 * (1.0 - t * t * (3.0 - 2.0 * t)))
+            if a > 0:
+                s.set_at((x, y), (255, 255, 255, a))
+    return s
+
+
 def _make_heart_texture() -> Surface:
     s = Surface((PARTICLE_TEXTURE_SIZE, PARTICLE_TEXTURE_SIZE), pygame.SRCALPHA)
     cx = PARTICLE_TEXTURE_SIZE // 2
@@ -139,12 +171,7 @@ def _make_heart_texture() -> Surface:
     for i in range(60):
         t = math.pi * 2 * i / 60
         x = 16 * math.sin(t) ** 3
-        y = (
-            13 * math.cos(t)
-            - 5 * math.cos(2 * t)
-            - 2 * math.cos(3 * t)
-            - math.cos(4 * t)
-        )
+        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
         points.append((cx + x * 0.7, cy - y * 0.7))
     pygame.draw.polygon(s, (255, 255, 255, 255), points)
     return s
@@ -159,6 +186,7 @@ def _get_base_texture(shape: str) -> Surface:
             "star": _make_star_texture,
             "sparkle": _make_sparkle_texture,
             "smoke": _make_smoke_texture,
+            "fog": _make_fog_texture,
             "heart": _make_heart_texture,
         }
         maker = makers.get(shape, _make_circle_texture)
@@ -167,7 +195,7 @@ def _get_base_texture(shape: str) -> Surface:
 
 
 _SCALED_CACHE: Dict[Tuple[str, int], Surface] = {}
-_TINTED_CACHE: Dict[Tuple[str, int, Tuple[int, int, int, int]], Surface] = {}
+_TINTED_CACHE: Dict[Tuple[str, int, Tuple[int, int, int, int], bool], Surface] = {}
 
 
 def _interp_color(
@@ -175,6 +203,7 @@ def _interp_color(
     ec: Tuple[int, int, int, int],
     t: float,
     alpha_fade: int,
+    peak_alpha: Optional[int] = None,
 ) -> Tuple[int, int, int, int]:
     r = int(sc[0] + (ec[0] - sc[0]) * t)
     g = int(sc[1] + (ec[1] - sc[1]) * t)
@@ -189,10 +218,11 @@ def _interp_color(
         a = int(a_end + (a_start - a_end) * t)
     else:
         mid = 0.5
+        peak = peak_alpha if peak_alpha is not None else max(a_start, a_end)
         if t < mid:
-            a = int(a_start + (255 - a_start) * (t / mid))
+            a = int(a_start + (peak - a_start) * (t / mid))
         else:
-            a = int(255 + (a_end - 255) * ((t - mid) / mid))
+            a = int(peak + (a_end - peak) * ((t - mid) / mid))
     return (
         max(0, min(255, r)),
         max(0, min(255, g)),
@@ -248,6 +278,7 @@ class Particle:
         "rotation",
         "rotation_speed",
         "alpha_fade",
+        "peak_alpha",
         "shape",
     )
 
@@ -266,6 +297,7 @@ class Particle:
         rotation_speed: float,
         alpha_fade: int,
         shape: str,
+        peak_alpha: Optional[int] = None,
     ):
         self.x = x
         self.y = y
@@ -281,6 +313,7 @@ class Particle:
         self.rotation = random.uniform(0, 360)
         self.rotation_speed = rotation_speed
         self.alpha_fade = alpha_fade
+        self.peak_alpha = peak_alpha
         self.shape = shape
 
     def update(self, dt: float, grav_x: float, grav_y: float) -> bool:
@@ -298,7 +331,9 @@ class Particle:
     def progress(self) -> float:
         if self.max_life <= 0:
             return 1.0
-        return max(0.0, 1.0 - self.life / self.max_life)
+        # Clamp to [0, 1]: in wrap mode life keeps ticking past zero (no
+        # death), so without the clamp size/color would extrapolate forever.
+        return min(1.0, max(0.0, 1.0 - self.life / self.max_life))
 
     @property
     def current_size(self) -> float:
@@ -308,7 +343,11 @@ class Particle:
     @property
     def current_color(self) -> Tuple[int, int, int, int]:
         return _interp_color(
-            self.start_color, self.end_color, self.progress, self.alpha_fade
+            self.start_color,
+            self.end_color,
+            self.progress,
+            self.alpha_fade,
+            self.peak_alpha,
         )
 
 
@@ -336,9 +375,7 @@ class ParticleEmitter:
             if p is not None:
                 self.particles.append(p)
 
-    def update(
-        self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float
-    ) -> None:
+    def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
         cfg = self.config
         if dt > MAX_DT:
             dt = MAX_DT
@@ -355,6 +392,15 @@ class ParticleEmitter:
 
         grav_x = cfg.gravity_x
         grav_y = cfg.gravity_y
+
+        if cfg.wrap:
+            # Continuous media: particles never expire, they just move and
+            # wrap around the emission area (toroidal, exact offset preserved).
+            for p in self.particles:
+                p.update(dt, grav_x, grav_y)
+                self._wrap_particle(p, area_x, area_y, area_w, area_h)
+            return
+
         alive = 0
         for i in range(len(self.particles)):
             p = self.particles[i]
@@ -370,11 +416,30 @@ class ParticleEmitter:
             self._pool.append(self.particles[i])
         del self.particles[alive:]
         if len(self._pool) > cfg.max_particles:
-            del self._pool[:len(self._pool) - cfg.max_particles]
+            del self._pool[: len(self._pool) - cfg.max_particles]
 
-    def _spawn(
-        self, area_x: float, area_y: float, area_w: float, area_h: float
-    ) -> Optional[Particle]:
+    @staticmethod
+    def _wrap_particle(p: Particle, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
+        """Toroidally fold ``p`` back into the emission area.
+
+        The particle disappears beyond the area edge by half its current
+        size, then re-enters on the opposite side at the exact same offset
+        (modulo), preserving velocity, alpha, and size.  Deterministic and
+        stateless — the same in-range particle is left untouched.
+        """
+        half = p.current_size / 2
+        span_x = area_w + 2 * half
+        span_y = area_h + 2 * half
+        if span_x <= 0 or span_y <= 0:
+            return
+        min_x = area_x - half
+        max_x = area_x + area_w + half
+        min_y = area_y - half
+        max_y = area_y + area_h + half
+        p.x = min_x + (p.x - min_x) % (max_x - min_x)
+        p.y = min_y + (p.y - min_y) % (max_y - min_y)
+
+    def _spawn(self, area_x: float, area_y: float, area_w: float, area_h: float) -> Optional[Particle]:
         cfg = self.config
         emission = cfg.emission_shape
 
@@ -417,6 +482,7 @@ class ParticleEmitter:
         )
         ec = (cfg.end_color_r, cfg.end_color_g, cfg.end_color_b, cfg.end_color_a)
         alpha_int = _ALPHA_FADE_MAP.get(cfg.alpha_fade, 1)
+        peak_alpha = cfg.fade_peak_alpha
 
         p = self._pool.pop() if self._pool else None
         if p is not None:
@@ -434,6 +500,7 @@ class ParticleEmitter:
             p.rotation = random.uniform(0, 360)
             p.rotation_speed = cfg.rotation_speed
             p.alpha_fade = alpha_int
+            p.peak_alpha = peak_alpha
             p.shape = cfg.particle_shape
         else:
             p = Particle(
@@ -450,19 +517,23 @@ class ParticleEmitter:
                 rotation_speed=cfg.rotation_speed,
                 alpha_fade=alpha_int,
                 shape=cfg.particle_shape,
+                peak_alpha=peak_alpha,
             )
         return p
 
 
 class ParticleRenderer(ABC):
     @abstractmethod
-    def prepare(
-        self, particles: List[Particle], config: ParticleSystemConfig
-    ) -> None: ...
+    def prepare(self, particles: List[Particle], config: ParticleSystemConfig) -> None: ...
 
     @abstractmethod
     def draw(
-        self, screen: Surface, offset_x: float, offset_y: float, zoom: float
+        self,
+        screen: Surface,
+        offset_x: float,
+        offset_y: float,
+        zoom: float,
+        blend: int = 0,
     ) -> None: ...
 
     @abstractmethod
@@ -499,6 +570,7 @@ class SpriteBatchRenderer(ParticleRenderer):
         offset_x: float,
         offset_y: float,
         zoom: float,
+        blend: int = 0,
     ) -> None:
         shape = self._shape
         if not shape:
@@ -507,6 +579,7 @@ class SpriteBatchRenderer(ParticleRenderer):
         if not particles:
             return
 
+        premul = blend == pygame.BLEND_PREMULTIPLIED
         screen_rect = screen.get_rect()
         batch = self._batch
         batch.clear()
@@ -514,25 +587,19 @@ class SpriteBatchRenderer(ParticleRenderer):
         needs_rotation = shape not in _SYMMETRIC_SHAPES
 
         for p in particles:
-
             sx = int((p.x - offset_x) * zoom)
             sy = int((p.y - offset_y) * zoom)
             size_px = max(1, int(p.current_size * zoom))
             size_px = ((size_px + 4) // 8) * 8
             half = size_px // 2 + 1
-            if (
-                sx + half < 0
-                or sx - half > screen_rect.right
-                or sy + half < 0
-                or sy - half > screen_rect.bottom
-            ):
+            if sx + half < 0 or sx - half > screen_rect.right or sy + half < 0 or sy - half > screen_rect.bottom:
                 continue
 
             color = p.current_color
             if color[3] <= 0:
                 continue
 
-            cache_key = (shape, size_px, _quantize_color(color))
+            cache_key = (shape, size_px, _quantize_color(color), premul)
             draw_surf = _TINTED_CACHE.pop(cache_key, None)
             if draw_surf is None:
                 if len(_TINTED_CACHE) >= _MAX_TINTED_CACHE:
@@ -540,24 +607,27 @@ class SpriteBatchRenderer(ParticleRenderer):
                 tex = _get_scaled_texture(shape, size_px)
                 draw_surf = tex.copy()
                 draw_surf.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
+                if premul:
+                    draw_surf = draw_surf.premul_alpha()
             _TINTED_CACHE[cache_key] = draw_surf  # move to MRU position
 
             if p.rotation_speed != 0 and needs_rotation:
                 rotated = pygame.transform.rotate(draw_surf, p.rotation)
                 dr = rotated.get_rect(center=(sx, sy))
-                screen.blit(rotated, dr)
+                screen.blit(rotated, dr, special_flags=blend)
             else:
                 dr = draw_surf.get_rect(center=(sx, sy))
                 batch.append((draw_surf, dr))
 
         if batch:
-            screen.blits(batch)
+            if blend:
+                screen.fblits(batch, blend)
+            else:
+                screen.blits(batch)
 
 
 class ParticleSystem:
-    def __init__(
-        self, config: ParticleSystemConfig, renderer: Optional[ParticleRenderer] = None
-    ):
+    def __init__(self, config: ParticleSystemConfig, renderer: Optional[ParticleRenderer] = None):
         self.config = config
         self.emitter = ParticleEmitter(config)
         self.renderer = renderer if renderer is not None else SpriteBatchRenderer()
@@ -568,20 +638,375 @@ class ParticleSystem:
         self.emitter.set_config(config)
         self.renderer.on_config_change(config)
 
-    def update(
-        self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float
-    ) -> None:
+    def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
         self.emitter.update(dt, area_x, area_y, area_w, area_h)
 
     def draw(
-        self, screen: Surface, offset_x: float, offset_y: float, zoom: float
+        self,
+        screen: Surface,
+        offset_x: float,
+        offset_y: float,
+        zoom: float,
+        blend: int = 0,
     ) -> None:
         self.renderer.prepare(self.emitter.particles, self.config)
-        self.renderer.draw(screen, offset_x, offset_y, zoom)
+        self.renderer.draw(screen, offset_x, offset_y, zoom, blend)
 
     def emit_burst(self, count: int, x: float, y: float, w: float, h: float) -> None:
+        self.emitter.emit_burst(count, x, y, w, h)
+
+    def emit_field(self, coverage: float, x: float, y: float, w: float, h: float) -> None:
+        """Fill the ``w x h`` area once with a persistent field.
+
+        Sets the particle count from ``config.count_for_coverage``
+        (capped at ``max_particles``), so density is expressed as a
+        dimensionless coverage (0.5 = half the area) instead of a raw
+        count.  Requires the field contract: ``wrap=True`` and
+        ``spawn_rate=0`` — otherwise the field would die or spawn on top
+        of itself, and the error names exactly which fields to change.
+        """
+        cfg = self.config
+        if not cfg.wrap:
+            raise ValueError(
+                "emit_field() needs a persistent field: set config.wrap=True (particles wrap instead of dying)"
+            )
+        if cfg.spawn_rate != 0:
+            raise ValueError(
+                "emit_field() fills once: set config.spawn_rate=0 so update() " + "does not spawn on top of the field"
+            )
+        count = cfg.count_for_coverage(coverage, w, h)
         self.emitter.emit_burst(count, x, y, w, h)
 
     def clear(self) -> None:
         self.emitter.clear()
         self.renderer.clear()
+
+
+@dataclass(frozen=True)
+class FieldLayerSpec:
+    """One layer's tuning inside a :class:`FieldProfile`.
+
+    ``coverage`` is the fill density (see ``count_for_coverage``);
+    ``ground_layer`` marks layers that sit in the lower band of the area
+    when the field is built with ``ground_bias=True``.
+    """
+
+    name: str
+    size_min: int
+    size_max: int
+    speed_min_mul: float
+    speed_max_mul: float
+    alpha: int
+    coverage: float
+    ground_layer: bool = False
+
+
+@dataclass(frozen=True)
+class FieldProfile:
+    """Named, inspectable set of layer specs for :class:`ParticleField`.
+
+    A profile is plain data: copy ``FOG_PROFILE`` and tweak the numbers to
+    build your own mood (dust, sandstorm, underwater shimmer...).  The
+    field machinery is generic; the tuning lives here.
+    """
+
+    name: str
+    presets: Tuple[FieldLayerSpec, ...]
+
+    def with_alpha(self, factor: float, name: Optional[str] = None) -> "FieldProfile":
+        """Return a copy with every layer alpha scaled by ``factor``.
+
+        Profiles are immutable data, so this never mutates the source profile.
+        ``name`` overrides the profile name on the returned copy (handy for
+        authoring named variants like ``fog.with_alpha(0.5, name="mist")``).
+        Use ``ParticleField.global_alpha`` for live fading; use this when you
+        want a named profile variant.
+        """
+        scale = max(0.0, float(factor))
+        return FieldProfile(
+            name if name is not None else self.name,
+            tuple(
+                FieldLayerSpec(
+                    spec.name,
+                    spec.size_min,
+                    spec.size_max,
+                    spec.speed_min_mul,
+                    spec.speed_max_mul,
+                    max(0, min(255, round(spec.alpha * scale))),
+                    spec.coverage,
+                    spec.ground_layer,
+                )
+                for spec in self.presets
+            ),
+        )
+
+
+@dataclass
+class ParticleFieldLayer:
+    """One generated layer inside a :class:`ParticleField`.
+
+    Most games should not need to build these manually.  The public shape is
+    useful for inspection, testing, or drawing layers yourself.
+    """
+
+    name: str
+    system: ParticleSystem
+    area: Tuple[float, float, float, float]
+
+
+class ParticleField:
+    """High-level persistent particle field helper.
+
+    ``ParticleField`` turns common continuous-effect dials (density,
+    strength, motion, color) into wrapped particle fields.  It owns the
+    field contract (``wrap=True`` and ``spawn_rate=0``), fills once, then
+    only moves existing particles.  Layer tuning comes from a
+    :class:`FieldProfile` (plain data) or from generic size/speed/alpha
+    dials when no profile is given.
+    """
+
+    shape: ParticleShape
+    quality: FieldQuality
+    direction: Direction
+
+    _QUALITY: ClassVar[Dict[str, Tuple[float, int]]] = {
+        "low": (0.72, 260),
+        "medium": (1.0, 500),
+        "high": (1.25, 800),
+    }
+
+    def __init__(
+        self,
+        area: Tuple[float, float, float, float],
+        *,
+        shape: ParticleShape = "fog",
+        color: Tuple[int, int, int] = (200, 205, 215),
+        alpha: int = 14,
+        global_alpha: float = 1.0,
+        density: float = 1.0,
+        direction: Direction = 0.0,
+        speed: Tuple[float, float] = (6.0, 14.0),
+        size: Tuple[int, int] = (70, 120),
+        spread: float = 30.0,
+        layers: int = 1,
+        quality: FieldQuality = "medium",
+        ground_bias: bool = True,
+        render_scale: float = 1.0,
+        profile: Optional[FieldProfile] = None,
+        blend: int = 0,
+    ) -> None:
+        if quality not in self._QUALITY:
+            raise ValueError("quality must be 'low', 'medium', or 'high'")
+        self.area = area
+        self.shape = shape
+        self.color = color
+        self.alpha = self._clamp_channel(alpha)
+        self._global_alpha = self._clamp_alpha(global_alpha)
+        self.density = max(0.01, float(density))
+        self.direction = self._normalize_direction(direction)
+        self.speed = (max(0.0, float(speed[0])), max(0.0, float(speed[1])))
+        if self.speed[1] < self.speed[0]:
+            self.speed = (self.speed[1], self.speed[0])
+        self.size = (max(1, int(size[0])), max(1, int(size[1])))
+        if self.size[1] < self.size[0]:
+            self.size = (self.size[1], self.size[0])
+        self.spread = max(0.0, min(360.0, float(spread)))
+        self.layer_count = max(1, int(layers))
+        self.quality = quality
+        self.ground_bias = ground_bias
+        self.render_scale = max(0.01, float(render_scale))
+        self.profile = profile
+        self.blend = int(blend)
+        self.layers: List[ParticleFieldLayer] = []
+        self._layer_base_alpha: List[int] = []
+        self.refill()
+
+    @staticmethod
+    def _clamp_channel(value: float) -> int:
+        return max(0, min(255, int(value)))
+
+    @staticmethod
+    def _clamp_alpha(value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
+
+    @staticmethod
+    def _normalize_direction(value: Direction) -> Direction:
+        if value == "random":
+            return "random"
+        if isinstance(value, str):
+            raise ValueError("direction must be degrees (float) or 'random'")
+        return float(value)
+
+    @property
+    def global_alpha(self) -> float:
+        """Master strength scale (0.0-1.0) applied to every layer's alpha."""
+        return self._global_alpha
+
+    @global_alpha.setter
+    def global_alpha(self, value: float) -> None:
+        """Live strength scale; restyles existing layer configs in place."""
+        self._global_alpha = self._clamp_alpha(value)
+        for layer, base in zip(self.layers, self._layer_base_alpha, strict=True):
+            alpha = self._clamp_channel(base * self._global_alpha)
+            cfg = layer.system.config
+            cfg.start_color_a = alpha
+            cfg.end_color_a = alpha
+
+    @staticmethod
+    def _ground_area(area: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
+        x, y, w, h = area
+        top = y + h * 0.35
+        return (x, top, w, h * 0.65)
+
+    def _generic_presets(self) -> Tuple[FieldLayerSpec, ...]:
+        size_min, size_max = self.size
+        alpha = self.alpha
+        if self.layer_count == 1:
+            return (FieldLayerSpec("field", size_min, size_max, 1.0, 1.0, alpha, 1.0),)
+
+        presets: List[FieldLayerSpec] = []
+        for i in range(self.layer_count):
+            t = i / max(1, self.layer_count - 1)
+            speed_min_mul = 0.75 + t * 0.5
+            speed_max_mul = 0.85 + t * 0.5
+            size_mul = 1.2 - t * 0.35
+            layer_alpha = max(1, round(alpha * (0.8 + t * 0.25)))
+            presets.append(
+                FieldLayerSpec(
+                    f"layer-{i + 1}",
+                    max(1, round(size_min * size_mul)),
+                    max(1, round(size_max * size_mul)),
+                    speed_min_mul,
+                    speed_max_mul,
+                    layer_alpha,
+                    1.0 / self.layer_count,
+                )
+            )
+        return tuple(presets)
+
+    def _make_config(self, preset: FieldLayerSpec, max_particles: int) -> ParticleSystemConfig:
+        r, g, b = (self._clamp_channel(c) for c in self.color)
+        end_r = self._clamp_channel(r - 10)
+        end_g = self._clamp_channel(g - 10)
+        end_b = self._clamp_channel(b - 10)
+        alpha = self._clamp_channel(preset.alpha * self.global_alpha)
+        speed_min, speed_max = self.speed
+
+        cfg = ParticleSystemConfig(
+            name=preset.name,
+            particle_shape=self.shape,
+            emission_shape="rect",
+            wrap=True,
+            spawn_rate=0,
+            particle_size_min=preset.size_min,
+            particle_size_max=preset.size_max,
+            speed_min=speed_min * preset.speed_min_mul,
+            speed_max=speed_max * preset.speed_max_mul,
+            direction=self.direction if self.direction != "random" else -1.0,
+            spread=self.spread,
+            gravity_x=0.0,
+            gravity_y=0.0,
+            lifetime_min=60.0,
+            lifetime_max=120.0,
+            start_color_r=r,
+            start_color_g=g,
+            start_color_b=b,
+            start_color_a=alpha,
+            end_color_r=end_r,
+            end_color_g=end_g,
+            end_color_b=end_b,
+            end_color_a=alpha,
+            alpha_fade="none",
+            start_scale=0.9,
+            end_scale=1.2,
+            rotation_speed=0.0,
+            max_particles=max_particles,
+        )
+        if self.render_scale != 1.0:
+            cfg.apply_render_scale(self.render_scale)
+        return cfg
+
+    def refill(self) -> None:
+        """Rebuild and fill layers after changing density, area, or quality."""
+        quality_density, max_particles = self._QUALITY[self.quality]
+        presets = self.profile.presets if self.profile is not None else self._generic_presets()
+        self._layer_base_alpha = [preset.alpha for preset in presets]
+        layers: List[ParticleFieldLayer] = []
+        for preset in presets:
+            area = self._ground_area(self.area) if preset.ground_layer and self.ground_bias else self.area
+            cfg = self._make_config(preset, max_particles)
+            system = ParticleSystem(cfg)
+            coverage = preset.coverage * self.density * quality_density
+            system.emit_field(coverage, *area)
+            layers.append(ParticleFieldLayer(preset.name, system, area))
+        self.layers = layers
+
+    def set_area(self, area: Tuple[float, float, float, float]) -> None:
+        self.area = area
+        self.refill()
+
+    def set_density(self, density: float) -> None:
+        self.density = max(0.01, float(density))
+        self.refill()
+
+    def set_motion(
+        self,
+        *,
+        direction: Optional[Direction] = None,
+        speed: Optional[Tuple[float, float]] = None,
+        spread: Optional[float] = None,
+    ) -> None:
+        if direction is not None:
+            self.direction = self._normalize_direction(direction)
+        if speed is not None:
+            self.speed = (max(0.0, float(speed[0])), max(0.0, float(speed[1])))
+            if self.speed[1] < self.speed[0]:
+                self.speed = (self.speed[1], self.speed[0])
+        if spread is not None:
+            self.spread = max(0.0, min(360.0, float(spread)))
+        self.refill()
+
+    def set_color(self, color: Tuple[int, int, int]) -> None:
+        """Recolor all layers in place; never rebuilds, never touches the
+        profile or per-layer alphas, and preserves current positions."""
+        self.color = color
+        r, g, b = (self._clamp_channel(c) for c in color)
+        end_r, end_g, end_b = (self._clamp_channel(c - 10) for c in (r, g, b))
+        for layer in self.layers:
+            cfg = layer.system.config
+            cfg.start_color_r = r
+            cfg.start_color_g = g
+            cfg.start_color_b = b
+            cfg.end_color_r = end_r
+            cfg.end_color_g = end_g
+            cfg.end_color_b = end_b
+
+    def clear(self) -> None:
+        for layer in self.layers:
+            layer.system.clear()
+
+    def update(self, dt: float) -> None:
+        for layer in self.layers:
+            layer.system.update(dt, *layer.area)
+
+    def draw(
+        self,
+        screen: Surface,
+        offset_x: float = 0.0,
+        offset_y: float = 0.0,
+        zoom: float = 1.0,
+    ) -> None:
+        for layer in self.layers:
+            layer.system.draw(screen, offset_x, offset_y, zoom, self.blend)
+
+
+# Known-good starting point: the validated layered fog look.  Copy it and
+# tweak the numbers to build your own moods — the machinery is generic.
+FOG_PROFILE = FieldProfile(
+    "fog",
+    (
+        FieldLayerSpec("far", 90, 140, 0.38, 0.75, 10, 4.4),
+        FieldLayerSpec("mid", 60, 95, 0.62, 1.12, 16, 2.67),
+        FieldLayerSpec("near", 40, 65, 1.00, 1.75, 10, 1.85, True),
+    ),
+)
