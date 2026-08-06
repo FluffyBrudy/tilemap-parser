@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.0.3 — 2026-08-06
 
 ### Updates
 - New `wrap` particle mode for continuous media (mist, snow, rain, dust): particles never die; exiting the emission area toroidally re-enters on the opposite side with exact offset, velocity, alpha, and size preserved. Combine with `emit_field()` + `spawn_rate=0` for a persistent, birth/death-free field

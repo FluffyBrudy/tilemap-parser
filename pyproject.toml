@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tilemap-parser"
-version = "5.0.2"
+version = "5.0.3"
 description = "Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and collision detection runtime."
-readme = "README.md"
+readme = "pypi-readme.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "tilemap parser contributors" }]
