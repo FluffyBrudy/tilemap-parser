@@ -393,10 +393,29 @@ export default function ApiReference() {
       </Group>
 
       <h2 id="particles">PARTICLES</h2>
-      <Group title="ParticleSystem">
+      <Group title="Fields & systems">
+        <Entry name="ParticleField(area, *, profile=None, shape='fog', color=(200,205,215), alpha=14, global_alpha=1.0, density=1.0, direction=0 | 'random', speed=(6,14), size=(70,120), spread=30, layers=1, quality='medium'|'low'|'high', ground_bias=True, render_scale=1.0, blend=0) / FOG_PROFILE">
+          <p>
+            High-level continuous field helper. Builds wrapped fields
+            internally, so users tune density, strength (<code>global_alpha</code>),
+            color, motion and quality instead of particle internals. Layer
+            tuning comes from a <code>FieldProfile</code> — plain data, e.g.
+            the shipped <code>FOG_PROFILE</code>, which you can copy and
+            tweak for your own moods. Profiles are immutable;{" "}
+            <code>FOG_PROFILE.with_alpha(factor, name=None)</code> returns a
+            scaled copy without touching the source. <code>blend</code> passes a pygame
+            blend flag (e.g. <code>pygame.BLEND_RGBA_ADD</code> for additive
+            particles, <code>pygame.BLEND_PREMULTIPLIED</code> for
+            premultiplied tints); for scene glow, alpha-blend the field into
+            a black RGB buffer and blit that with{" "}
+            <code>pygame.BLEND_RGB_ADD</code>. Every parameter, its valid
+            values and its meaning:{" "}
+            <a href="/particles#field-params">the Particles parameter reference</a>.
+          </p>
+        </Entry>
         <Entry name="ParticleSystemConfig(particle_shape, spawn_rate, max_particles, lifetime_min/max, speed_min/max, direction, spread, start_color_r/g/b/a, end_color_r/g/b/a, alpha_fade, gravity_x, gravity_y)">
           <p>
-            Everything about a particle, in one config. Full wiring on the{" "}
+            Low-level particle config and advanced escape hatch. Full wiring on the{" "}
             <a href="/particles">Particles</a> page.
           </p>
         </Entry>

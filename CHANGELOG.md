@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Updates
+- New `wrap` particle mode for continuous media (mist, snow, rain, dust): particles never die; exiting the emission area toroidally re-enters on the opposite side with exact offset, velocity, alpha, and size preserved. Combine with `emit_field()` + `spawn_rate=0` for a persistent, birth/death-free field
+- New field ergonomics: `ParticleSystem.emit_field(coverage, x, y, w, h)` fills an area once with density expressed as dimensionless coverage, backed by `ParticleSystemConfig.count_for_coverage()` and shape-aware `fill_area()` (circle emitters use their inscribed disc). Contract errors name the exact fields to set (`wrap`, `spawn_rate`)
+- New `ParticleField` high-level helper: continuous-effect dials (`density`, `global_alpha` strength scale 0-1, `direction`/`speed`, `color`, `quality` budget, `ground_bias`) over wrapped fields, with `set_area`/`set_density`/`set_motion` refills; `set_color` and `global_alpha` restyle existing layers in place without rebuilding. Layer tuning ships as plain data — `FieldProfile`/`FieldLayerSpec` with the validated `FOG_PROFILE` constant (copy and tweak for your own moods; `fog()` factory removed)
+- `ParticleField` gains a `blend` knob passing pygame blend flags to every particle draw: `pygame.BLEND_RGBA_ADD` gives additive (glowing) particles, `pygame.BLEND_PREMULTIPLIED` premultiplies the tinted sprites for cleaner overlap compositing. Default stays plain alpha blending. For scene glow, draw the field into a black RGB buffer and blit it with `pygame.BLEND_RGB_ADD` — fog adds light to the scene instead of occluding it
+- String enums are now typed: `ParticleSystemConfig` fields use `Literal` types (`particle_shape`/`emission_shape`/`alpha_fade`) and `ParticleField` uses `quality: Literal['low','medium','high']` and `shape: Literal[...]`. The aliases `EmissionShape`, `ParticleShape`, `AlphaFadeMode`, `FieldQuality` are exported from `tilemap_parser` for type checkers; valid values still live in `EMISSION_SHAPES`, `PARTICLE_SHAPES`, `ALPHA_FADE_MODES`
+- `ParticleField` accepts `direction="random"` for omnidirectional drift (every sheet picks a random angle), hiding the low-level `direction < 0` sentinel behind a readable value. `set_motion(direction="random")` works too; unknown strings raise
+- `FieldProfile.with_alpha(factor, name=None)` derives a new immutable profile with every layer alpha scaled (clamped 0-255) — author named variants like `FOG_PROFILE.with_alpha(0.5, name="mist")` without ever mutating the source profile. `global_alpha` remains the live strength control
+- New `fog` particle shape: flat soft-edged square that tiles into continuous haze (no bright core, unlike `smoke`)
+- New optional `fade_peak_alpha` config field: `fade_both` can now follow a smooth `0 -> peak -> 0` bell curve (e.g. fog), instead of peaking at the max of start/end alpha
+- `fade_both` no longer forces alpha to 255 at mid-life; it peaks at `max(start_a, end_a)` (or `fade_peak_alpha` when set)
+
 ## 5.0.1 — 2026-08-05
 
 ### Major Features Added
