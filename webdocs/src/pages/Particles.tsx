@@ -6,11 +6,106 @@ export default function Particles() {
     <div className="content">
       <h1>Particles: visual effects</h1>
       <p>
-        The particle system is one config per effect, one{" "}
-        <code>ParticleSystem</code> per emitter. A system owns exactly one
-        emitter; for two effects you build two systems. Configs come from the
-        tilemap-editor's particle JSON or are built by hand with{" "}
-        <code>ParticleSystemConfig</code>.
+        One config per effect, one <code>ParticleSystem</code> per emitter. A
+        system owns exactly one emitter; for two effects you build two
+        systems. Configs come from the tilemap-editor's particle JSON or are
+        built by hand with <code>ParticleSystemConfig</code>.
+      </p>
+
+      <h2 id="quickstart">QUICK START: ONE EFFECT, FIVE LINES</h2>
+      <p>
+        A particle effect has three pieces: a <strong>config</strong> (everything the
+        effect looks like), a <strong>system</strong> (the runtime object), and a
+        <strong>spawn area</strong> (the rect where new particles appear —
+        passed to <code>update()</code> every frame). The engine does the rest:
+      </p>
+      <CodeBlock
+        title="one effect, whole game"
+        code={`from tilemap_parser import TilemapData
+from tilemap_parser.runtime.particles import ParticleSystem
+
+td = TilemapData.load("data/map.json", nodes_dir="data")
+
+# 1. grab the effect's config from the map (emitters placed in the editor)
+snow_node = next(n for n in td.particle_emitters if n.name == "snow")
+
+# 2. build the system; maps with render_scale > 1: scale dimensionful
+#    fields once, and remember the scale for the area rect (step 3)
+rs = td.render_scale
+snow_cfg = snow_node.config
+snow_cfg.apply_render_scale(rs)
+snow = ParticleSystem(snow_cfg)
+
+# 3. every frame: update() spawns inside the area, draw() blits with the camera
+r = snow_node.rect
+snow.update(dt, r.x * rs, r.y * rs, r.w * rs, r.h * rs)
+snow.draw(screen, camera_x, camera_y, 1.0)`}
+      />
+      <p>
+        The emitter's <code>rect</code> is raw editor pixels, not auto-scaled.
+        Unlike <code>AreaNode</code> rects (which come pre-scaled), particle
+        emitter rects need the same <code>rs</code> multiplier the config got.
+        With <code>render_scale = 1</code> the multiplication is a no-op, which
+        is why examples that skip it still work.
+      </p>
+      <p>
+        Same shape when you bypass the map:{" "}
+        <code>parse_particle_file()</code> returns the configs directly, and
+        you supply the area rect yourself.
+      </p>
+
+      <h2 id="kinds">TWO WAYS TO SPEND THE AREA RECT</h2>
+      <p>
+        The area rect is simply the rect where <em>new particles spawn</em>.
+        What it should be depends on the effect you want.
+      </p>
+      <ul>
+        <li>
+          <strong>Anchored to the map</strong> — an explosion at a fixed spot,
+          a torch, a bullet spark. Use the emitter's rect from the editor
+          node (a small, static rect in world coordinates), as in the quick
+          start.
+        </li>
+        <li>
+          <strong>Following the camera</strong> — full-screen effects like
+          snow or mist that should cover the <em>whole visible screen</em>.
+          Pass the on-screen rect each frame instead; particles keep spawning
+          across the view and the effect follows the camera everywhere.
+        </li>
+      </ul>
+      <CodeBlock
+        title="snow: camera-following, screen-wide"
+        code={`# the config is stored in the map; the area is the visible screen rect
+rs = td.render_scale
+snow_cfg = next(n for n in td.particle_emitters if n.name == "snow").config
+snow_cfg.apply_render_scale(rs)
+snow = ParticleSystem(snow_cfg)
+
+# area = a rect on screen (top quarter of the view), moved with the camera.
+# screen rect is already in effective pixels: no rs multiplication here.
+snow.update(dt, cam.x, cam.y + HEIGHT // 4, WIDTH, HEIGHT // 2)
+snow.draw(screen, cam.x, cam.y, 1.0)`}
+      />
+      <CodeBlock
+        title="spark: map-anchored burst"
+        code={`spark_cfg = next(n for n in td.particle_emitters if n.name == "spark").config
+spark_cfg.apply_render_scale(rs)
+spark_cfg.spawn_rate = 0            # no streaming; fire on demand
+spark = ParticleSystem(spark_cfg)
+
+# fire a fixed burst in world pixels: position and spread are yours to
+# pick, rs-scaled if the map is scaled. A burst enters the area rect once,
+# then dynamics take over.
+spark.emit_burst(24, bullet.x, bullet.y, 8 * rs, 8 * rs)
+
+# zero-area update: nothing new spawns, existing particles keep being animated
+spark.update(dt, 0, 0, 0, 0)
+spark.draw(screen, cam.x, cam.y, 1.0)`}
+      />
+      <p>
+        Same config, same loop — only the rectangle changes. Map rect makes
+        the effect stay in place; screen rect makes it travel with the camera;
+        a zero rect means "no new particles, just finish the ones alive".
       </p>
 
       <h2 id="setup">LOADING AND BUILDING</h2>
@@ -44,10 +139,10 @@ configs[0].apply_render_scale(render_scale)`}
       <h2 id="update-render">UPDATE AND DRAW: THE AREA RECT</h2>
       <p>
         <code>update()</code> needs the emitter's <em>emission area</em>: the
-        rect where particles spawn (config <code>emission_shape</code> decides
-        how the area is used: point / rect / circle / line).{" "}
-        <code>draw()</code> needs the camera offset and zoom. This is the whole
-        per-frame cost:
+        rect where particles spawn — the two patterns above. Config{" "}
+        <code>emission_shape</code> decides <em>how</em> the area is used:
+        point / rect / circle / line. <code>draw()</code> needs the camera
+        offset and zoom. This is the whole per-frame cost:
       </p>
       <CodeBlock
         title="game loop"
@@ -75,17 +170,67 @@ explosion.emit_burst(120, x, y, 32.0, 32.0)
 # torch: config.spawn_rate > 0 and update() every frame emits steadily`}
       />
 
-      <h2 id="field">PERSISTENT FIELDS: FOG, HAZE, DUST</h2>
+      <h2 id="renderers">RENDERERS</h2>
       <p>
-        Three modes, one system: <strong>burst</strong> (fires once),{" "}
-        <strong>emitter</strong> (<code>spawn_rate</code>, particles are born
-        and die), and <strong>field</strong> — the atmosphere case. Fog should
-        not be a steady stream of newborn particles: every birth is an alpha
-        pop and every death is churn. A field is filled once and then{" "}
-        <em>only moves</em>: <code>wrap=True</code> makes particles never die —
-        exiting the area re-enters on the opposite side, exact offset kept —
-        and <code>spawn_rate=0</code> stops new births. Nothing pops, nothing
-        churns; the per-frame cost is just moving the same sheets.
+        <code>ParticleSystem.draw()</code> internally calls{" "}
+        <code>SpriteBatchRenderer</code>, the concrete renderer that caches
+        shape textures, tints, scales and batches blits. The{" "}
+        <code>ParticleRenderer</code> base class is abstract; you only meet it
+        if you write your own renderer (implement{" "}
+        <code>prepare(particles, config)</code> and{" "}
+        <code>draw(screen, offset_x, offset_y, zoom)</code>).{" "}
+        <code>clear_texture_caches()</code> frees the cached shape textures
+        when you're done.
+      </p>
+
+      <h2 id="editor">EDITOR-PLACED EMITTERS (NODES)</h2>
+      <p>
+        Emitters placed in the tilemap-editor come back as parsed nodes. Wrap
+        each node in a <code>ParticleEmitterNode</code> to get its config and
+        placement rect, then build the system, exactly as{" "}
+        <code>examples/particles/src/main.py</code> does:
+      </p>
+      <CodeBlock
+        title="from the map"
+        code={`from tilemap_parser import parse_nodes_file
+from tilemap_parser.runtime.particles import ParticleEmitterNode
+
+for parsed in parse_nodes_file("data/map.nodes.json"):
+    if parsed.node_type != "particle_emitter":
+        continue
+    node = ParticleEmitterNode(parsed)          # .config + .rect
+    ps = ParticleSystem(node.config)
+    # node.rect is raw editor coords: multiply by the map's render_scale
+    # (same rs the config got), like the quick start above
+    ps.update(dt, node.rect.x * rs, node.rect.y * rs, node.rect.w * rs, node.rect.h * rs)
+    ps.draw(screen, 0, 0, 1)`}
+      />
+      <p>
+        If you already load the map with{" "}
+        <code>TilemapData.load(path, nodes_dir=...)</code>, the same emitters
+        come pre-wrapped as <code>td.particle_emitters</code>; skip the manual
+        wrapping.
+      </p>
+
+      <Callout kind="tip" title="PERFORMANCE">
+        Batching means the renderer is cheap at reasonable counts, but each
+        particle is a Python object, so thousands per frame will cost you. For
+        bursts and emitters prefer a few bursts or modest{" "}
+        <code>spawn_rate</code>s over one system with{" "}
+        <code>max_particles</code> in the thousands. Fields are the exception:
+        a field is paid for once at <code>emit_field</code> time and then only
+        moved, so large persistent effects should be fields, not fast
+        spawners.
+      </Callout>
+
+      <h2 id="field">ADVANCED: PARTICLE FIELDS — FOG, HAZE, DUST</h2>
+      <p>
+        The three modes above are for one-off or streaming particles. Fog,
+        haze, and dust are different: they should <em>already be there</em> and
+        only drift. That's what <code>ParticleField</code> is for — it creates
+        the sheets once, then just moves them. Nothing is ever created or
+        destroyed, so the fog never flickers and costs almost nothing per
+        frame.
       </p>
       <CodeBlock
         title="field.py"
@@ -106,33 +251,262 @@ fog = ParticleField(
 fog.update(dt)
 fog.draw(screen)`}
       />
-      <p>
-        <code>ParticleField</code> owns the hidden field contract and the
-        layered recipe. Tune <code>density</code> for sheet count,{" "}
-        <code>alpha</code> for strength, <code>direction</code>/
-        <code>speed</code> for motion, and <code>quality</code> for the
-        visual/performance budget. For depth, pass{" "}
-        <code>profile=FOG_PROFILE</code> (see LAYERED FIELDS) — or check the{" "}
-        <a href="#field-params">parameter reference</a> before inventing your
-        own look. See <code>examples/particles/src/field.py</code> (LEFT/RIGHT
-        change density live).
-      </p>
       <Callout kind="tip" title="FIELDS vs EMITTERS">
-        <code>spawn_rate</code> is right for discrete continuous effects —
-        rain, embers, smoke puffs — where a stream of short-lived particles{" "}
-        <em>is</em> the look. It is the wrong tool for a uniform atmosphere:
-        fog via <code>spawn_rate</code> means thousands of birth/death events
-        per minute and constant alpha flicker. For atmosphere, fill once and
-        wrap. A field of a few hundred sheets costs a fraction of an emitter
-        producing the same look.
+        <code>spawn_rate</code> is great for effects that are naturally a{" "}
+        <em>stream</em> — rain, embers, smoke puffs — because a stream of
+        short-lived particles <em>is</em> the look. It is a bad fit for plain
+        atmosphere: fog made of a constant stream means thousands of
+        create/destroy events per minute and constant flicker. For atmosphere,
+        fill once and wrap. A field of a few hundred sheets costs far less
+        than an emitter making the same look.
       </Callout>
 
-      <h2 id="layered">LAYERED FIELDS: DEPTH FROM PARALLEL FIELDS</h2>
+      <h3 id="field-options">WHAT EACH <code>ParticleField</code> OPTION DOES</h3>
       <p>
-        A single field reads flat: one sheet size, one speed, one alpha — a
-        uniform haze. Real atmosphere is layered. Run three fields in
-        parallel, each with its own size, speed and alpha, and the eye reads
-        depth. The rule that works:
+        The quick answer for each option — what it changes, and the values it
+        accepts. If an option says <em>profile overrides</em>, it only matters
+        when you have not passed a <code>profile</code>.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>option</th>
+            <th>type</th>
+            <th>what it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <code>area</code>
+            </td>
+            <td>
+              <code>(x, y, w, h)</code>
+            </td>
+            <td>
+              The world rect where the fog lives. Sheets wrap at the edges, so
+              pad it so sheets are off-screen before they wrap. <strong>Required.</strong>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>profile</code>
+            </td>
+            <td>
+              <code>FieldProfile | None</code>
+            </td>
+            <td>
+              The layered tuning as plain data. Safer and easiest: pass{" "}
+              <code>FOG_PROFILE</code>. <code>None</code> builds reasonable
+              defaults from the <code>size</code>/<code>speed</code>/<code>alpha</code>{" "}
+              options. Profile overrides those.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>shape</code>
+            </td>
+            <td>
+              <code>"circle" | "square" | "diamond" | "star" | "sparkle" | "smoke" | "heart" | "line" | "fog"</code>
+            </td>
+            <td>
+              The sprite each sheet draws. <code>"fog"</code> is a flat,
+              soft-edged square that tiles into continuous haze;{" "}
+              <code>"smoke"</code> is rounder with a brighter middle. Profile
+              overrides.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>color</code>
+            </td>
+            <td>
+              <code>(r, g, b)</code>
+            </td>
+            <td>
+              Tint for every sheet. The end color is auto-darkened slightly.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>alpha</code>
+            </td>
+            <td>
+              <code>int</code> 0-255
+            </td>
+            <td>
+              How strong each sheet is. Only used when there is no{" "}
+              <code>profile</code>. Profile overrides.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>global_alpha</code>
+            </td>
+            <td>
+              <code>float</code> 0.0-1.0
+            </td>
+            <td>
+              The master strength knob, multiplied into every layer's alpha.
+              Assign to fade the whole effect live:{" "}
+              <code>field.global_alpha = 0.4</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>density</code>
+            </td>
+            <td>
+              <code>float</code> &gt; 0
+            </td>
+            <td>
+              How many sheets there are. 1.0 = the default amount; 2.0 = twice
+              that — and roughly twice the work. starting low and raising it
+              only if the look is too thin.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>direction</code>
+            </td>
+            <td>
+              <code>float</code> degrees | <code>"random"</code>
+            </td>
+            <td>
+              Where sheets drift: 0 = right, 90 = down, 180 = left, 270 = up.
+              Or <code>"random"</code> — every sheet drifts its own way.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>speed</code>
+            </td>
+            <td>
+              <code>(min, max)</code> px/sec
+            </td>
+            <td>
+              How fast sheets drift, as a range — each picks one. Varying speed
+              between layers is what stops the fog looking like a grid.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>size</code>
+            </td>
+            <td>
+              <code>(min, max)</code> px
+            </td>
+            <td>Sheet size range. Only used when there is no{" "}<code>profile</code>. Profile overrides.</td>
+          </tr>
+          <tr>
+            <td>
+              <code>spread</code>
+            </td>
+            <td>
+              <code>float</code> 0-360
+            </td>
+            <td>
+              How much wobble around <code>direction</code>; 0 = one straight
+              drift angle.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>layers</code>
+            </td>
+            <td>
+              <code>int</code> &ge; 1
+            </td>
+            <td>
+              Depth layers for generic fields (no profile) — more = more depth,
+              more work. Profile overrides.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>quality</code>
+            </td>
+            <td>
+              <code>"low" | "medium" | "high"</code>
+            </td>
+            <td>
+              The performance budget: low = fewer sheets (cap 260), medium =
+              default (cap 500), high = most (cap 800). It never removes
+              layers — layer structure comes from the profile. Turn this down
+              on weaker machines.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>ground_bias</code>
+            </td>
+            <td>
+              <code>bool</code>
+            </td>
+            <td>
+              <code>True</code> keeps the nearest layer in the lower 65% of the
+              area, so the fog reads as hugging the ground.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>render_scale</code>
+            </td>
+            <td>
+              <code>float</code> &gt; 0
+            </td>
+            <td>
+              Scales sizes and speeds to match the map's{" "}
+              <code>render_scale</code>. Pass <code>map_data.render_scale</code>.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <code>blend</code>
+            </td>
+            <td>
+              <code>int</code> (pygame flag)
+            </td>
+            <td>
+              <p>
+                <code>0</code> (default) = normal soft alpha. Overlapping sheets
+                just look denser. This is the option for atmosphere: fog, mist,
+                haze.
+              </p>
+              <p>
+                Any non-zero flag except <code>pygame.BLEND_PREMULTIPLIED</code>{" "}
+                changes how the sheet is drawn onto the screen: the soft
+                transparent look is lost and the fog renders <em>solid</em>{" "}
+                (opaque). So for realistic fog keep <code>blend=0</code>.
+              </p>
+              <p>
+                Useful non-zero choices:{" "}
+                <code>pygame.BLEND_PREMULTIPLIED</code> = premultiplied alpha,
+                which preserves soft alpha when used with a{" "}
+                <code>premul_alpha()</code> surface;{" "}
+                <code>pygame.BLEND_RGBA_ADD</code> = additive glow (sparks,
+                fireflies) — start with <code>global_alpha</code> roughly
+                halved or it washes out.
+              </p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Live tuning: <code>set_color((r, g, b))</code> retints in place (never
+        touches alphas), <code>set_density(x)</code>,{" "}
+        <code>set_motion(direction=90, speed=(2, 4))</code> and{" "}
+        <code>set_area((x, y, w, h))</code> rebuild the field so the change
+        applies immediately. Read the result via <code>field.layers</code> —
+        each layer has <code>.name</code>, <code>.area</code> and{" "}
+        <code>.system</code>.
+      </p>
+
+      <h3 id="layered">LAYERED FIELDS: DEPTH FROM PARALLEL FIELDS</h3>
+      <p>
+        One layer reads flat: same size, same speed, same alpha — a uniform
+        haze. Run three stacked layers, each with its own size, speed and
+        alpha, and the eye reads depth. The working recipe:
       </p>
       <table>
         <thead>
@@ -169,13 +543,11 @@ fog.draw(screen)`}
         </tbody>
       </table>
       <p>
-        Layering is not just aesthetics. Wrap preserves each sheet's y-offset
-        forever, so within one field, sheets that share a speed stay aligned
-        as coherent rows or vertical streaks — the classic "I can tell it's
-        particles" tell. Spreading speeds and sizes <em>across</em> layers
-        makes sheets decorrelate over time, dissolving those structures at
-        config level. The recipe below is a known-good fog, so start from it
-        and touch only the dials you care about.
+        Wrap preserves each sheet's y-offset forever, so sheets that share a
+        speed stay aligned as coherent rows or streaks — the giveaway that it
+        is particles. Spreading speeds and sizes <em>across</em> layers is what
+        dissolves that. The recipe below is a known-good fog; start from it and
+        only touch the dials you care about.
       </p>
       <CodeBlock
         title="layered fog"
@@ -196,22 +568,18 @@ fog = ParticleField(
 fog.update(dt)
 fog.draw(screen, 0, 0, 1)`}
       />
-      <p>
-        Four dials, everything else shared: <code>density</code> is sheet
-        count, <code>global_alpha</code> is strength, <code>direction</code>/
-        <code>speed</code> is motion, and <code>quality</code> is budget. The
-        layer tuning lives in <code>FOG_PROFILE</code> — copy it and edit the
-        numbers to build your own layered moods. Starting points: light mist —
-        halve <code>global_alpha</code>; heavy fog — raise <code>density</code>;
-        dust haze — reverse the wind and use a generic field.
-      </p>
+      <Callout kind="tip" title="FOG_PROFILE IS A STARTING POINT">
+        <code>FOG_PROFILE</code> is just data. Copy it, edit the numbers, and
+        you have your own mood — dust, ash, underwater shimmer. Starting
+        points: light mist — halve <code>global_alpha</code>; heavy fog — raise{" "}
+        <code>density</code>; dust — watch the wind and use a generic field.
+      </Callout>
 
-      <h2 id="generic-field">GENERIC CONTINUOUS FIELDS</h2>
+      <h3 id="generic-field">GENERIC CONTINUOUS FIELDS</h3>
       <p>
-        Fog is only a preset. For dust, pollen, ash, magic haze, or other
-        persistent ambience, use <code>ParticleField</code> directly. It still
-        fills once and wraps forever; you choose the shape, alpha, density,
-        size and motion.
+        Fog is only a preset. For dust, pollen, ash, or magic haze, use{" "}
+        <code>ParticleField</code> without a profile — it still fills once and
+        wraps forever, and you pick the shape, alpha, density, size and motion.
       </p>
       <CodeBlock
         title="generic field"
@@ -232,284 +600,6 @@ dust.update(dt)
 dust.draw(screen)`}
       />
 
-      <h2 id="field-params">PARTICLE FIELD PARAMETER REFERENCE</h2>
-      <p>
-        Every dial on <code>ParticleField</code>, what it means, and the
-        valid values. If a param says "profile overrides", it only drives the
-        generic (profile-less) field — the moment you pass{" "}
-        <code>profile=FOG_PROFILE</code> the profile's numbers win.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>param</th>
-            <th>type</th>
-            <th>meaning</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <code>area</code>
-            </td>
-            <td>
-              <code>(x, y, w, h)</code>
-            </td>
-            <td>
-              The world-space rect the field lives in. Sheets wrap at the
-              edges, so pad it until sheets leave the visible screen before
-              they wrap. Required.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>profile</code>
-            </td>
-            <td>
-              <code>FieldProfile | None</code>
-            </td>
-            <td>
-              Layer tuning as plain data (see below). <code>None</code> builds
-              generic layers from the size/speed/alpha dials. Ship with{" "}
-              <code>FOG_PROFILE</code>.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>shape</code>
-            </td>
-            <td>
-              <code>"circle" | "square" | "diamond" | "star" | "sparkle" | "smoke" | "heart" | "line" | "fog"</code>
-            </td>
-            <td>
-              Particle sprite. <code>"fog"</code> is a flat soft-edged square
-              that tiles into continuous haze (no bright core, unlike{" "}
-              <code>"smoke"</code>). Profile overrides.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>color</code>
-            </td>
-            <td>
-              <code>(r, g, b)</code>
-            </td>
-            <td>Tint for every layer; end color auto-darkens by 10.</td>
-          </tr>
-          <tr>
-            <td>
-              <code>alpha</code>
-            </td>
-            <td>
-              <code>int</code> 0-255
-            </td>
-            <td>
-              Per-sheet strength used by generic fields. Profile overrides.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>global_alpha</code>
-            </td>
-            <td>
-              <code>float</code> 0.0-1.0
-            </td>
-            <td>
-              Master strength scale, multiplied into every layer's alpha.
-              Hot-tunable: assigning refills the field, so{" "}
-              <code>field.global_alpha = 0.4</code> live is how you fade the
-              whole effect.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>density</code>
-            </td>
-            <td>
-              <code>float</code> &gt; 0
-            </td>
-            <td>Sheet count multiplier. 1.0 = the recipe's reference count.</td>
-          </tr>
-          <tr>
-            <td>
-              <code>direction</code>
-            </td>
-            <td>
-              <code>float</code> degrees | <code>"random"</code>
-            </td>
-            <td>
-              Drift direction: 0 = right, 90 = down, 180 = left, 270 = up
-              (plain trig on screen coords). Or <code>"random"</code> for
-              omnidirectional drift — every sheet picks a random angle on
-              refill, the same as a generic field set loose.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>speed</code>
-            </td>
-            <td>
-              <code>(min, max)</code> px/sec
-            </td>
-            <td>
-              Drift speed range; each sheet picks one. Spreading speeds{" "}
-              <em>across layers</em> is what dissolves "I can tell it's
-              particles" alignment.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>size</code>
-            </td>
-            <td>
-              <code>(min, max)</code> px
-            </td>
-            <td>Sheet size range for generic fields. Profile overrides.</td>
-          </tr>
-          <tr>
-            <td>
-              <code>spread</code>
-            </td>
-            <td>
-              <code>float</code> 0-360
-            </td>
-            <td>
-              Random jitter around <code>direction</code>; 0 = a single drift
-              direction.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>layers</code>
-            </td>
-            <td>
-              <code>int</code> &ge; 1
-            </td>
-            <td>
-              How many generic layers to split into when no profile is given.
-              Profile overrides.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>quality</code>
-            </td>
-            <td>
-              <code>"low" | "medium" | "high"</code>
-            </td>
-            <td>
-              Budget dial only: scales density and caps total particles (low
-              0.72x/260, medium 1.0x/500, high 1.25x/800). It never trims
-              layers — layer structure belongs to the profile.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>ground_bias</code>
-            </td>
-            <td>
-              <code>bool</code>
-            </td>
-            <td>
-              True keeps the last (nearest) layer in the lower 65% of the
-              area, so it reads as proximity to the ground.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>render_scale</code>
-            </td>
-            <td>
-              <code>float</code> &gt; 0
-            </td>
-            <td>
-              Scales sizes and speeds to match the map's{" "}
-              <code>render_scale</code> (pass <code>map_data.render_scale</code>).
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <code>blend</code>
-            </td>
-            <td>
-              <code>int</code> (pygame flag)
-            </td>
-            <td>
-              <p>
-                Passed to every particle blit. <code>0</code> (default) =
-                plain alpha — the right choice for natural atmosphere: fog,
-                mist, haze. Overlapping sheets just look denser.
-              </p>
-              <p>
-                <code>pygame.BLEND_PREMULTIPLIED</code> = premultiplied
-                tints; slightly cleaner overlap compositing when many soft
-                sheets stack (same visual style, more correct math). Also
-                the cheapest per-pixel blit.
-              </p>
-              <p>
-                <code>pygame.BLEND_RGBA_ADD</code> = additive, glowing
-                particles. Reserved for glow/magic effects: RGB <em>and</em>{" "}
-                alpha accumulate, so start with{" "}
-                <code>global_alpha</code> roughly halved or the field washes
-                out to white. Prefer it for sparks, fireflies, magic haze —
-                not for natural fog.
-              </p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p>
-        Live tuning beyond <code>global_alpha</code>:{" "}
-        <code>set_color((r, g, b))</code> retints (never touches alphas),{" "}
-        <code>set_density(x)</code>, <code>set_motion(direction=90, speed=(2, 4))</code>{" "}
-        and <code>set_area((x, y, w, h))</code> all refill the field so the
-        change applies immediately. Read the result via{" "}
-        <code>field.layers</code>: each has <code>.name</code>,{" "}
-        <code>.area</code> and <code>.system</code> (the underlying{" "}
-        <code>ParticleSystem</code>).
-      </p>
-
-      <h2 id="halfres">HALF-RESOLUTION RENDERING AND SCENE GLOW</h2>
-      <p>
-        A few hundred big sheets still means per-pixel work every frame.
-        Fog is a soft blur anyway, so render it into a half-resolution
-        buffer and upscale once — a quarter of the blit area, visually
-        identical. This is a rendering recipe, not a{" "}
-        <code>ParticleField</code> responsibility:
-      </p>
-      <CodeBlock
-        title="natural atmosphere"
-        code={`mist_buffer = pygame.Surface((W // 2, H // 2), pygame.SRCALPHA)
-mist_buffer.fill((0, 0, 0, 0))
-mist.draw(mist_buffer, 0, 0, 0.5)   # zoom = 1/2
-
-# Two-step scale+blit: the dest-form smoothscale(src, size, dest)
-# corrupts display surface pixels, so scale to a fresh surface first.
-scaled = pygame.transform.smoothscale(mist_buffer, (W, H))
-screen.blit(scaled, (0, 0))         # plain alpha composite`}
-      />
-      <p>
-        If you want the fog to <em>add light</em> instead of just tint —
-        glowing haze in a dark scene — swap the buffer to plain RGB and
-        composite additively. That's the additive-composite trick: fog
-        brightens the scene where it lies instead of occluding it.
-      </p>
-      <CodeBlock
-        title="scene glow (additive composite)"
-        code={`glow_buffer = pygame.Surface((W // 2, H // 2))   # no alpha channel
-glow_buffer.fill((0, 0, 0))
-mist.draw(glow_buffer, 0, 0, 0.5)
-
-scaled = pygame.transform.smoothscale(glow_buffer, (W, H))
-screen.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)`}
-      />
-      <p>
-        Alpha particles against black already store their premultiplied
-        color, so the additive blit adds exactly the fog's light. Keep the
-        field's own <code>blend</code> at <code>0</code> for this; the
-        additive behavior comes from the composite, not the particles.
-      </p>
-
       <h3 id="profiles">PROFILES: LAYER TUNING AS PLAIN DATA</h3>
       <p>
         <code>FOG_PROFILE</code> is a <code>FieldProfile(name, presets)</code>:
@@ -518,11 +608,10 @@ screen.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)`}
         — <code>coverage</code> is that layer's share of the area (2.0 =
         double the sheet area), <code>speed_*_mul</code> multiplies the
         field's speed range, and <code>ground_layer=True</code> pins the band
-        to the lower 65%. Profiles are immutable data — copy them, don't
-        mutate them. <code>profile.with_alpha(factor, name=None)</code>{" "}
-        returns a scaled copy (e.g. <code>FOG_PROFILE.with_alpha(0.5, name="mist")</code>)
-        for authoring named variants; the source profile is never touched.
-        Copy and edit the numbers for your own moods:
+        to the lower 65%. Profiles are immutable data — copy them, never mutate
+        them. <code>profile.with_alpha(factor, name=None)</code> returns a
+        scaled copy (e.g. <code>FOG_PROFILE.with_alpha(0.5, name="mist")</code>)
+        without touching the source. Here is the shipped fog, ready to copy:
       </p>
       <table>
         <thead>
@@ -563,10 +652,50 @@ screen.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)`}
         </tbody>
       </table>
 
-      <h2 id="manual-field">ADVANCED: MANUAL FIELDS</h2>
+      <h3 id="halfres">HALF-RESOLUTION RENDERING AND SCENE GLOW</h3>
       <p>
-        <code>ParticleField</code> is just a friendly wrapper around the
-        primitive. If you need full control, build the contract yourself:{" "}
+        A few hundred big sheets still means per-pixel work every frame. Fog is
+        a soft blur anyway, so render it into a half-resolution buffer and
+        upscale once — a quarter of the blit area, visually identical. This is
+        a rendering recipe, not a <code>ParticleField</code> responsibility:
+      </p>
+      <CodeBlock
+        title="natural atmosphere"
+        code={`mist_buffer = pygame.Surface((W // 2, H // 2), pygame.SRCALPHA)
+mist_buffer.fill((0, 0, 0, 0))
+mist.draw(mist_buffer, 0, 0, 0.5)   # zoom = 1/2
+
+# Two-step scale+blit: the dest-form smoothscale(src, size, dest)
+# corrupts display surface pixels, so scale to a fresh surface first.
+scaled = pygame.transform.smoothscale(mist_buffer, (W, H))
+screen.blit(scaled, (0, 0))         # plain alpha composite`}
+      />
+      <p>
+        If you want the fog to <em>add light</em> instead of just tint —
+        glowing haze in a dark scene — swap the buffer to plain RGB and
+        composite additively. The fog then brightens the scene where it lies
+        instead of occluding it.
+      </p>
+      <CodeBlock
+        title="scene glow (additive composite)"
+        code={`glow_buffer = pygame.Surface((W // 2, H // 2))   # no alpha channel
+glow_buffer.fill((0, 0, 0))
+mist.draw(glow_buffer, 0, 0, 0.5)
+
+scaled = pygame.transform.smoothscale(glow_buffer, (W, H))
+screen.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)`}
+      />
+      <p>
+        Alpha particles against black already store their premultiplied color,
+        so the additive blit adds exactly the fog's light. Keep the field's own
+        <code>blend</code> at <code>0</code> for this — the additive behavior
+        comes from the composite, not from the particles.
+      </p>
+
+      <h3 id="manual-field">MANUAL FIELDS</h3>
+      <p>
+        <code>ParticleField</code> is a friendly wrapper around the primitive.
+        If you need full control, build the contract yourself:{" "}
         <code>wrap=True</code>, <code>spawn_rate=0</code>, fill once with{" "}
         <code>emit_field()</code>, then update and draw normally.
       </p>
@@ -585,57 +714,6 @@ ps.emit_field(0.6, -80, -80, 960, 760)
 ps.update(dt, -80, -80, 960, 760)
 ps.draw(screen, 0, 0, 1)`}
       />
-
-      <h2 id="renderers">RENDERERS</h2>
-      <p>
-        <code>ParticleSystem.draw()</code> internally calls{" "}
-        <code>SpriteBatchRenderer</code>, the concrete renderer that caches
-        shape textures, tints, scales and batches blits. The{" "}
-        <code>ParticleRenderer</code> base class is abstract; you only meet it
-        if you write your own renderer (implement{" "}
-        <code>prepare(particles, config)</code> and{" "}
-        <code>draw(screen, offset_x, offset_y, zoom)</code>).{" "}
-        <code>clear_texture_caches()</code> frees the cached shape textures
-        when you're done.
-      </p>
-
-      <h2 id="editor">EDITOR-PLACED EMITTERS (NODES)</h2>
-      <p>
-        Emitters placed in the tilemap-editor come back as parsed nodes. Wrap
-        each node in a <code>ParticleEmitterNode</code> to get its config and
-        placement rect, then build the system, exactly as{" "}
-        <code>examples/particles/src/main.py</code> does:
-      </p>
-      <CodeBlock
-        title="from the map"
-        code={`from tilemap_parser import parse_nodes_file
-from tilemap_parser.runtime.particles import ParticleEmitterNode
-
-for parsed in parse_nodes_file("data/map.nodes.json"):
-    if parsed.node_type != "particle_emitter":
-        continue
-    node = ParticleEmitterNode(parsed)          # .config + .rect
-    ps = ParticleSystem(node.config)
-    ps.update(dt, node.rect.x, node.rect.y, node.rect.w, node.rect.h)
-    ps.draw(screen, 0, 0, 1)`}
-      />
-      <p>
-        If you already load the map with{" "}
-        <code>TilemapData.load(path, nodes_dir=...)</code>, the same emitters
-        come pre-wrapped as <code>td.particle_emitters</code>; skip the manual
-        wrapping.
-      </p>
-
-      <Callout kind="tip" title="PERFORMANCE">
-        Batching means the renderer is cheap at reasonable counts, but each
-        particle is a Python object, so thousands per frame will cost you. For
-        bursts and emitters prefer a few bursts or modest{" "}
-        <code>spawn_rate</code>s over one system with{" "}
-        <code>max_particles</code> in the thousands. Fields are the exception:
-        a field is paid for once at <code>emit_field</code> time and then only
-        moved, so large persistent effects should be fields, not fast
-        spawners.
-      </Callout>
     </div>
   );
 }

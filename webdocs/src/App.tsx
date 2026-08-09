@@ -20,9 +20,17 @@ import FullPathfinding from "./pages/FullPathfinding";
 import FullPhysicsWorld from "./pages/FullPhysicsWorld";
 import JsonFormats from "./pages/JsonFormats";
 import TechnicalNotes from "./pages/TechnicalNotes";
+import { SEO, SITE_DESCRIPTION } from "./seo";
 
 function ScrollManager() {
   const { pathname, hash } = useLocation();
+  useEffect(() => {
+    const seoPath = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+    const seo = SEO[seoPath];
+    document.title = seo?.title ?? "tilemap-parser — docs";
+    const desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute("content", seo?.description ?? SITE_DESCRIPTION);
+  }, [pathname]);
   useEffect(() => {
     if (hash) {
       const el = document.getElementById(hash.slice(1));

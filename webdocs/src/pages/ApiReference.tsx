@@ -34,9 +34,10 @@ export default function ApiReference() {
     <div className="content">
       <h1>API Reference</h1>
       <p>
-        Grouped by purpose, not alphabet soup. Every entry is wired, never just
-        signed; the "why" and the "connect it like this" are one sentence. The
-        physics pages carry the deep explanations; this is the map.
+        The practical index. Every entry says what it does and how to use it
+        in one sentence, grouped by purpose rather than alphabetically. The
+        deeper theory lives on the guide pages; an entry links to its guide
+        when one exists.
       </p>
 
       <h2 id="map-data">MAP DATA & LOADING</h2>
@@ -72,8 +73,8 @@ export default function ApiReference() {
         </Entry>
         <Entry name="TilemapData.get_tile_surface(ttype, variant, copy_surface=True) → Surface | None">
           <p>
-            The renderer's bake path: one tile texture from the tileset, scaled
-            by <code>render_scale</code>. Handy when you want a tile's art
+            Gets one tile texture from the tileset, scaled by{" "}
+            <code>render_scale</code>. Handy when you want a tile's art
             outside the renderer (icons, minimaps).
           </p>
         </Entry>
@@ -106,9 +107,9 @@ export default function ApiReference() {
         </Entry>
         <Entry name="load_map_objects / MapObject">
           <p>
-            <code>MapObject</code> is the lane for polygon solids: a body with
-            owner-local polygon shapes. If <code>Body</code> won't take your
-            polygon, this is why it exists.
+            <code>MapObject</code> is the body used by polygon solids: it keeps
+            its own shapes instead of relying on <code>Body</code>, which only
+            accepts primitives. Use this one for polygon bodies.
           </p>
         </Entry>
       </Group>

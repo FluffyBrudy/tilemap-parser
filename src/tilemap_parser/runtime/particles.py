@@ -177,6 +177,23 @@ def _make_heart_texture() -> Surface:
     return s
 
 
+def _make_line_texture() -> Surface:
+    # will be applied on next release not yet
+    """Vertical streak spanning the full canvas with a thin core.
+
+    Kept axis-aligned (not rotated): the renderer only rotates particles
+    when ``rotation_speed`` is non-zero, so a vertical line reads as a
+    falling streak for rain and stream effects.
+    """
+    s = Surface((PARTICLE_TEXTURE_SIZE, PARTICLE_TEXTURE_SIZE), pygame.SRCALPHA)
+    w = max(1, PARTICLE_TEXTURE_SIZE // 6)
+    x = (PARTICLE_TEXTURE_SIZE - w) // 2
+    pygame.draw.rect(s, (255, 255, 255, 255), Rect(x, 2, w, PARTICLE_TEXTURE_SIZE - 4))
+    pygame.draw.rect(s, (255, 255, 255, 140), Rect(x, 0, w, 2))
+    pygame.draw.rect(s, (255, 255, 255, 140), Rect(x, PARTICLE_TEXTURE_SIZE - 2, w, 2))
+    return s
+
+
 def _get_base_texture(shape: str) -> Surface:
     if shape not in _TEXTURE_CACHE:
         makers = {
@@ -188,6 +205,7 @@ def _get_base_texture(shape: str) -> Surface:
             "smoke": _make_smoke_texture,
             "fog": _make_fog_texture,
             "heart": _make_heart_texture,
+            "line": _make_line_texture,
         }
         maker = makers.get(shape, _make_circle_texture)
         _TEXTURE_CACHE[shape] = maker()
