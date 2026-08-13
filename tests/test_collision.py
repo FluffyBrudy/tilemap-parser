@@ -192,6 +192,60 @@ class TestParseCharacterCollision:
         result = parse_character_collision(data)
         assert result.properties == {}
 
+    def test_render_scale_rectangle(self):
+        result = parse_character_collision(CHARACTER_RECT_DATA, render_scale=2.0)
+        assert isinstance(result.shape, RectangleShape)
+        assert result.shape.width == 48.0
+        assert result.shape.height == 64.0
+        assert result.shape.offset == (8.0, 0.0)
+
+    def test_render_scale_circle(self):
+        result = parse_character_collision(CHARACTER_CIRCLE_DATA, render_scale=3.0)
+        assert isinstance(result.shape, CircleShape)
+        assert result.shape.radius == 48.0
+
+    def test_render_scale_capsule(self):
+        result = parse_character_collision(CHARACTER_CAPSULE_DATA, render_scale=2.0)
+        assert isinstance(result.shape, CapsuleShape)
+        assert result.shape.radius == 16.0
+        assert result.shape.height == 96.0
+
+    def test_render_scale_polygon(self):
+        data = {
+            "name": "poly",
+            "shape": {
+                "type": "polygon",
+                "vertices": [[0, 0], [10, 0], [10, 10], [0, 10]],
+            },
+            "properties": {},
+        }
+        result = parse_character_collision(data, render_scale=2.0)
+        assert isinstance(result.shape, CollisionPolygon)
+        assert result.shape.vertices == [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]
+
+    def test_render_scale_default_is_one(self):
+        result = parse_character_collision(CHARACTER_RECT_DATA)
+        assert isinstance(result.shape, RectangleShape)
+        assert result.shape.width == 24.0
+
+    def test_render_scale_zero_rejected(self):
+        with pytest.raises(CollisionParseError, match="render_scale"):
+            parse_character_collision(CHARACTER_RECT_DATA, render_scale=0)
+
+    def test_render_scale_negative_rejected(self):
+        with pytest.raises(CollisionParseError, match="render_scale"):
+            parse_character_collision(CHARACTER_RECT_DATA, render_scale=-1)
+
+    def test_render_scale_nonfinite_rejected(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with pytest.raises(CollisionParseError, match="render_scale"):
+                parse_character_collision(CHARACTER_RECT_DATA, render_scale=bad)
+
+    def test_render_scale_non_numeric_rejected(self):
+        for bad in (None, "2", "abc"):
+            with pytest.raises(CollisionParseError, match="render_scale"):
+                parse_character_collision(CHARACTER_RECT_DATA, render_scale=bad)
+
 
 # ===========================================================================
 # Shape helpers
@@ -231,6 +285,54 @@ class TestShapeHelpers:
         assert transformed.vertices[0] == (5.0, 7.0)
         assert transformed.vertices[1] == (15.0, 7.0)
         assert transformed.vertices[2] == (15.0, 17.0)
+
+    def test_rectangle_scaled(self):
+        shape = RectangleShape(width=24.0, height=32.0, offset=(4.0, 0.0))
+        scaled = shape.scaled(2.0)
+        assert isinstance(scaled, RectangleShape)
+        assert scaled.width == 48.0
+        assert scaled.height == 64.0
+        assert scaled.offset == (8.0, 0.0)
+        assert shape.width == 24.0  # original untouched
+
+    def test_circle_scaled(self):
+        shape = CircleShape(radius=16.0, offset=(2.0, 3.0))
+        scaled = shape.scaled(3.0)
+        assert isinstance(scaled, CircleShape)
+        assert scaled.radius == 48.0
+        assert scaled.offset == (6.0, 9.0)
+
+    def test_capsule_scaled(self):
+        shape = CapsuleShape(radius=8.0, height=48.0, offset=(0.0, 2.0))
+        scaled = shape.scaled(1.5)
+        assert isinstance(scaled, CapsuleShape)
+        assert scaled.radius == 12.0
+        assert scaled.height == 72.0
+        assert scaled.offset == (0.0, 3.0)
+
+    def test_collision_polygon_scaled(self):
+        poly = CollisionPolygon(vertices=[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0)], one_way=True)
+        scaled = poly.scaled(2.0)
+        assert isinstance(scaled, CollisionPolygon)
+        assert scaled.vertices == [(0.0, 0.0), (20.0, 0.0), (20.0, 20.0)]
+        assert scaled.one_way is True
+
+    def test_scaled_one_is_identity(self):
+        shape = RectangleShape(width=24.0, height=32.0, offset=(4.0, 0.0))
+        assert shape.scaled(1.0) == shape
+
+    def test_character_collision_scaled(self):
+        coll = parse_character_collision(CHARACTER_RECT_DATA)
+        scaled = coll.scaled(2.0)
+        assert scaled.name == coll.name
+        assert isinstance(scaled.shape, RectangleShape)
+        assert scaled.shape.width == 48.0
+        assert scaled.shape.height == 64.0
+        assert scaled.shape.offset == (8.0, 0.0)
+        assert scaled.collision_layer == coll.collision_layer
+        assert scaled.collision_mask == coll.collision_mask
+        assert scaled.properties == coll.properties
+        assert coll.shape.width == 24.0  # original untouched
 
 
 # ===========================================================================
@@ -308,6 +410,16 @@ class TestLoadCharacterCollision:
         result = load_character_collision(CHARACTER_COLLISION)
         assert isinstance(result.shape, RectangleShape)
 
+    def test_render_scale_scales_shape(self):
+        base = load_character_collision(CHARACTER_COLLISION)
+        scaled = load_character_collision(CHARACTER_COLLISION, render_scale=2.0)
+        assert base is not None and scaled is not None
+        assert isinstance(base.shape, RectangleShape)
+        assert isinstance(scaled.shape, RectangleShape)
+        assert scaled.shape.width == base.shape.width * 2.0
+        assert scaled.shape.height == base.shape.height * 2.0
+        assert scaled.shape.offset == (base.shape.offset[0] * 2.0, base.shape.offset[1] * 2.0)
+
     def test_non_json_file_raises(self, tmp_path):
         # Passing a non-JSON file (e.g. an image) raises CollisionParseError,
         # not silently returns None — the file exists so we try to parse it.
@@ -357,7 +469,7 @@ class TestCollisionCache:
 
     def test_preload_character(self):
         self.cache.preload_character(CHARACTER_COLLISION)
-        key = str(CHARACTER_COLLISION.resolve())
+        key = (str(CHARACTER_COLLISION.resolve()), 1.0)
         assert key in self.cache._character_cache
 
     def test_cache_key_is_resolved_path(self, tmp_path):
@@ -368,6 +480,14 @@ class TestCollisionCache:
         r1 = self.cache.get_tileset_collision(link)
         r2 = self.cache.get_tileset_collision(link)
         assert r1 is r2
+
+    def test_character_cache_separates_render_scales(self):
+        r1 = self.cache.get_character_collision(CHARACTER_COLLISION)
+        r2 = self.cache.get_character_collision(CHARACTER_COLLISION, render_scale=1.0)
+        r3 = self.cache.get_character_collision(CHARACTER_COLLISION, render_scale=2.0)
+        assert r1 is r2  # same scale -> same cached object
+        assert r1 is not r3  # different scale -> separate cache entry
+        assert r3.shape.width == r1.shape.width * 2.0
 
 
 # ===========================================================================
