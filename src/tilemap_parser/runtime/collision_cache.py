@@ -8,7 +8,7 @@ repeated file I/O during runtime.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Tuple, Union
 
 from ..parser.collision import (
     CharacterCollision,
@@ -39,7 +39,7 @@ class CollisionCache:
 
     def __init__(self):
         self._tileset_cache: Dict[str, Optional[TilesetCollision]] = {}
-        self._character_cache: Dict[str, Optional[CharacterCollision]] = {}
+        self._character_cache: Dict[Tuple[str, float], Optional[CharacterCollision]] = {}
         self._object_cache: Dict[str, Optional[ObjectCollisionData]] = {}
 
     def get_tileset_collision(
@@ -58,17 +58,21 @@ class CollisionCache:
         return self._tileset_cache[key]
 
     def get_character_collision(
-        self, collision_path: Union[str, Path]
+        self, collision_path: Union[str, Path], render_scale: float = 1.0
     ) -> Optional[CharacterCollision]:
         """Get character collision data (cached).
 
         Args:
             collision_path: Direct path to the .collision.json file.
+            render_scale: Multiplier applied to shape dimensions and offsets.
+                Cached per (path, render_scale) pair.
         """
-        key = str(Path(collision_path).resolve())
+        key = (str(Path(collision_path).resolve()), render_scale)
 
         if key not in self._character_cache:
-            self._character_cache[key] = load_character_collision(collision_path)
+            self._character_cache[key] = load_character_collision(
+                collision_path, render_scale=render_scale
+            )
 
         return self._character_cache[key]
 
@@ -134,13 +138,15 @@ def get_cached_tileset_collision(
 
 def get_cached_character_collision(
     collision_path: Union[str, Path],
+    render_scale: float = 1.0,
 ) -> Optional[CharacterCollision]:
     """Get character collision using global cache.
 
     Args:
         collision_path: Direct path to the .collision.json file.
+        render_scale: Multiplier applied to shape dimensions and offsets.
     """
-    return _global_cache.get_character_collision(collision_path)
+    return _global_cache.get_character_collision(collision_path, render_scale=render_scale)
 
 
 def get_cached_object_collision(

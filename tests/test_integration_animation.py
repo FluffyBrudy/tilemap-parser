@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import json
+
+import pygame
 import pytest
 
 from tilemap_parser import (
@@ -114,6 +117,128 @@ class TestSpriteAnimationSetLoad:
         anim_set = SpriteAnimationSet.load(PLAYER_ANIM_PATH)
         bounds = anim_set.get_content_bounds("nonexistent")
         assert bounds is None
+
+    def test_load_with_render_scale(self):
+        anim_set = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=2.0)
+        assert anim_set.render_scale == 2.0
+        assert anim_set.surface.get_width() == 2400
+        assert anim_set.surface.get_height() == 840
+        assert anim_set.library.tile_size == (300, 120)
+        assert anim_set.library.grid_offset == (0, 0)
+        assert anim_set.grid_offset_x == 0
+
+    def test_render_scale_one_matches_default(self):
+        default = SpriteAnimationSet.load(PLAYER_ANIM_PATH)
+        explicit = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=1.0)
+        assert explicit.render_scale == 1.0
+        assert explicit.surface.get_size() == default.surface.get_size()
+        assert explicit.library.tile_size == default.library.tile_size
+
+    def test_get_image_scaled_by_render_scale(self):
+        anim_set = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=2.0)
+        img = anim_set.get_image(0)
+        assert img is not None
+        assert img.get_width() == 300
+        assert img.get_height() == 120
+
+    def test_get_image_cell_lookup_still_valid_at_scale(self):
+        anim_set = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=2.0)
+        img = anim_set.get_image(8)
+        assert img is not None
+        assert img.get_size() == (300, 120)
+
+    def test_get_content_bounds_scaled(self):
+        base = SpriteAnimationSet.load(PLAYER_ANIM_PATH)
+        scaled = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=3.0)
+        base_bounds = base.get_content_bounds("idle")
+        scaled_bounds = scaled.get_content_bounds("idle")
+        assert base_bounds is not None and scaled_bounds is not None
+        assert scaled_bounds.width == base_bounds.width * 3
+        assert scaled_bounds.height == base_bounds.height * 3
+        assert scaled_bounds.x == base_bounds.x * 3
+        assert scaled_bounds.y == base_bounds.y * 3
+
+    def test_invalid_render_scale_raises(self):
+        with pytest.raises(ValueError):
+            SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=0)
+
+    def test_zero_sized_scaled_cells_rejected(self):
+        for bad in (0.01, 0.0005):
+            with pytest.raises(ValueError, match="zero-sized"):
+                SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=bad)
+
+    def test_animation_player_frames_scaled(self):
+        anim_set = SpriteAnimationSet.load(PLAYER_ANIM_PATH, render_scale=2.0)
+        player = AnimationPlayer(anim_set, "idle")
+        img = player.get_current_image()
+        assert img is not None
+        assert img.get_size() == (300, 120)
+
+
+def _write_offset_atlas(tmp_path: Path, cols: int, rows: int):
+    """Write a synthetic atlas with a nonzero grid offset and solid per-cell colors."""
+    tile = 8
+    ox, oy = 1, 1
+    w, h = ox + cols * tile, oy + rows * tile
+    sheet = pygame.Surface((w, h))
+    colors = {}
+    for row in range(rows):
+        for col in range(cols):
+            idx = row * cols + col
+            color = (
+                (20 + idx * 7) % 256,
+                (40 + idx * 13) % 256,
+                (60 + idx * 29) % 256,
+            )
+            colors[idx] = color
+            sheet.fill(color, (ox + col * tile, oy + row * tile, tile, tile))
+    sheet.fill((250, 250, 250), (0, 0, w, oy))
+    sheet.fill((250, 250, 250), (0, 0, ox, h))
+    png_path = tmp_path / "atlas.png"
+    pygame.image.save(sheet, str(png_path))
+    json_path = tmp_path / "atlas.animation.json"
+    json_path.write_text(
+        json.dumps(
+            {
+                "spritesheet_path": str(png_path),
+                "tile_size": [tile, tile],
+                "grid_offset": [ox, oy],
+                "trim_transparent": False,
+                "animations": {
+                    "test": {
+                        "name": "test",
+                        "frames": [{"variant_id": 0, "duration_ms": 100.0}],
+                        "loop": True,
+                    }
+                },
+            }
+        )
+    )
+    return colors
+
+
+class TestFractionalScaleWithOffset:
+    def test_downscale_0_6_returns_correct_cell(self, tmp_path):
+        colors = _write_offset_atlas(tmp_path, cols=5, rows=3)
+        anim_set = SpriteAnimationSet.load(
+            tmp_path / "atlas.animation.json", render_scale=0.6
+        )
+        for variant in (0, 5, 6):
+            img = anim_set.get_image(variant)
+            assert img is not None
+            center = img.get_at((img.get_width() // 2, img.get_height() // 2))[:3]
+            assert center == colors[variant]
+
+    def test_upscale_1_1_returns_correct_cell(self, tmp_path):
+        colors = _write_offset_atlas(tmp_path, cols=12, rows=3)
+        anim_set = SpriteAnimationSet.load(
+            tmp_path / "atlas.animation.json", render_scale=1.1
+        )
+        for variant in (0, 12, 13):
+            img = anim_set.get_image(variant)
+            assert img is not None
+            center = img.get_at((img.get_width() // 2, img.get_height() // 2))[:3]
+            assert center == colors[variant]
 
 
 class TestAnimationPlayerPlayback:

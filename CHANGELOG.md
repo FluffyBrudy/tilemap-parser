@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Updates
+- `render_scale` support: `SpriteAnimationSet.load()` scales the spritesheet grid, and `parse_character_collision()` / `load_character_collision()` scale character shapes via `render_scale`
+
+### Bug fixes
+- Fixed atlas cell addressing with fractional `render_scale` and nonzero `grid_offset` in `SpriteAnimationSet`: the grid column/row counts are now pinned from the original sheet, and scales that produce zero-sized or non-fitting cells are rejected at load
+- `parse_character_collision` now rejects non-finite (`nan`, `inf`) and invalid (`0`, negatives, non-numeric) `render_scale` values with `CollisionParseError`
+- `CollisionCache._character_cache` is now typed for `(path, render_scale)` tuple keys
+
 ## 5.0.3 — 2026-08-06
 
 ### Updates

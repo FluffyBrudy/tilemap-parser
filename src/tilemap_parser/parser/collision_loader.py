@@ -55,6 +55,7 @@ def load_tileset_collision(
 
 def load_character_collision(
     collision_path: Union[str, Path],
+    render_scale: float = 1.0,
 ) -> CharacterCollision | None:
     """
     Load character collision data from a collision JSON file.
@@ -64,6 +65,8 @@ def load_character_collision(
 
     Args:
         collision_path: Direct path to the .collision.json file.
+        render_scale: Multiplier applied to shape dimensions and offsets
+            (no-op when 1.0).
 
     Returns:
         CharacterCollision object, or None if the file does not exist.
@@ -79,7 +82,7 @@ def load_character_collision(
     try:
         with open(collision_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return parse_character_collision(data)
+        return parse_character_collision(data, render_scale=render_scale)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
         raise CollisionParseError(f"Cannot load {collision_path}: {e}") from e
 

@@ -9,6 +9,7 @@ Provides parsing of collision data from JSON into data classes:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -33,6 +34,13 @@ class CollisionPolygon:
         """Transform polygon to world space coordinates"""
         world_vertices = [(tile_x + vx * scale, tile_y + vy * scale) for vx, vy in self.vertices]
         return CollisionPolygon(vertices=world_vertices, one_way=self.one_way)
+
+    def scaled(self, scale: float) -> "CollisionPolygon":
+        """Return a copy with all vertices multiplied by *scale*."""
+        return CollisionPolygon(
+            vertices=[(vx * scale, vy * scale) for vx, vy in self.vertices],
+            one_way=self.one_way,
+        )
 
     def is_valid(self) -> bool:
         """Check if polygon has at least 3 vertices"""
@@ -130,6 +138,14 @@ class RectangleShape:
         top = y + self.offset[1]
         return (left, top, left + self.width, top + self.height)
 
+    def scaled(self, scale: float) -> "RectangleShape":
+        """Return a copy with dimensions and offset multiplied by *scale*."""
+        return RectangleShape(
+            width=self.width * scale,
+            height=self.height * scale,
+            offset=(self.offset[0] * scale, self.offset[1] * scale),
+        )
+
 
 @dataclass
 class CircleShape:
@@ -141,6 +157,13 @@ class CircleShape:
     def get_center(self, x: float, y: float) -> Point:
         """Get center position in world space"""
         return (x + self.offset[0], y + self.offset[1])
+
+    def scaled(self, scale: float) -> "CircleShape":
+        """Return a copy with radius and offset multiplied by *scale*."""
+        return CircleShape(
+            radius=self.radius * scale,
+            offset=(self.offset[0] * scale, self.offset[1] * scale),
+        )
 
 
 @dataclass
@@ -159,6 +182,14 @@ class CapsuleShape:
         """Get bottom circle center in world space"""
         return (x + self.offset[0], y + self.offset[1] + self.height)
 
+    def scaled(self, scale: float) -> "CapsuleShape":
+        """Return a copy with radius, height, and offset multiplied by *scale*."""
+        return CapsuleShape(
+            radius=self.radius * scale,
+            height=self.height * scale,
+            offset=(self.offset[0] * scale, self.offset[1] * scale),
+        )
+
 
 CharacterShapeType = Union[RectangleShape, CircleShape, CapsuleShape, CollisionPolygon]
 
@@ -172,6 +203,16 @@ class CharacterCollision:
     properties: Dict[str, Any] = field(default_factory=dict)
     collision_layer: int = 1
     collision_mask: int = 0xFFFFFFFF
+
+    def scaled(self, scale: float) -> "CharacterCollision":
+        """Return a copy whose shape is scaled by *scale* (typically ``render_scale``)."""
+        return CharacterCollision(
+            name=self.name,
+            shape=self.shape.scaled(scale),
+            properties=dict(self.properties),
+            collision_layer=self.collision_layer,
+            collision_mask=self.collision_mask,
+        )
 
 
 @dataclass
@@ -255,19 +296,28 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
         raise CollisionParseError(f"Invalid tileset collision data: {e}") from e
 
 
-def parse_character_collision(data: JsonDict) -> CharacterCollision:
+def parse_character_collision(data: JsonDict, render_scale: float = 1.0) -> CharacterCollision:
     """
     Parse character collision data from dictionary.
 
     Args:
         data: Dictionary loaded from .collision.json file
+        render_scale: Multiplier applied to shape dimensions and offsets
+            (no-op when 1.0).
 
     Returns:
         CharacterCollision object
 
     Raises:
-        CollisionParseError: If data format is invalid
+        CollisionParseError: If data format is invalid or render_scale is not
+            finite and greater than zero.
     """
+    if (
+        not isinstance(render_scale, (int, float))
+        or not math.isfinite(render_scale)
+        or render_scale <= 0
+    ):
+        raise CollisionParseError(f"render_scale must be finite and > 0, got {render_scale!r}")
     try:
         name = data["name"]
         shape_data = data["shape"]
@@ -312,7 +362,7 @@ def parse_character_collision(data: JsonDict) -> CharacterCollision:
             properties=properties,
             collision_layer=collision_layer,
             collision_mask=collision_mask,
-        )
+        ).scaled(render_scale)
     except (KeyError, ValueError, TypeError) as e:
         raise CollisionParseError(f"Invalid character collision data: {e}") from e
 

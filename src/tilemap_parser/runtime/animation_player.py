@@ -20,6 +20,9 @@ class SpriteAnimationSet:
     json_path: Optional[Path] = None
     grid_offset_x: int = 0
     grid_offset_y: int = 0
+    render_scale: float = 1.0
+    grid_columns: int = 0
+    grid_rows: int = 0
 
     @classmethod
     def load(
@@ -28,6 +31,7 @@ class SpriteAnimationSet:
         *,
         spritesheet_path: Optional[PathLike] = None,
         extra_search_base: Optional[Path] = None,
+        render_scale: float = 1.0,
     ) -> "SpriteAnimationSet":
         path = Path(json_path)
         library = parse_animation_file(path)
@@ -59,6 +63,29 @@ class SpriteAnimationSet:
         except pygame.error as e:
             raise AnimationParseError(f"Failed to load image {image_path}: {e}") from e
 
+        tw, th = library.tile_size
+        ox, oy = library.grid_offset
+        grid_columns = max(1, (surface.get_width() - ox) // tw)
+        grid_rows = max(1, (surface.get_height() - oy) // th)
+
+        if render_scale != 1.0:
+            if render_scale <= 0:
+                raise ValueError(f"render_scale must be > 0, got {render_scale}")
+            w, h = surface.get_size()
+            sw, sh = int(w * render_scale), int(h * render_scale)
+            stw, sth = int(tw * render_scale), int(th * render_scale)
+            if sw < 1 or sh < 1 or stw < 1 or sth < 1:
+                raise ValueError(f"render_scale {render_scale} produces zero-sized atlas cells")
+            if (
+                int(ox * render_scale) + grid_columns * stw > sw
+                or int(oy * render_scale) + grid_rows * sth > sh
+            ):
+                raise ValueError(
+                    f"render_scale {render_scale} cannot maintain atlas grid cell bounds"
+                )
+            surface = pygame.transform.scale(surface, (sw, sh))
+            library = _scaled_library(library, render_scale)
+
         return cls(
             library=library,
             surface=surface,
@@ -66,6 +93,9 @@ class SpriteAnimationSet:
             json_path=path,
             grid_offset_x=library.grid_offset[0],
             grid_offset_y=library.grid_offset[1],
+            render_scale=render_scale,
+            grid_columns=grid_columns,
+            grid_rows=grid_rows,
         )
 
     def get_content_bounds(self, clip_name: str) -> Optional[Rect]:
@@ -88,15 +118,10 @@ class SpriteAnimationSet:
 
     def get_image(self, variant_id: int, *, copy_surface: bool = True) -> Optional[Surface]:
         tw, th = self.library.tile_size
-        if tw <= 0 or th <= 0:
+        if tw <= 0 or th <= 0 or self.grid_columns <= 0 or self.grid_rows <= 0:
             return None
-        available_w = self.surface.get_width() - self.grid_offset_x
-        available_h = self.surface.get_height() - self.grid_offset_y
-        if available_w < tw or available_h < th:
-            return None
-        cols = max(1, available_w // tw)
-        col = variant_id % cols
-        row = variant_id // cols
+        col = variant_id % self.grid_columns
+        row = variant_id // self.grid_columns
         src = Rect(self.grid_offset_x + col * tw, self.grid_offset_y + row * th, tw, th)
         if not self.surface.get_rect().contains(src):
             return None
@@ -161,3 +186,19 @@ class AnimationPlayer:
         if variant not in self._frame_cache:
             self._frame_cache[variant] = self.animation_set.get_image(variant, copy_surface=True)
         return self._frame_cache[variant]
+
+
+def _scaled_library(library: AnimationLibrary, scale: float) -> AnimationLibrary:
+    """Return a copy of *library* whose grid geometry is scaled by *scale*.
+
+    Kept in lockstep with the scaled spritesheet surface so that
+    :meth:`SpriteAnimationSet.get_image` continues to address cells
+    correctly.
+    """
+    return AnimationLibrary(
+        animations=library.animations,
+        spritesheet_path=library.spritesheet_path,
+        tile_size=(int(library.tile_size[0] * scale), int(library.tile_size[1] * scale)),
+        grid_offset=(int(library.grid_offset[0] * scale), int(library.grid_offset[1] * scale)),
+        trim_transparent=library.trim_transparent,
+    )
