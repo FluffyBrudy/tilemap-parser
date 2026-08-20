@@ -21,11 +21,20 @@ export default function Animations() {
         The JSON's <code>spritesheet_path</code> is resolved relative to the
         JSON file; pass <code>spritesheet_path=</code> to override it.
       </p>
+      <p>
+        Pass <code>render_scale=</code> to scale the sheet and its atlas grid
+        (<code>tile_size</code>, <code>grid_offset</code>) in one step — handy
+        for hi-res art rendered at a lower resolution or vice versa. The grid
+        is pinned from the original sheet, so fractional scales with a nonzero{" "}
+        <code>grid_offset</code> still address cells correctly. Scales that
+        are not finite, not &gt; 0, or that produce zero-sized or non-fitting
+        cells are rejected at load.
+      </p>
       <CodeBlock
         title="loading.py"
         code={`from tilemap_parser import SpriteAnimationSet, AnimationPlayer
 
-anim_set = SpriteAnimationSet.load("data/animations/player.json")
+anim_set = SpriteAnimationSet.load("data/animations/player.json", render_scale=2.0)
 # anim_set.warnings collects non-fatal issues from the JSON
 
 player = AnimationPlayer(anim_set, "idle")   # animation_name is REQUIRED`}

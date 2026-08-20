@@ -195,9 +195,21 @@ export default function JsonFormats() {
           Parser: <code>parse_character_collision</code> /{" "}
           <code>load_character_collision</code> →{" "}
           <code>CharacterCollision</code>. Apply its <code>shape</code> to your
-          sprite at spawn.
+          sprite at spawn. Both accept <code>render_scale=</code> to scale the
+          shape's dimensions and offsets. By design this scales collision data
+          only — no image is touched — so the sprite paired with the shape must
+          already be at the target resolution (e.g. frames from{" "}
+          <code>SpriteAnimationSet.load(render_scale=...)</code>).
         </li>
       </ul>
+      <Callout kind="tip" title="KEEPING SHAPE + SPRITE IN SYNC">
+        Define the shape on the same spritesheet your animation uses, then pass
+        the same <code>render_scale</code> to both{" "}
+        <code>SpriteAnimationSet.load()</code> and the character collision load.
+        Both are derived from the same source with the same scale factor, so the
+        shape auto-syncs with the scaled frames — no hand-scaled image, no
+        double work.
+      </Callout>
 
       <h2 id="object">OBJECT COLLISION</h2>
       <p>
@@ -222,7 +234,9 @@ export default function JsonFormats() {
         </li>
         <li>
           Runtime: <code>SpriteAnimationSet.load(...)</code> +{" "}
-          <code>AnimationPlayer.update(dt_ms)</code>.
+          <code>AnimationPlayer.update(dt_ms)</code>; pass{" "}
+          <code>render_scale=</code> to <code>load()</code> to scale the sheet
+          and its atlas grid together.
         </li>
       </ul>
 

@@ -370,9 +370,14 @@ export default function ApiReference() {
 
       <h2 id="animation">ANIMATION</h2>
       <Group title="AnimationPlayer">
-        <Entry name="SpriteAnimationSet.load(json_path, *, spritesheet_path=None, extra_search_base=None)">
+        <Entry name="SpriteAnimationSet.load(json_path, *, spritesheet_path=None, extra_search_base=None, render_scale=1.0)">
           <p>
             Loads an animation JSON + spritesheet into one object.{" "}
+            <code>render_scale</code> scales the spritesheet and its atlas
+            grid (<code>tile_size</code>, <code>grid_offset</code>) so frames
+            render at a different resolution; values must be finite and &gt; 0,
+            and scales that produce zero-sized or non-fitting cells raise{" "}
+            <code>ValueError</code>.{" "}
             <code>get_image(variant_id)</code>,{" "}
             <code>get_content_bounds(clip_name)</code>.
           </p>
