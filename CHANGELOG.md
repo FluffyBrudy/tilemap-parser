@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.0.4 — 2026-08-20
 
 ### Updates
 - `render_scale` support: `SpriteAnimationSet.load()` scales the spritesheet grid, and `parse_character_collision()` / `load_character_collision()` scale character shapes via `render_scale`
