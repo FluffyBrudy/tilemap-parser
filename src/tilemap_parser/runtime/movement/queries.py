@@ -4,10 +4,29 @@ from __future__ import annotations
 
 import math
 
-from ...parser.collision import CollisionPolygon, TilesetCollision
+from ...parser.collision import CollisionPolygon, TileCollisionData, TilesetCollision
 from ..collision.hit import should_collide
 from ..polygon_query import _check_sprite_polygon_offset, get_shape_bounds
 from ..protocols import ICollidable, ICollidableSprite
+
+
+def _resolve_tile_data(
+    world,
+    tileset_collision: TilesetCollision,
+    tile_id: int | None,
+) -> TileCollisionData | None:
+    """Fetch collision data for *tile_id*, GID-routed when a world is attached.
+
+    With an attached world built via ``from_map(..., use_gids=True)`` the id
+    is range-routed against the map's grid resources (decoration tilesets can
+    never alias into the collision owner's local keys).  Without a world the
+    historic literal lookup applies.
+    """
+    if tile_id is None:
+        return None
+    if world is not None:
+        return world.resolve_collision(tile_id)
+    return tileset_collision.tiles.get(tile_id)
 
 
 def _collides_at(
@@ -35,9 +54,7 @@ def _collides_at(
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             tile_id = tile_map.get((tile_x, tile_y))
-            if tile_id is None:
-                continue
-            tile_data = tileset_collision.tiles.get(tile_id)
+            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
             if tile_data is None:
                 continue
             ox = tile_x * tw
@@ -72,9 +89,7 @@ def _first_colliding_shape(
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             tile_id = tile_map.get((tile_x, tile_y))
-            if tile_id is None:
-                continue
-            tile_data = tileset_collision.tiles.get(tile_id)
+            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
             if tile_data is None:
                 continue
             ox = tile_x * tw
@@ -113,9 +128,7 @@ def _collides_at_platformer(
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             tile_id = tile_map.get((tile_x, tile_y))
-            if tile_id is None:
-                continue
-            tile_data = tileset_collision.tiles.get(tile_id)
+            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
             if tile_data is None:
                 continue
             ox = tile_x * tw
@@ -218,9 +231,7 @@ def _find_walkable_ground_y(
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             tile_id = tile_map.get((tile_x, tile_y))
-            if tile_id is None:
-                continue
-            tile_data = tileset_collision.tiles.get(tile_id)
+            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
             if tile_data is None:
                 continue
             ox = tile_x * tw

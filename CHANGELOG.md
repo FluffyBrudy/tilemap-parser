@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.1.0 — 2026-08-25
+
+### Updates
+- GID range routing for single-grid collision files: `PhysicsWorld.from_map(..., use_gids=True)` captures each grid tileset's `firstgid`/`tile_count`/`stem` and `PhysicsWorld.resolve_collision()` / `has_collision_gid()` route global ids against that table, translating `tile_id - firstgid` only when the GID window belongs to the collision owner — decoration tilesets never alias into local keys (fixes false-solid `1813 - 90 = 1723` and silent miss for `firstgid != 0` where only a fraction of collidable tiles resolved)
+- `CollisionRunner` (`get_tile_shapes`, `get_nearby_tile_shapes`), `move_platformer` and all `queries._resolve_tile_data` paths now resolve via the world when attached (literal fallback otherwise)
+- `NavGrid` now accepts `gid_resolver` (pass `world.resolve_collision` for GID-routed maps) so walkability / one-way checks don't alias through decoration ids; `get_eroded_grid_for_size()` accepts `gid_resolver` and docs updated in `RunnerGuide` / `TechnicalNotes`
+
+### Bug fixes
+- `NavGrid` `clone()`/`erode()` now preserves `_gid_resolver` in `__slots__` (was dropped, breaking derived grids and raising `AttributeError` on `is_one_way`)
+- `NavGrid.get_eroded_grid_for_size(cache=)` now keys by `(margin, resolver_is_literal)` to avoid literal/GID cache cross-contamination
+
 ## 5.0.4 — 2026-08-20
 
 ### Updates

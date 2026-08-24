@@ -59,6 +59,7 @@ const TOC = [
   { id: "presets", label: "Game-type presets" },
   { id: "tunables", label: "Tunables" },
   { id: "attach", label: "Attach / detach / from_world" },
+  { id: "gid-routing", label: "GID routing (multi-tileset)" },
   { id: "result", label: "CollisionResult flags" },
   { id: "wiring", label: "Per-mode wiring" },
   { id: "validate", label: "validate_config & strict" },
@@ -322,6 +323,45 @@ result = runner.move_platformer(player, None, None, dt, input_x=1.0, world=other
           <code>get_nearby_tile_shapes(...)</code> for queries outside movement.
         </li>
       </ul>
+
+      <h2 id="gid-routing">GID ROUTING — MULTI-TILESET MAPS</h2>
+      <p>
+        Maps with several <code>type:"tile"</code> resources encode cells as{" "}
+        <strong>global ids</strong>: <code>gid = firstgid + local_variant</code>,
+        stacked in resource order. Collision files, however, are keyed by the{" "}
+        <em>local</em> variant of their own tileset. Feeding a plain
+        local-keyed file into a GID world used to miss every lookup — floors
+        silently stopped being solid.
+      </p>
+      <p>
+        Since 5.0.5, <code>PhysicsWorld.from_map(..., use_gids=True)</code>{" "}
+        fixes this automatically. It records every grid resource's{" "}
+        <code>[firstgid, firstgid + tile_count)</code> window and stem-matches{" "}
+        <code>tileset_collision.tileset_name</code> against them. Every tile
+        lookup is then <strong>range-routed</strong>:
+      </p>
+      <CodeBlock
+        title="how a gid resolves"
+        code={`1. find the grid resource whose window contains the gid
+2. owner != collision file's tileset  -> None   (decoration grids are never solid)
+3. owner == collision file's tileset  -> tiles[gid - firstgid]`}
+      />
+      <CodeBlock
+        title="nothing to configure"
+        language="python"
+        code={`col = load_tileset_collision("data/collision/tileset.collision.json")  # local keys ("2", "575", ...)
+world = PhysicsWorld.from_map(map_data, col, use_gids=True)            # map has N grid tilesets
+
+world.has_collision_gid(92)    # True  -> jungle local 2
+world.has_collision_gid(1813)  # False -> belongs to another grid resource, never aliases`}
+      />
+      <Callout kind="note" title="ONE GRID COLLISION FILE PER WORLD">
+        Routing enforces the Godot-style model: exactly one collidable grid
+        tileset per world; every other grid resource is inert decoration.
+        Object tilesets never participate in tile collision at all.
+        Pre-merged GID-keyed collisions (<code>TilesetCollision.merge</code>)
+        and literal <code>use_gids=False</code> lookups keep working unchanged.
+      </Callout>
 
       <h2 id="result">COLLISIONRESULT FLAGS</h2>
       <p>
