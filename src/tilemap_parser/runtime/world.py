@@ -9,13 +9,17 @@ resolves movement against the world's tiles AND bodies uniformly.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from ..parser.collision import TilesetCollision
+from ..parser.collision import TileCollisionData, TilesetCollision
 from .body import Body
 from .collision.hit import check_collision
 from .map_loader import TilemapData
 from .protocols import ICollidable
+
+if TYPE_CHECKING:  # pragma: no cover
+    from ..parser.map_parse import ParsedTileset
 
 
 class PhysicsWorld:
@@ -45,6 +49,11 @@ class PhysicsWorld:
         self.tile_size = tuple(tile_size)
         self.render_scale = render_scale
         self.bodies: List[Body] = []
+        # GID routing (see `resolve_collision`): (firstgid, tile_count, stem)
+        # for every *grid* resource of the source map, plus the stem that the
+        # single collision file belongs to.  Empty => literal local lookups.
+        self._grid_ranges: List[Tuple[int, int, str]] = []
+        self._collision_owner_stem: Optional[str] = None
         if self.tile_map and self.tileset_collision is None:
             raise ValueError(
                 "tile_map requires tileset_collision: a world with solid "
@@ -91,12 +100,68 @@ class PhysicsWorld:
                 "tiles cannot resolve movement without collision data"
             )
         world.tileset_collision = tileset_collision
+        if use_gids:
+            world._capture_grid_ownership(tilemap_data, tileset_collision)
         return world
 
-    # ------------------------------------------------------------------
-    # Body management
-    # ------------------------------------------------------------------
+ 
+    def _capture_grid_ownership(
+        self, map_data: TilemapData, tileset_collision: TilesetCollision
+    ) -> None:
+        """Record every grid resource's GID range and the collision owner.
 
+        Only ``type=="tile"`` resources participate; object tilesets are
+        never part of the physics grid.  Routing activates only when the
+        collision file's ``tileset_name`` stem-matches one of them —
+        otherwise lookups stay literal (legacy / pre-merged files).
+        """
+        owner = tileset_collision.tileset_name
+        ranges: List[Tuple[int, int, str]] = []
+        matched: Optional[str] = None
+        for ts in map_data.parsed.tilesets:
+            if getattr(ts, "type", "tile") != "tile":
+                continue
+            stem = Path(ts.path).stem
+            ranges.append((ts.firstgid, ts.tile_count, stem))
+            if stem == owner and matched is None:
+                matched = stem
+        if matched is not None:
+            self._grid_ranges = ranges
+            self._collision_owner_stem = matched
+
+    def resolve_collision(self, tile_id: int) -> Optional[TileCollisionData]:
+        """Resolve a possibly-global tile id to its collision data.
+
+        With GID routing active (``from_map(..., use_gids=True)`` plus a
+        stem-matched collision file):
+
+        1. find the grid resource whose ``[firstgid, firstgid+count)``
+           window contains *tile_id*;
+        2. if that resource is **not** the collision owner → ``None``
+           (decoration grids are never solid, no cross-set aliasing);
+        3. else translate ``tile_id - firstgid`` to the local key.
+
+        Without routing (literal mode, or a pre-merged GID-keyed
+        collision), falls back to a plain dictionary lookup — identical
+        to historic behaviour.
+        """
+        if self._grid_ranges and self.tileset_collision is not None:
+            for firstgid, count, stem in self._grid_ranges:
+                if firstgid <= tile_id < firstgid + count:
+                    if stem != self._collision_owner_stem:
+                        return None
+                    return self.tileset_collision.tiles.get(tile_id - firstgid)
+            return None
+        if self.tileset_collision is None:
+            return None
+        return self.tileset_collision.tiles.get(tile_id)
+
+    def has_collision_gid(self, tile_id: int) -> bool:
+        """Convenience boolean form of :meth:`resolve_collision`."""
+        data = self.resolve_collision(tile_id)
+        return data is not None and data.has_collision()
+
+    # body
     def add_body(self, body: Body) -> None:
         """Add a body to the world.  Adding the same body twice is a no-op."""
         if body not in self.bodies:

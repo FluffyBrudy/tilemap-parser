@@ -163,6 +163,19 @@ export default function TechnicalNotes() {
         <code>ObjectCollisionManager</code>. If you can draw it, you can move
         it; if you can move it, it can be pushed.
       </p>
+
+      <h2 id="gid">GID OWNERSHIP IS A RANGE TEST, NOT A SUBTRACTION</h2>
+      <p>
+        With <code>use_gids=True</code>, tile ids are{" "}
+        <code>firstgid + local_variant</code> per grid resource. Collision
+        files stay local-keyed. Resolving a gid therefore never does a blind{" "}
+        <code>gid - firstgid_of_owner</code>: the world first finds which grid
+        resource's window <code>[firstgid, firstgid+count)</code> owns the id,
+        rejects ids owned by non-collision resources (decoration grids), and
+        only then subtracts. This kills cross-tileset aliasing — e.g. gid{" "}
+        <code>1813 - 90 = 1723</code> must not light up jungle-local key 1723.
+        See <a href="/runner#gid-routing">GID routing</a> on the runner page.
+      </p>
     </div>
   );
 }

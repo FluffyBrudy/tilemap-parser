@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Dict, List, Optional, Tuple
 
-from ...parser.collision import TilesetCollision
+from ...parser.collision import TileCollisionData, TilesetCollision
 
 
 class NavGrid:
@@ -15,14 +15,15 @@ class NavGrid:
     """
 
     __slots__ = (
-        "tile_map",
-        "tileset_collision",
-        "tile_size",
-        "_eff_tw",
         "_eff_th",
-        "_width",
+        "_eff_tw",
+        "_gid_resolver",
         "_height",
         "_walkable",
+        "_width",
+        "tile_map",
+        "tile_size",
+        "tileset_collision",
     )
 
     def __init__(
@@ -32,9 +33,14 @@ class NavGrid:
         tile_size: Tuple[int, int],
         render_scale: float = 1.0,
         map_size: Optional[Tuple[int, int]] = None,
+        gid_resolver=None,
     ) -> None:
         self.tile_map = tile_map
         self.tileset_collision = tileset_collision
+        # Optional callable (int) -> TileCollisionData | None.  Pass
+        # ``physics_world.resolve_collision`` for GID-routed maps so ids from
+        # non-collidable grid tilesets resolve to None instead of aliasing.
+        self._gid_resolver = gid_resolver
         self.tile_size = tile_size
         self._eff_tw = tile_size[0] * render_scale
         self._eff_th = tile_size[1] * render_scale
@@ -52,11 +58,15 @@ class NavGrid:
 
         self._walkable = [[self._is_tile_walkable(x, y) for x in range(self._width)] for y in range(self._height)]
 
-    def _is_tile_walkable(self, tx: int, ty: int) -> bool:
-        tile_id = self.tile_map.get((tx, ty))
+    def _resolve(self, tile_id):
         if tile_id is None:
-            return True
-        tile_data = self.tileset_collision.tiles.get(tile_id)
+            return None
+        if self._gid_resolver is not None:
+            return self._gid_resolver(tile_id)
+        return self.tileset_collision.tiles.get(tile_id)
+
+    def _is_tile_walkable(self, tx: int, ty: int) -> bool:
+        tile_data = self._resolve(self.tile_map.get((tx, ty)))
         if tile_data is None:
             return True
         for poly in tile_data.shapes:
@@ -78,10 +88,7 @@ class NavGrid:
         return self._walkable[ty][tx]
 
     def is_one_way(self, tx: int, ty: int) -> bool:
-        tile_id = self.tile_map.get((tx, ty))
-        if tile_id is None:
-            return False
-        tile_data = self.tileset_collision.tiles.get(tile_id)
+        tile_data = self._resolve(self.tile_map.get((tx, ty)))
         if tile_data is None:
             return False
         has_one_way = False
@@ -104,6 +111,10 @@ class NavGrid:
         new._width = self._width
         new._height = self._height
         new._walkable = [row[:] for row in self._walkable]
+        # _gid_resolver lives in __slots__: dropping it here made every
+        # derived grid raise AttributeError once _resolve() ran (e.g. via
+        # is_one_way), and silently lost GID routing before that.
+        new._gid_resolver = self._gid_resolver
         return new
 
     def erode(self, margin: float) -> NavGrid:
@@ -155,16 +166,31 @@ class NavGrid:
         sprite_height: Optional[float] = None,
         render_scale: float = 1.0,
         map_size: Optional[Tuple[int, int]] = None,
-        cache: Optional[Dict[float, NavGrid]] = None,
+        cache: Optional[dict[tuple[float, bool], NavGrid]] = None,
+        gid_resolver=None,
     ) -> NavGrid:
+        """Build (or fetch from *cache*) an eroded grid for one entity size.
+
+        The cache is scoped to a single map/routing context and is keyed by
+        ``(margin, resolver_is_literal)`` so literal and GID-routed grids can
+        never cross-contaminate through a shared cache dict.
+        """
         tw = tile_size[0] * render_scale
         size = max(sprite_width, sprite_height if sprite_height is not None else sprite_width)
         margin = (size / 2.0) / tw
-        if cache is not None and margin in cache:
-            return cache[margin]
-        nav = cls(tile_map, tileset_collision, tile_size, render_scale, map_size).erode(margin)
+        key = (margin, gid_resolver is None)
+        if cache is not None and key in cache:
+            return cache[key]
+        nav = cls(
+            tile_map,
+            tileset_collision,
+            tile_size,
+            render_scale,
+            map_size,
+            gid_resolver=gid_resolver,
+        ).erode(margin)
         if cache is not None:
-            cache[margin] = nav
+            cache[key] = nav
         return nav
 
     def get_neighbors(self, tx: int, ty: int, *, diagonals: bool = False) -> List[Tuple[int, int]]:

@@ -151,13 +151,19 @@ class CollisionRunner:
         tile_x, tile_y = self.get_tile_at(world_x, world_y)
         tile_id = tile_map.get((tile_x, tile_y))
 
-        if tile_id is None or not tileset_collision.has_collision(tile_id):
+        world = self._resolve_world(None)
+        tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
+        if tile_data is None:
             return []
 
         tile_world_x = tile_x * self._eff_tw
         tile_world_y = tile_y * self._eff_th
 
-        return tileset_collision.get_world_shapes(tile_id, tile_world_x, tile_world_y, self.render_scale)
+        return [
+            shape.transform(tile_world_x, tile_world_y, self.render_scale)
+            for shape in tile_data.shapes
+            if shape.is_valid()
+        ]
 
     def get_nearby_tile_shapes(
         self,
@@ -182,12 +188,11 @@ class CollisionRunner:
         max_tile_y = int(bottom // th) + margin
 
         shapes = []
+        world = self._resolve_world(None)
         for tile_y in range(min_tile_y, max_tile_y + 1):
             for tile_x in range(min_tile_x, max_tile_x + 1):
                 tile_id = tile_map.get((tile_x, tile_y))
-                if tile_id is None:
-                    continue
-                tile_data = tileset_collision.tiles.get(tile_id)
+                tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
                 if tile_data is None:
                     continue
                 tile_world_x = tile_x * tw
