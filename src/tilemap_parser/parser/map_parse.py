@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import string
 from dataclasses import dataclass, field
@@ -122,21 +123,38 @@ class ParsedObjectArea:
 
 
 @dataclass
+class ObjectAnimation:
+    frame_count: int
+    frame_duration_ms: float
+    speed: float = 1.0
+    loop: bool = True
+    animation_mode: str = "default"
+    random_phase: bool = False
+    frames: List[int] = field(default_factory=list)
+    frame_stride: int = 1
+    frame_w: Optional[int] = None
+    frame_h: Optional[int] = None
+
+
+@dataclass
 class ParsedObject:
     area: ParsedObjectArea
     ttype: int
     tileset_type: str
     variant: int
     properties: Optional[JsonDict] = None
+    animation: Optional[ObjectAnimation] = None
 
 
 @dataclass
 class TilesetAnimation:
     frame_count: int
     frame_duration_ms: float
-    frame_stride: int
+    frame_stride: int = 1
     loop: bool = True
     animation_mode: str = "default"
+    frame_w: Optional[int] = None
+    frame_h: Optional[int] = None
 
 
 @dataclass
@@ -166,6 +184,8 @@ class ParsedLayer:
     objects: Dict[int, ParsedObject] = field(default_factory=dict)
     next_object_id: Optional[int] = None
     ttypes: set[int] = field(default_factory=set)
+    image_path: Optional[str] = None
+    image_rect: Optional[Tuple[int, int, int, int]] = None
 
 
 @dataclass
@@ -256,6 +276,47 @@ def _parse_object_area(area_obj: JsonDict, ctx: str) -> ParsedObjectArea:
     )
 
 
+def _parse_object_animation(anim_obj: JsonDict, ctx: str) -> ObjectAnimation:
+    frame_count = _coerce_int(anim_obj.get("frame_count"), f"{ctx}.frame_count")
+    if frame_count < 1:
+        raise MapParseError(_ctx(f"{ctx}.frame_count", "must be >= 1"))
+    frame_duration_ms = _coerce_float(
+        anim_obj.get("frame_duration_ms"), f"{ctx}.frame_duration_ms"
+    )
+    if not math.isfinite(frame_duration_ms) or frame_duration_ms <= 0:
+        raise MapParseError(_ctx(f"{ctx}.frame_duration_ms", "must be > 0 and finite"))
+    frames_raw = anim_obj.get("frames")
+    frames: List[int] = []
+    if frames_raw is not None:
+        frames_list = _require_list(frames_raw, f"{ctx}.frames")
+        if len(frames_list) != frame_count:
+            raise MapParseError(
+                _ctx(
+                    f"{ctx}.frames",
+                    f"must contain exactly {frame_count} entries (got {len(frames_list)})",
+                )
+            )
+        frames = [_coerce_int(f, f"{ctx}.frames[{i}]") for i, f in enumerate(frames_list)]
+        for i, frame_idx in enumerate(frames):
+            if frame_idx < 0:
+                raise MapParseError(
+                    _ctx(f"{ctx}.frames[{i}]", f"must be non-negative (got {frame_idx})")
+                )
+    return ObjectAnimation(
+        frame_count=frame_count,
+        frame_duration_ms=frame_duration_ms,
+        speed=_coerce_float(anim_obj.get("speed", 1.0), f"{ctx}.speed"),
+        loop=_coerce_bool(anim_obj.get("loop", True), f"{ctx}.loop"),
+        animation_mode=_require_str(
+            anim_obj.get("animation_mode", "default"), f"{ctx}.animation_mode"
+        ),
+        random_phase=_coerce_bool(
+            anim_obj.get("random_phase", False), f"{ctx}.random_phase"
+        ),
+        frames=frames,
+    )
+
+
 def _parse_objects(objs_obj: JsonDict, ctx: str) -> Dict[int, ParsedObject]:
     result: Dict[int, ParsedObject] = {}
     for key, value in objs_obj.items():
@@ -269,12 +330,22 @@ def _parse_objects(objs_obj: JsonDict, ctx: str) -> Dict[int, ParsedObject]:
         )
         variant = _coerce_int(obj_dict.get("variant"), f"{ctx}.{key}.variant")
         props = _optional_dict(obj_dict.get("properties"), f"{ctx}.{key}.properties")
+        animation_raw = obj_dict.get("animation")
+        animation = (
+            _parse_object_animation(
+                _require_dict(animation_raw, f"{ctx}.{key}.animation"),
+                f"{ctx}.{key}.animation",
+            )
+            if animation_raw is not None
+            else None
+        )
         result[oid] = ParsedObject(
             area=area,
             ttype=ttype,
             tileset_type=tileset_type,
             variant=variant,
             properties=props,
+            animation=animation,
         )
     return result
 
@@ -308,6 +379,24 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
             layer.next_object_id = _coerce_int(
                 layer_obj["next_object_id"], f"{ctx}.next_object_id"
             )
+
+    image_path_raw = layer_obj.get("image_path")
+    if image_path_raw is not None:
+        layer.image_path = _require_str(image_path_raw, f"{ctx}.image_path")
+        # Normalize background/background_layer types with images to "image" type
+        if layer.layer_type in ("background", "background_layer"):
+            layer.layer_type = "image"
+
+    image_rect_raw = layer_obj.get("image_rect")
+    if image_rect_raw is not None:
+        rect_obj = _require_dict(image_rect_raw, f"{ctx}.image_rect")
+        layer.image_rect = (
+            _coerce_int(rect_obj.get("x"), f"{ctx}.image_rect.x"),
+            _coerce_int(rect_obj.get("y"), f"{ctx}.image_rect.y"),
+            _coerce_int(rect_obj.get("w"), f"{ctx}.image_rect.w"),
+            _coerce_int(rect_obj.get("h"), f"{ctx}.image_rect.h"),
+        )
+
     return layer
 
 
@@ -380,12 +469,28 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
         animation_raw = ts_obj.get("animation")
         if animation_raw is not None:
             anim_obj = _require_dict(animation_raw, f"{ctx}[{i}].animation")
+            frame_stride_raw = anim_obj.get("frame_stride")
+            frame_stride = (
+                _coerce_int(frame_stride_raw, f"{ctx}[{i}].animation.frame_stride")
+                if frame_stride_raw is not None
+                else 1
+            )
+            frame_w_raw = anim_obj.get("frame_w")
+            frame_h_raw = anim_obj.get("frame_h")
+            frame_count = _coerce_int(anim_obj.get("frame_count"), f"{ctx}[{i}].animation.frame_count")
+            frame_duration_ms = _coerce_float(anim_obj.get("frame_duration_ms"), f"{ctx}[{i}].animation.frame_duration_ms")
+            if frame_count < 1:
+                raise MapParseError(_ctx(f"{ctx}[{i}].animation.frame_count", "must be >= 1"))
+            if not math.isfinite(frame_duration_ms) or frame_duration_ms <= 0:
+                raise MapParseError(_ctx(f"{ctx}[{i}].animation.frame_duration_ms", "must be > 0 and finite"))
             animation = TilesetAnimation(
-                frame_count=_coerce_int(anim_obj.get("frame_count"), f"{ctx}[{i}].animation.frame_count"),
-                frame_duration_ms=_coerce_float(anim_obj.get("frame_duration_ms"), f"{ctx}[{i}].animation.frame_duration_ms"),
-                frame_stride=_coerce_int(anim_obj.get("frame_stride"), f"{ctx}[{i}].animation.frame_stride"),
+                frame_count=frame_count,
+                frame_duration_ms=frame_duration_ms,
+                frame_stride=frame_stride,
                 loop=_coerce_bool(anim_obj.get("loop", True), f"{ctx}[{i}].animation.loop"),
                 animation_mode=_require_str(anim_obj.get("animation_mode", "default"), f"{ctx}[{i}].animation.animation_mode"),
+                frame_w=_coerce_int(frame_w_raw, f"{ctx}[{i}].animation.frame_w") if frame_w_raw is not None else None,
+                frame_h=_coerce_int(frame_h_raw, f"{ctx}[{i}].animation.frame_h") if frame_h_raw is not None else None,
             )
         out.append(
             ParsedTileset(

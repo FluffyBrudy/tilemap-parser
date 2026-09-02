@@ -10,8 +10,9 @@ export default function Animations() {
         <code>SpriteAnimationSet</code> holds the parsed clips and the loaded
         spritesheet; <code>AnimationPlayer</code> is a pure frame clock that
         advances clip time and hands you the right frame image. The rule:
-        <code>AnimationPlayer.update()</code> takes <strong>milliseconds</strong>
-        , not seconds. Feed it <code>clock.tick(60)</code> directly.
+        <code>AnimationPlayer.update()</code> takes{" "}
+        <strong>milliseconds</strong>, not seconds. Feed it{" "}
+        <code>clock.tick(60)</code> directly.
       </p>
 
       <h2 id="loading">LOADING</h2>
@@ -22,13 +23,13 @@ export default function Animations() {
         JSON file; pass <code>spritesheet_path=</code> to override it.
       </p>
       <p>
-        Pass <code>render_scale=</code> to scale the sheet and its atlas grid
-        (<code>tile_size</code>, <code>grid_offset</code>) in one step — handy
-        for hi-res art rendered at a lower resolution or vice versa. The grid
-        is pinned from the original sheet, so fractional scales with a nonzero{" "}
-        <code>grid_offset</code> still address cells correctly. Scales that
-        are not finite, not &gt; 0, or that produce zero-sized or non-fitting
-        cells are rejected at load.
+        Pass <code>render_scale=</code> to scale the sheet and its atlas grid (
+        <code>tile_size</code>, <code>grid_offset</code>) in one step — handy
+        for hi-res art rendered at a lower resolution or vice versa. The grid is
+        pinned from the original sheet, so fractional scales with a nonzero{" "}
+        <code>grid_offset</code> still address cells correctly. Scales that are
+        not finite, not &gt; 0, or that produce zero-sized or non-fitting cells
+        are rejected at load.
       </p>
       <CodeBlock
         title="loading.py"
@@ -88,8 +89,8 @@ if image is not None:
       <h2 id="switching">SWITCHING ANIMATIONS</h2>
       <p>
         There is no <code>play()</code> method. The player's{" "}
-        <code>animation_name</code> attribute <em>is</em> the switching API.
-        Set it, then reset the clock to start the new clip from frame 0:
+        <code>animation_name</code> attribute <em>is</em> the switching API. Set
+        it, then reset the clock to start the new clip from frame 0:
       </p>
       <CodeBlock
         title="state.py"
@@ -109,9 +110,9 @@ if player.animation_name != target:
       <p>
         Frames are cut from the spritesheet on a grid, honoring the library's{" "}
         <code>tile_size</code> and <code>grid_offset</code>. If the JSON enables{" "}
-        <code>trim_transparent</code>, each frame is trimmed to its content.
-        Use <code>get_content_bounds()</code> to ask where the visible pixels
-        are, and anchor your blit against it:
+        <code>trim_transparent</code>, each frame is trimmed to its content. Use{" "}
+        <code>get_content_bounds()</code> to ask where the visible pixels are,
+        and anchor your blit against it:
       </p>
       <CodeBlock
         title="anchor.py"
@@ -148,9 +149,95 @@ if clip is not None:
       />
 
       <Callout kind="info" title="HEADLESS-FRIENDLY">
-        <code>AnimationPlayer</code> is pure math: no surfaces, no pygame
-        state. Only <code>SpriteAnimationSet.load()</code> touches the
-        renderer, and only because it must load the spritesheet.
+        <code>AnimationPlayer</code> is pure math: no surfaces, no pygame state.
+        Only <code>SpriteAnimationSet.load()</code> touches the renderer, and
+        only because it must load the spritesheet.
+      </Callout>
+
+      <h2 id="object-animations">OBJECT ANIMATIONS</h2>
+      <p>
+        Objects on an object layer can carry a typed{" "}
+        <code>ObjectAnimation</code> — frames cut from the object's tileset in a
+        row-major grid (left-to-right, top-to-bottom). Required fields fail
+        early at parse time; optional fields have defaults.
+      </p>
+      <CodeBlock
+        title="object animation json"
+        code={`// inside data.layers[].objects[\"1\"]
+{
+  "area": {"x": 32, "y": 64, "w": 16, "h": 16},
+  "ttype": 0,
+  "tileset_type": "object",
+  "variant": 0,
+  "animation": {
+    "frame_count": 4,          // Required
+    "frame_duration_ms": 120,  // Required
+    "speed": 1.0,
+    "loop": true,
+    "animation_mode": "default", // or "random_start_times"
+    "random_phase": false,
+    "frames": [0, 1, 2, 3]       // optional explicit order
+  }
+}`}
+      />
+      <CodeBlock
+        title="object animation — python"
+        code={`from tilemap_parser import load_map
+
+data = load_map("data/map.json")
+obj = data.get_layer("Objects").objects[1]
+
+anim = obj.animation                 # ObjectAnimation | None
+# or: anim = data.get_object_animation(obj)
+if anim is not None:
+    print(anim.frame_count, anim.frame_duration_ms)
+    print(anim.speed, anim.loop, anim.animation_mode)
+    # anim.frames == [] means 0..frame_count-1
+
+frames: list[Surface] | None = data.get_object_animation_frames(obj)
+if frames is not None:
+    # frames[i] is a w×h Surface (obj.area.w × obj.area.h)
+    screen.blit(frames[frame_index], (obj.area.x, obj.area.y))`}
+      />
+      <ul>
+        <li>
+          <code>frame_count</code> and <code>frame_duration_ms</code> are
+          required — missing or non-positive values raise{" "}
+          <code>MapParseError</code>.
+        </li>
+        <li>
+          <code>frames</code> overrides the default{" "}
+          <code>0..frame_count-1</code> order when present.
+        </li>
+        <li>
+          Frame slicing uses <code>obj.area.w × obj.area.h</code> (one frame) as
+          the cell size across the object's tileset sheet.
+        </li>
+        <li>
+          Access via <code>obj.animation.properties</code> is not needed — the
+          dataclass is the typed view. Raw JSON stays on{" "}
+          <code>data.parsed.raw</code>.
+        </li>
+      </ul>
+      <Callout kind="info" title="PER-TILESET FALLBACK (SHARED STRIP)">
+        Most maps store animation on the <code>tileset</code> (
+        <code>resources.tilesets[].animation</code> — e.g., all coins share one
+        5-frame strip) and leave per-object <code>animation</code> as{" "}
+        <code>None</code> for efficiency.{" "}
+        <code>TilemapData.get_object_animation(obj)</code> now returns the
+        effective animation (per-object if present, else{" "}
+        <code>get_tileset_animation(obj.ttype)</code>), and{" "}
+        <code>get_object_animation_frames(obj, scaled=True)</code> builds frames
+        from it automatically. For a one-call blit use{" "}
+        <code>get_animated_object_surface(obj, elapsed_ms, scaled=True)</code>.
+      </Callout>
+      <Callout kind="tip" title="RANDOM_START HASH">
+        When <code>animation_mode == "random_start_times"</code> the frame is
+        desynced deterministically via{" "}
+        <code>(obj.area.x * 73856093 ^ obj.area.y * 19349663 ^ obj.ttype * 83492791) % count</code>
+        , so identical potion instances don't tick in sync. This is handled for
+        you by <code>get_animated_object_surface</code> and by{" "}
+        <code>TileLayerRenderer</code> for tile strips.
       </Callout>
     </div>
   );

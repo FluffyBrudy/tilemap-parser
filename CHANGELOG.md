@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `TilemapData.get_effective_object_animation` / `get_animated_object_surface(obj, elapsed_ms, scaled=True)` - per-tileset animation fallback for object layers: when per-object `animation` is `None`, effective animation is resolved from `ParsedTileset.animation` (shared strip, e.g., all coins) including deterministic `random_start_times` hash `(x*73856093 ^ y*19349663 ^ ttype*83492791) % count`. `get_object_animation` and `get_object_animation_frames(..., scaled=True)` now handle this fallback automatically.
+- `TilemapData.get_object_animation_frames` scaled support via `scaled=True`
+
+### Fixed
+- `ParsedTileset` animation validation: enforce `frame_count >= 1` and finite positive `frame_duration_ms` (matching `ObjectAnimation` validation) before constructing `TilesetAnimation` (`parser/map_parse.py:477`).
+- `TilemapData.load` background-layer image loading now respects `skip_missing_images=False` (raises `MapParseError` after warning, matching tileset path; `runtime/map_loader.py:155`).
+- `TilemapData.get_animated_object_surface` non-looping clamp: use modulo only when `anim.loop` is true, otherwise clamp to final frame (`runtime/map_loader.py:451`).
+
+### Docs
+- Clarify `TilemapData.load` parses all image-layer metadata but eagerly loads only the first image layer into `TilemapData.background_layer`; additional image layers remain in `data.parsed.layers` for manual loading (`webdocs/src/pages/JsonFormats.tsx:175`, `MapParsing.tsx:164`).
+- Document object animation per-tileset shared strip vs per-object override and one-call `get_animated_object_surface` with `random_start_times` hash (`webdocs/src/pages/JsonFormats.tsx:182`, `Animations.tsx:204`).
+- Fix `get_object_animation_frames` return type docs to `list[Surface] | None` (`webdocs/src/pages/JsonFormats.tsx:191`).
+
 ## 5.1.0 — 2026-08-25
 
 ### Updates

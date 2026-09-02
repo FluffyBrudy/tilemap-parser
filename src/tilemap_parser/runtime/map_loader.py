@@ -9,12 +9,34 @@ from typing import Dict, List, Optional, Tuple, Union
 import pygame
 from pygame import Rect, Surface
 
-from ..parser.map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedObject, ParsedTile, parse_map_file
+from ..parser.map_parse import (
+    MapParseError,
+    ObjectAnimation,
+    ParsedLayer,
+    ParsedMap,
+    ParsedObject,
+    ParsedTile,
+    parse_map_file,
+)
 from ..parser.node_parse import parse_nodes_dict
 from .area_node import AreaNode
 from .particles import ParticleEmitterNode
 
 PathLike = Union[str, Path]
+
+
+class BackgroundLayer:
+    __slots__ = ("image_path", "image_rect", "surface")
+
+    def __init__(
+        self,
+        image_path: str,
+        image_rect: tuple[int, int, int, int] | None,
+        surface: Surface | None,
+    ) -> None:
+        self.image_path = image_path
+        self.image_rect = image_rect
+        self.surface = surface
 
 
 class TilemapData:
@@ -36,6 +58,7 @@ class TilemapData:
         self.origin_offset = (0, 0)
         self.area_nodes: List[AreaNode] = []
         self.particle_emitters: List[ParticleEmitterNode] = []
+        self.background_layer: Optional[BackgroundLayer] = None
         self._tw, self._th = parsed.meta.tile_size
         self._build_path_index()
         self._normalize_tile_ttypes()
@@ -117,6 +140,35 @@ class TilemapData:
         result.particle_emitters = [
             ParticleEmitterNode(n) for n in parsed.nodes if n.node_type == "particle_emitter"
         ]
+
+        for layer in parsed.layers:
+            if layer.image_path is not None and layer.layer_type == "image":
+                bg_path = _resolve_resource_path(layer.image_path, map_dir, extra_search_base)
+                bg_surface: Optional[Surface] = None
+                if bg_path.is_file():
+                    try:
+                        bg_surface = pygame.image.load(str(bg_path))
+                        try:
+                            bg_surface = bg_surface.convert_alpha()
+                        except pygame.error:
+                            pass
+                    except pygame.error as e:
+                        msg = f"Background layer image load failed: {e}"
+                        warnings.append(msg)
+                        if not skip_missing_images:
+                            raise MapParseError(msg) from e
+                else:
+                    msg = f"Background layer image not found: {layer.image_path!r} -> {bg_path}"
+                    warnings.append(msg)
+                    if not skip_missing_images:
+                        raise MapParseError(msg)
+                result.background_layer = BackgroundLayer(
+                    image_path=layer.image_path,
+                    image_rect=layer.image_rect,
+                    surface=bg_surface,
+                )
+                break
+
         return result
 
     def _build_path_index(self) -> None:
@@ -329,6 +381,111 @@ class TilemapData:
                     "animation_mode": anim.animation_mode,
                 }
         return None
+
+    def get_object_animation(self, obj: ParsedObject) -> Optional[ObjectAnimation]:
+        if obj.animation is not None:
+            return obj.animation
+        # fallback to tileset animation (per-tileset optimization) when per-object is None
+        t_anim = self.get_tileset_animation(obj.ttype)
+        if t_anim is None:
+            return None
+        # synthesize ObjectAnimation from TilesetAnimation dict, preserving stride/dimensions
+        return ObjectAnimation(
+            frame_count=t_anim["frame_count"],
+            frame_duration_ms=t_anim["frame_duration_ms"],
+            loop=t_anim.get("loop", True),
+            animation_mode=t_anim.get("animation_mode", "default"),
+            frames=[],
+            frame_stride=t_anim.get("frame_stride", 1),
+            frame_w=t_anim.get("frame_w"),
+            frame_h=t_anim.get("frame_h"),
+        )
+
+    def get_effective_object_animation(self, obj: ParsedObject) -> Optional[ObjectAnimation]:
+        """Alias for get_object_animation (includes tileset fallback)."""
+        return self.get_object_animation(obj)
+
+    def get_object_animation_frames(
+        self, obj: ParsedObject, *, copy_surface: bool = True, scaled: bool = False
+    ) -> Optional[List[Surface]]:
+        anim = self.get_object_animation(obj)
+        if anim is None:
+            return None
+        if obj.ttype < 0 or obj.ttype >= len(self.surfaces):
+            return None
+        source = self.surfaces[obj.ttype]
+        if source is None:
+            return None
+        # Frame size: prefer animation's frame_w/h if provided (tileset fallback), else object area, else tile_size
+        fw = getattr(anim, "frame_w", None)
+        if fw is None:
+            fw = obj.area.w if obj.area.w > 0 else self._tw
+        fh = getattr(anim, "frame_h", None)
+        if fh is None:
+            fh = obj.area.h if obj.area.h > 0 else self._th
+        if fw <= 0 or fh <= 0:
+            return None
+        cols = max(1, source.get_width() // fw)
+        # consume frame_stride when present (tileset fallback) for non-explicit frames
+        if anim.frames:
+            frame_indices = anim.frames
+        else:
+            stride = getattr(anim, "frame_stride", 1)
+            if stride is None or stride <= 0:
+                stride = 1
+            if stride == 1:
+                frame_indices = list(range(anim.frame_count))
+            else:
+                frame_indices = [i * stride for i in range(anim.frame_count)]
+        frames: List[Surface] = []
+        for fi in frame_indices:
+            col = fi % cols
+            row = fi // cols
+            src = Rect(col * fw, row * fh, fw, fh)
+            if not source.get_rect().contains(src):
+                frames.append(Surface((fw, fh), pygame.SRCALPHA))
+                continue
+            cell = source.subsurface(src)
+            frames.append(cell.copy() if copy_surface else cell)
+        if scaled and self.render_scale != 1.0:
+            rs = self.render_scale
+            frames = [pygame.transform.scale(f, (int(f.get_width() * rs), int(f.get_height() * rs))) for f in frames]
+        return frames
+
+    def get_animated_object_surface(
+        self, obj: ParsedObject, elapsed_ms: float, *, scaled: bool = False
+    ) -> Optional[Surface]:
+        """Return current animated frame for *obj* at *elapsed_ms* (single call).
+
+        Handles per-object override or tileset fallback automatically, including
+        random_start_times phase. Returns static surface if not animated.
+        """
+        anim = self.get_object_animation(obj)
+        frames = self.get_object_animation_frames(obj, scaled=scaled)
+        if frames is None or anim is None:
+            surf = self.get_object_surface(obj, copy_surface=True)
+            if surf is not None and scaled and self.render_scale != 1.0:
+                surf = pygame.transform.scale(
+                    surf, (int(surf.get_width() * self.render_scale), int(surf.get_height() * self.render_scale))
+                )
+            return surf
+        if len(frames) == 1:
+            return frames[0]
+        dur = anim.frame_duration_ms
+        if dur <= 0:
+            return frames[0]
+        speed = getattr(anim, "speed", 1.0)
+        if not isinstance(speed, (int, float)) or not math.isfinite(speed) or speed <= 0:
+            speed = 1.0
+        effective_ms = elapsed_ms * speed
+        if anim.loop:
+            idx = int(effective_ms // dur) % len(frames)
+            if anim.animation_mode == "random_start_times":
+                phase = ((obj.area.x * 73856093) ^ (obj.area.y * 19349663) ^ (obj.ttype * 83492791)) % len(frames)
+                idx = (idx + phase) % len(frames)
+        else:
+            idx = min(int(effective_ms // dur), len(frames) - 1)
+        return frames[idx]
 
 
 def _variant_surface(
