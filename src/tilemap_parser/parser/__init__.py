@@ -30,6 +30,7 @@ from .collision_loader import (
 )
 from .map_parse import (
     MapParseError,
+    ObjectAnimation,
     ParsedAutotileGroup,
     ParsedAutotileRule,
     ParsedLayer,
@@ -72,6 +73,7 @@ __all__ = [
     "CollisionParseError",
     "CollisionPolygon",
     "MapParseError",
+    "ObjectAnimation",
     "ObjectCollisionData",
     "ObjectCollisionRegionData",
     "ParsedAutotileGroup",

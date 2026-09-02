@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.2.0 — 2026-09-04
+
+### Added
+- `BackgroundLayer` class and `TilemapData.background_layer` attribute: eagerly loads the first image layer from the map (if present) with `image_path`, `image_rect`, and `surface` attributes; additional image layers remain in `data.parsed.layers` for manual loading.
+- `TilemapData.get_object_animation(obj, render_scale=1.0)` returns normalized `AnimData` dict with `frames` (list of surfaces), `properties`, `frame_duration_ms`, `loop`, `animation_mode`, `frame_w`, and `frame_h`. When per-object `animation` is `None`, falls back to the object's tileset `ParsedTileset.animation` (shared strip, e.g., all coins). User handles playback: frame selection, elapsed time tracking, and `random_start_times` hash `(x*73856093 ^ y*19349663 ^ ttype*83492791) % count`.
+
+### Fixed
+- `ParsedTileset` animation validation: enforce `frame_count >= 1` and finite positive `frame_duration_ms` (matching `ObjectAnimation` validation) before constructing `TilesetAnimation` (`parser/map_parse.py:477`).
+- `TilemapData.load` background-layer image loading now respects `skip_missing_images=False` (raises `MapParseError` after warning, matching tileset path behavior; `runtime/map_loader.py:155`).
+
+### Docs
+- Clarify `TilemapData.load` parses all image-layer metadata but eagerly loads only the first image layer into `TilemapData.background_layer`; additional image layers remain in `data.parsed.layers` for manual loading (`webdocs/src/pages/JsonFormats.tsx:175`, `MapParsing.tsx:164`).
+- Document object animation API: `obj.animation` (raw `ObjectAnimation` dataclass) vs `get_object_animation(obj)` (normalized `AnimData` dict with frames + metadata). Clarify per-tileset shared strip vs per-object override, user-side playback responsibility, and `random_start_times` hash (`webdocs/src/pages/JsonFormats.tsx:182`, `Animations.tsx:158`, `ApiReference.tsx:109`).
+
 ## 5.1.0 — 2026-08-25
 
 ### Updates

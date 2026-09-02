@@ -16,7 +16,7 @@ from .map_object import MapObject, load_map_objects
 from .movement import CollisionResult, CollisionRunner, MovementMode
 from .polygon_query import rect_vs_tilemap
 from .protocols import ICollidable, ICollidableObject, ICollidableSprite
-from .map_loader import TilemapData, load_map
+from .map_loader import BackgroundLayer, TilemapData, load_map
 from .collision import (
     CollisionHit,
     ObjectCollisionManager,
@@ -43,6 +43,7 @@ from .particles import (
 __all__ = [
     "AnimationPlayer",
     "AreaNode",
+    "BackgroundLayer",
     "Body",
     "Camera",
     "CollisionCache",
