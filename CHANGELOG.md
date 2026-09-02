@@ -1,5 +1,22 @@
 # Changelog
 
+## 5.2.0 — 2026-09-04
+
+### Added
+
+- **Background layer support** — `TilemapData.background_layer` automatically loads the first image layer from your map with `image_path`, `image_rect`, and `surface`. Additional image layers stay in `data.parsed.layers` for manual loading.
+- **Object animation API** — `TilemapData.get_object_animation(obj, render_scale=1.0)` returns normalized animation data (`AnimData` dict) with frames as surfaces, metadata (`frame_duration_ms`, `loop`, `animation_mode`), and dimensions (`frame_w`, `frame_h`). When objects don't have per-object animation, it automatically falls back to the tileset's shared animation strip (e.g., all coins share one strip). Playback (elapsed time, frame selection, `random_start_times` desyncing) is user-side.
+
+### Fixed
+
+- **Tileset animation validation** — enforces `frame_count >= 1` and finite positive `frame_duration_ms` (matching object animation validation).
+- **Background layer loading** — respects `skip_missing_images=False` and raises `MapParseError` after warning (consistent with tileset loading behavior).
+
+### Documentation
+
+- Clarified image layer eager-loading behavior: parser loads the first image layer into `background_layer`; additional layers remain in `data.parsed.layers`.
+- Documented object animation: raw `obj.animation` dataclass vs normalized `get_object_animation()` dict, per-tileset fallback, and user-side playback requirements.
+
 ## 5.1.0 — 2026-08-25
 
 ### Updates

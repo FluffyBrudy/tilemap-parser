@@ -9,20 +9,40 @@ const MAP = `{
     "render_scale": 1.0,
     "version": "1.1"
   },
-  "resources": { "tilesets": [] },
+  "resources": { "tilesets": [{ "path": "assets/hero.png", "type": "object" }] },
   "project_state": { "rules": [], "groups": [], "automap_rules": [] },
   "data": {
-    "ongrid": {},
     "layers": [
+      {
+        "name": "Background",
+        "type": "image",
+        "visible": true, "locked": false, "opacity": 1.0, "z_index": -1,
+        "tiles": {},
+        "image_path": "assets/sky.png",
+        "image_rect": {"x": 0, "y": 0, "w": 960, "h": 640}
+      },
       {
         "name": "Layer 1",
         "type": "tile",
-        "visible": true,
-        "locked": false,
-        "opacity": 1.0,
-        "z_index": 0,
+        "visible": true, "locked": false, "opacity": 1.0, "z_index": 0,
+        "tiles": {}, "properties": {}
+      },
+      {
+        "name": "Objects",
+        "type": "object",
+        "visible": true, "locked": false, "opacity": 1.0, "z_index": 1,
         "tiles": {},
-        "properties": {}
+        "objects": {
+          "1": {
+            "area": {"x": 64, "y": 128, "w": 32, "h": 32},
+            "ttype": 0, "tileset_type": "object", "variant": 0,
+            "animation": {
+              "frame_count": 4, "frame_duration_ms": 120,
+              "speed": 1.0, "loop": true, "animation_mode": "default",
+              "frames": [0, 1, 2, 3]
+            }
+          }
+        }
       }
     ]
   }
@@ -148,7 +168,44 @@ export default function JsonFormats() {
         </li>
         <li>
           <code>data.layers</code>: tile layers with visibility,{" "}
-          <code>z_index</code>, opacity, per-tile entries.
+          <code>z_index</code>, opacity, per-tile entries. Types:{" "}
+          <code>"tile"</code>, <code>"object"</code>, <code>"image"</code>{" "}
+          (aliases <code>"background"</code>, <code>"background_layer"</code>).
+        </li>
+        <li>
+          Image layers: <code>image_path</code> + <code>image_rect</code> (pixel
+          rect{" "}
+          <code>
+            {"{"}x,y,w,h{"}"}
+          </code>
+          ). Parses all image-layer metadata but eagerly loads only the first
+          image layer into <code>TilemapData.background_layer</code> (
+          <code>BackgroundLayer</code>
+          ); additional image layers remain in <code>
+            data.parsed.layers
+          </code>{" "}
+          for manual loading.
+        </li>
+        <li>
+          Object animation: <code>objects[].animation</code> with required{" "}
+          <code>frame_count</code> + <code>frame_duration_ms</code> and optional{" "}
+          <code>speed</code>, <code>loop</code>, <code>animation_mode</code>,{" "}
+          <code>random_phase</code>, <code>frames</code>. Parsed as{" "}
+          <code>ObjectAnimation</code>; access via <code>obj.animation</code>{" "}
+          (raw dataclass) or <code>data.get_object_animation(obj)</code> which
+          returns normalized <code>AnimData</code> dict with <code>frames</code>{" "}
+          (list of surfaces), <code>frame_w/h</code>,{" "}
+          <code>frame_duration_ms</code>, <code>loop</code>,{" "}
+          <code>animation_mode</code>, and <code>properties</code>. When
+          per-object <code>animation</code> is <code>None</code>, the effective
+          animation falls back to the object's tileset{" "}
+          <code>ParsedTileset.animation</code> (per-tileset strip shared by all
+          instances — e.g., all coins) via{" "}
+          <code>get_tileset_animation(obj.ttype)</code>;{" "}
+          <code>get_object_animation</code> handles this fallback automatically.
+          Playback (speed, loop, <code>random_start_times</code> hash{" "}
+          <code>(x*73856093 ^ y*19349663 ^ ttype*83492791) % count</code>) is
+          user-side.
         </li>
         <li>
           Parser entry: <code>load_map(path)</code> → <code>TilemapData</code>;{" "}
@@ -157,7 +214,11 @@ export default function JsonFormats() {
       </ul>
 
       <h2 id="tileset">TILESET COLLISION</h2>
-      <CodeBlock title="terrain.collision.json" language="json" code={TILESET} />
+      <CodeBlock
+        title="terrain.collision.json"
+        language="json"
+        code={TILESET}
+      />
       <ul>
         <li>
           Top-level <code>tileset_name</code> + <code>tile_size</code>; per-id{" "}
@@ -248,7 +309,11 @@ export default function JsonFormats() {
         config dicts. The same fields construct{" "}
         <code>ParticleSystemConfig</code> in code.
       </p>
-      <CodeBlock title="map.nodes.json: a particle emitter node" language="json" code={NODE} />
+      <CodeBlock
+        title="map.nodes.json: a particle emitter node"
+        language="json"
+        code={NODE}
+      />
 
       <Callout kind="tip" title="WHY THE EDITOR">
         Every format above round-trips through tilemap-editor. Using the editor
