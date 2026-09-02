@@ -4,17 +4,50 @@ import json
 import math
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
 import pygame
 from pygame import Rect, Surface
 
-from ..parser.map_parse import MapParseError, ParsedLayer, ParsedMap, ParsedObject, ParsedTile, parse_map_file
+from ..parser.map_parse import (
+    MapParseError,
+    ObjectAnimation,
+    ParsedLayer,
+    ParsedMap,
+    ParsedObject,
+    ParsedTile,
+    parse_map_file,
+)
 from ..parser.node_parse import parse_nodes_dict
 from .area_node import AreaNode
 from .particles import ParticleEmitterNode
 
 PathLike = Union[str, Path]
+
+
+class BackgroundLayer:
+    __slots__ = ("image_path", "image_rect", "surface")
+
+    def __init__(
+        self,
+        image_path: str,
+        image_rect: tuple[int, int, int, int] | None,
+        surface: Surface | None,
+    ) -> None:
+        self.image_path = image_path
+        self.image_rect = image_rect
+        self.surface = surface
+
+
+# Public return for get_object_animation (exposed, not internal ObjectAnimation)
+class AnimData(TypedDict, total=True):
+    frames: List[Surface]
+    properties: Dict[str, object]
+    frame_duration_ms: float
+    loop: bool
+    animation_mode: Literal["default", "random_start_times"]
+    frame_w: int
+    frame_h: int
 
 
 class TilemapData:
@@ -36,6 +69,7 @@ class TilemapData:
         self.origin_offset = (0, 0)
         self.area_nodes: List[AreaNode] = []
         self.particle_emitters: List[ParticleEmitterNode] = []
+        self.background_layer: Optional[BackgroundLayer] = None
         self._tw, self._th = parsed.meta.tile_size
         self._build_path_index()
         self._normalize_tile_ttypes()
@@ -117,6 +151,35 @@ class TilemapData:
         result.particle_emitters = [
             ParticleEmitterNode(n) for n in parsed.nodes if n.node_type == "particle_emitter"
         ]
+
+        for layer in parsed.layers:
+            if layer.image_path is not None and layer.layer_type == "image":
+                bg_path = _resolve_resource_path(layer.image_path, map_dir, extra_search_base)
+                bg_surface: Optional[Surface] = None
+                if bg_path.is_file():
+                    try:
+                        bg_surface = pygame.image.load(str(bg_path))
+                        try:
+                            bg_surface = bg_surface.convert_alpha()
+                        except pygame.error:
+                            pass
+                    except pygame.error as e:
+                        msg = f"Background layer image load failed: {e}"
+                        warnings.append(msg)
+                        if not skip_missing_images:
+                            raise MapParseError(msg) from e
+                else:
+                    msg = f"Background layer image not found: {layer.image_path!r} -> {bg_path}"
+                    warnings.append(msg)
+                    if not skip_missing_images:
+                        raise MapParseError(msg)
+                result.background_layer = BackgroundLayer(
+                    image_path=layer.image_path,
+                    image_rect=layer.image_rect,
+                    surface=bg_surface,
+                )
+                break
+
         return result
 
     def _build_path_index(self) -> None:
@@ -327,8 +390,97 @@ class TilemapData:
                     "frame_stride": anim.frame_stride,
                     "loop": anim.loop,
                     "animation_mode": anim.animation_mode,
+                    "frame_w": anim.frame_w,
+                    "frame_h": anim.frame_h,
                 }
         return None
+
+    def get_object_animation(self, obj: ParsedObject, render_scale: float = 1.0) -> Optional[AnimData]:
+        """Return effective object animation as ``AnimData`` or ``None``.
+
+        When per-object ``animation`` is ``None``, falls back to the object's
+        tileset ``ParsedTileset.animation`` (shared strip). ``render_scale``
+        scales both ``frames`` and ``frame_w/h`` in the returned dict
+        (default ``1.0`` leaves at source resolution). No ``Surface`` overload -
+        single dict with ``frames`` + ``properties`` + ``loop``/``duration``/``mode``/``w/h``.
+        """
+        if not isinstance(render_scale, (int, float)) or not math.isfinite(render_scale) or render_scale <= 0:
+            raise ValueError(f"render_scale must be finite and > 0, got {render_scale!r}")
+        # effective animation (per-object or tileset fallback) - internal ObjectAnimationData
+        anim_data: Optional[ObjectAnimation] = obj.animation  # internal, keep frame_count
+        if anim_data is None:
+            t_anim = self.get_tileset_animation(obj.ttype)
+            if t_anim is None:
+                return None
+            anim_data = ObjectAnimation(
+                frame_count=t_anim["frame_count"],
+                frame_duration_ms=t_anim["frame_duration_ms"],
+                loop=t_anim.get("loop", True),
+                animation_mode=t_anim.get("animation_mode", "default"),
+                frames=[],
+                frame_stride=t_anim.get("frame_stride", 1),
+                frame_w=t_anim.get("frame_w"),
+                frame_h=t_anim.get("frame_h"),
+            )
+        if obj.ttype < 0 or obj.ttype >= len(self.surfaces):
+            return None
+        source = self.surfaces[obj.ttype]
+        if source is None:
+            return None
+        # frame dimensions - prefer animation's w/h, else area, else tile_size, scaled by render_scale
+        fw = getattr(anim_data, "frame_w", None)
+        if fw is None:
+            fw = obj.area.w if obj.area.w > 0 else self._tw
+        fh = getattr(anim_data, "frame_h", None)
+        if fh is None:
+            fh = obj.area.h if obj.area.h > 0 else self._th
+        if fw <= 0 or fh <= 0:
+            return None
+        # apply render_scale to dimensions
+        if render_scale != 1.0:
+            fw = int(fw * render_scale)
+            fh = int(fh * render_scale)
+        # cols based on original fw before scale for correct slicing
+        orig_fw = getattr(anim_data, "frame_w", None)
+        if orig_fw is None:
+            orig_fw = obj.area.w if obj.area.w > 0 else self._tw
+        if orig_fw is None or orig_fw <= 0:
+            orig_fw = fw
+        cols = max(1, source.get_width() // orig_fw) if render_scale != 1.0 else max(1, source.get_width() // fw)
+        if anim_data.frames:
+            frame_indices = anim_data.frames
+        else:
+            stride = getattr(anim_data, "frame_stride", 1)
+            if stride is None or stride <= 0:
+                stride = 1
+            if stride == 1:
+                frame_indices = list(range(anim_data.frame_count))
+            else:
+                frame_indices = [i * stride for i in range(anim_data.frame_count)]
+        frames: List[Surface] = []
+        for fi in frame_indices:
+            col = fi % cols
+            row = fi // cols
+            src_fw = getattr(anim_data, "frame_w", None) or (obj.area.w if obj.area.w > 0 else self._tw)
+            src_fh = getattr(anim_data, "frame_h", None) or (obj.area.h if obj.area.h > 0 else self._th)
+            src = Rect(col * src_fw, row * src_fh, src_fw, src_fh)
+            if not source.get_rect().contains(src):
+                surf = Surface((src_fw, src_fh), pygame.SRCALPHA)
+            else:
+                cell = source.subsurface(src)
+                surf = cell.copy()
+            if render_scale != 1.0:
+                surf = pygame.transform.scale(surf, (fw, fh))
+            frames.append(surf)
+        return {
+            "frames": frames,
+            "properties": dict(obj.properties) if obj.properties else {},
+            "frame_duration_ms": float(anim_data.frame_duration_ms),
+            "loop": bool(anim_data.loop),
+            "animation_mode": str(anim_data.animation_mode),
+            "frame_w": fw,
+            "frame_h": fh,
+        }
 
 
 def _variant_surface(
