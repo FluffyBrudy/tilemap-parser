@@ -161,14 +161,30 @@ def _walkable_edge_y_at_x(
     world_x: float,
     edge_index: int,
     min_upness: float,
+    centroid: tuple[float, float] | None = None,
+    world_verts: list[tuple[float, float]] | None = None,
 ) -> float | None:
-    """Return the world Y for a walkable polygon edge at world_x."""
+    """Return the world Y for a walkable polygon edge at world_x.
+
+    ``centroid`` is the polygon centroid in world space. It is constant
+    per polygon, so callers evaluating several edges of the same polygon
+    (e.g. :func:`_find_walkable_ground_y`) precompute it once and pass it
+    in; when omitted it is derived inline (identical expression).
+    ``world_verts`` is the polygon's vertices pre-transformed to world
+    space (``v * render_scale + offset`` per component, identical
+    expression to the inline path); when omitted the edge endpoints are
+    transformed inline.
+    """
     verts = poly.vertices
     n = len(verts)
-    v1x = verts[edge_index][0] * self.render_scale + ox
-    v1y = verts[edge_index][1] * self.render_scale + oy
-    v2x = verts[(edge_index + 1) % n][0] * self.render_scale + ox
-    v2y = verts[(edge_index + 1) % n][1] * self.render_scale + oy
+    if world_verts is None:
+        v1x = verts[edge_index][0] * self.render_scale + ox
+        v1y = verts[edge_index][1] * self.render_scale + oy
+        v2x = verts[(edge_index + 1) % n][0] * self.render_scale + ox
+        v2y = verts[(edge_index + 1) % n][1] * self.render_scale + oy
+    else:
+        v1x, v1y = world_verts[edge_index]
+        v2x, v2y = world_verts[(edge_index + 1) % n]
 
     min_x = min(v1x, v2x)
     max_x = max(v1x, v2x)
@@ -188,8 +204,11 @@ def _walkable_edge_y_at_x(
     normal_x = -edge_y / edge_len
     normal_y = edge_x / edge_len
 
-    cx = sum(v[0] for v in verts) / n * self.render_scale + ox
-    cy = sum(v[1] for v in verts) / n * self.render_scale + oy
+    if centroid is None:
+        cx = sum(v[0] for v in verts) / n * self.render_scale + ox
+        cy = sum(v[1] for v in verts) / n * self.render_scale + oy
+    else:
+        cx, cy = centroid
     mid_x = (v1x + v2x) * 0.5
     mid_y = (v1y + v2y) * 0.5
 
@@ -241,10 +260,21 @@ def _find_walkable_ground_y(
                     continue
                 if poly.one_way and not include_one_way:
                     continue
+                # polygon constant data, shared by every edge/sample
+                verts = poly.vertices
+                n_verts = len(verts)
+                cx = sum(v[0] for v in verts) / n_verts * self.render_scale + ox
+                cy = sum(v[1] for v in verts) / n_verts * self.render_scale + oy
+                world_verts = [
+                    (v[0] * self.render_scale + ox, v[1] * self.render_scale + oy)
+                    for v in verts
+                ]
                 for sample_x in sample_xs:
                     for i in range(len(poly.vertices)):
                         ground_y = self._walkable_edge_y_at_x(
-                            poly, ox, oy, sample_x, i, min_upness
+                            poly, ox, oy, sample_x, i, min_upness,
+                            centroid=(cx, cy),
+                            world_verts=world_verts,
                         )
                         if ground_y is None:
                             continue
