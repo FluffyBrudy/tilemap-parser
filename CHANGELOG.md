@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.2.1 — 2026-09-05
+
+### Added
+
+- **Supporting ground geometry on `CollisionResult`** — `move_platformer_with_slide()` now reports `ground_angle: float | None` and `ground_normal: tuple | None`: the actual supporting polygon edge's orientation (`0.0` = flat, positive = rises toward `+X`, negative = falls toward `+X`; `None` = no walkable support such as airborne, jumping, steep, or ledge walk-off). Derived from the existing walkable-edge selection (`edge -> normal -> angle`, normal authoritative), so it stays correct for nearly-rectangular polygons with tilted edges. No movement semantics changed: `horizontal_speed`/`vx` remain world-X velocity. New `GroundInfo` type (`y`, `normal`, `angle`) backs the internal `_find_walkable_ground_info()` query, with `_find_walkable_ground_y()` delegating to it.
+
+### Performance
+
+- **Walkable ground query hoist** — `_find_walkable_ground_y()` now precomputes the polygon-constant centroid and world-space vertices once per polygon instead of per edge × foot-sample (identical expressions, verified bitwise-identical over 70k recorded input→output cases). ~21% faster on the query microbench; no API or behavior change.
+
 ## 5.2.0 — 2026-09-04
 
 ### Added
