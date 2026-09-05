@@ -8,6 +8,7 @@ from ...parser.collision import CollisionPolygon, TileCollisionData, TilesetColl
 from ..collision.hit import should_collide
 from ..polygon_query import _check_sprite_polygon_offset, get_shape_bounds
 from ..protocols import ICollidable, ICollidableSprite
+from .types import GroundInfo
 
 
 def _resolve_tile_data(
@@ -66,6 +67,7 @@ def _collides_at(
                     return True
     return world is not None and world.collides_with_body(sprite) is not None
 
+
 def _first_colliding_shape(
     self,
     sprite: ICollidable,
@@ -106,6 +108,7 @@ def _first_colliding_shape(
             # `v * scale + ox` to tile-local polygons, so offset is zero.
             return (body.as_polygon(), 0.0, 0.0)
     return None
+
 
 def _collides_at_platformer(
     self,
@@ -153,7 +156,19 @@ def _collides_at_platformer(
                     return True
     return world is not None and world.collides_with_body(sprite) is not None
 
-def _walkable_edge_y_at_x(
+
+def _angle_from_normal(normal_x: float, normal_y: float) -> float:
+    """Derive raw ground angle from an outward walkable normal.
+
+    Normal is authoritative; angle is derived. ``0.0`` = flat,
+    positive = rises toward ``+X``, negative = falls toward ``+X``
+    (screen coords, ``+Y`` down). No flat threshold applied.
+    """
+    angle = math.degrees(math.atan2(-normal_x, -normal_y))
+    return 0.0 if angle == 0.0 else angle
+
+
+def _walkable_edge_info_at_x(
     self,
     poly: CollisionPolygon,
     ox: float,
@@ -161,8 +176,15 @@ def _walkable_edge_y_at_x(
     world_x: float,
     edge_index: int,
     min_upness: float,
-) -> float | None:
-    """Return the world Y for a walkable polygon edge at world_x."""
+) -> tuple[float, float, float] | None:
+    """Return ``(ground_y, normal_x, normal_y)`` for a walkable edge.
+
+    Identical selection semantics to the historic ``_walkable_edge_y_at_x``:
+    world transform via tile offset/``render_scale``, degenerate and
+    near-vertical rejection, outward normal via centroid, and
+    ``upness >= min_upness`` walkability. The normal is the source of
+    truth; callers derive angle from it.
+    """
     verts = poly.vertices
     n = len(verts)
     v1x = verts[edge_index][0] * self.render_scale + ox
@@ -203,9 +225,25 @@ def _walkable_edge_y_at_x(
         return None
 
     t = (world_x - v1x) / edge_x
-    return v1y + (v2y - v1y) * t
+    ground_y = v1y + (v2y - v1y) * t
+    return (ground_y, normal_x, normal_y)
 
-def _find_walkable_ground_y(
+
+def _walkable_edge_y_at_x(
+    self,
+    poly: CollisionPolygon,
+    ox: float,
+    oy: float,
+    world_x: float,
+    edge_index: int,
+    min_upness: float,
+) -> float | None:
+    """Return the world Y for a walkable polygon edge at world_x."""
+    info = self._walkable_edge_info_at_x(poly, ox, oy, world_x, edge_index, min_upness)
+    return info[0] if info is not None else None
+
+
+def _find_walkable_ground_info(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision,
@@ -215,8 +253,16 @@ def _find_walkable_ground_y(
     include_one_way: bool = True,
     previous_bottom: float | None = None,
     world=None,
-) -> float | None:
-    """Find the nearest walkable floor surface under or just above the sprite."""
+) -> GroundInfo | None:
+    """Find the walkable supporting surface under/just above the sprite.
+
+    Same selection as the historic ``_find_walkable_ground_y`` (three
+    foot samples, vertical window, one-way gating, highest ``y`` wins,
+    existing body ``top_y_at`` handling). Returns the supporting edge's
+    ``y`` plus its outward ``normal`` and derived ``angle``. Bodies keep
+    existing behavior with conservative flat ``(0.0, -1.0)`` / ``0.0``
+    (no new curved-body slope semantics).
+    """
     left, _, right, bottom = get_shape_bounds(sprite)
     sample_xs = (left, (left + right) * 0.5, right)
 
@@ -227,7 +273,7 @@ def _find_walkable_ground_y(
     max_tile_y = int((bottom + max_down + th) // th) + 1
     min_upness = math.cos(math.radians(self.max_walk_angle))
 
-    best_y: float | None = None
+    best: GroundInfo | None = None
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             tile_id = tile_map.get((tile_x, tile_y))
@@ -243,20 +289,25 @@ def _find_walkable_ground_y(
                     continue
                 for sample_x in sample_xs:
                     for i in range(len(poly.vertices)):
-                        ground_y = self._walkable_edge_y_at_x(
+                        edge = self._walkable_edge_info_at_x(
                             poly, ox, oy, sample_x, i, min_upness
                         )
-                        if ground_y is None:
+                        if edge is None:
                             continue
+                        ground_y, nx, ny = edge
                         one_way_from_above = True
                         if poly.one_way and previous_bottom is not None:
                             one_way_from_above = previous_bottom <= ground_y + 0.5
                         if not one_way_from_above:
                             continue
                         if (bottom - max_up <= ground_y <= bottom + max_down) and (
-                            best_y is None or ground_y < best_y
+                            best is None or ground_y < best.y
                         ):
-                            best_y = ground_y
+                            best = GroundInfo(
+                                y=ground_y,
+                                normal=(nx, ny),
+                                angle=_angle_from_normal(nx, ny),
+                            )
     if world is not None:
         for body in world.bodies:
             if body is sprite:
@@ -269,7 +320,31 @@ def _find_walkable_ground_y(
                     continue
                 if not bottom - max_up <= ground_y <= bottom + max_down:
                     continue
-                if best_y is None or ground_y < best_y:
-                    best_y = ground_y
-    return best_y
+                if best is None or ground_y < best.y:
+                    best = GroundInfo(y=ground_y, normal=(0.0, -1.0), angle=0.0)
+    return best
 
+
+def _find_walkable_ground_y(
+    self,
+    sprite: ICollidableSprite,
+    tileset_collision: TilesetCollision,
+    tile_map: dict,
+    max_up: float,
+    max_down: float,
+    include_one_way: bool = True,
+    previous_bottom: float | None = None,
+    world=None,
+) -> float | None:
+    """Find the nearest walkable floor surface under or just above the sprite."""
+    info = self._find_walkable_ground_info(
+        sprite,
+        tileset_collision,
+        tile_map,
+        max_up,
+        max_down,
+        include_one_way=include_one_way,
+        previous_bottom=previous_bottom,
+        world=world,
+    )
+    return info.y if info is not None else None
