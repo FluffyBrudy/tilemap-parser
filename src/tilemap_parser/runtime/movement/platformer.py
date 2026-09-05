@@ -56,6 +56,8 @@ def move_platformer(
     result.hit_ceiling = False
     result.on_ground = False
     result.slide_vector = None
+    result.ground_angle = None
+    result.ground_normal = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 
@@ -343,10 +345,13 @@ def move_platformer_with_slide(
     result.hit_ceiling = False
     result.on_ground = False
     result.slide_vector = None
+    result.ground_angle = None
+    result.ground_normal = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 
     skin = 0.01
+    support_info = None
     old_x, old_y = sprite.x, sprite.y
     _, _, _, old_bottom = get_shape_bounds(sprite)
     was_on_ground = getattr(sprite, "on_ground", False)
@@ -380,13 +385,15 @@ def move_platformer_with_slide(
 
     # Horizontal movement first. Grounded sprites are allowed to follow
     # walkable floor contours, but only when a jump did not start this frame.
+    # World-X velocity is preserved (dx = vx * dt); ground following only
+    # derives dy. support_info tracks the already-selected surface.
     if delta_x != 0.0:
         sprite.x = old_x + delta_x
         sprite.y = old_y
 
         followed_ground = False
         if was_on_ground and not jumped:
-            ground_y = self._find_walkable_ground_y(
+            ground_info = self._find_walkable_ground_info(
                 sprite,
                 tileset_collision,
                 tile_map,
@@ -395,16 +402,17 @@ def move_platformer_with_slide(
                 include_one_way=True,
                 previous_bottom=old_bottom, world=world
             )
-            if ground_y is not None:
-                sprite.y = ground_y - bottom_offset - skin
+            if ground_info is not None:
+                sprite.y = ground_info.y - bottom_offset - skin
                 followed_ground = True
+                support_info = ground_info
 
         if self._collides_at_platformer(
             sprite, tileset_collision, tile_map, include_one_way=False, world=world
         ):
             sprite.x = old_x + delta_x
             sprite.y = old_y - self.step_height
-            step_ground_y = self._find_walkable_ground_y(
+            step_info = self._find_walkable_ground_info(
                 sprite,
                 tileset_collision,
                 tile_map,
@@ -413,6 +421,7 @@ def move_platformer_with_slide(
                 include_one_way=False,
                 previous_bottom=old_bottom, world=world
             )
+            step_ground_y = step_info.y if step_info is not None else None
             if step_ground_y is not None:
                 sprite.y = step_ground_y - bottom_offset - skin
             if step_ground_y is None or self._collides_at_platformer(
@@ -423,8 +432,10 @@ def move_platformer_with_slide(
                 sprite.vx = 0.0
                 result.collided = True
                 result.hit_wall_x = True
+                support_info = None
             else:
                 followed_ground = True
+                support_info = step_info
 
         if followed_ground:
             sprite.on_ground = True
@@ -438,6 +449,7 @@ def move_platformer_with_slide(
 
     if jumped or sprite.vy < 0.0:
         sprite.y = y_before_vertical + delta_y
+        support_info = None
         if self._collides_at_platformer(
             sprite, tileset_collision, tile_map, include_one_way=False, world=world
         ):
@@ -461,7 +473,7 @@ def move_platformer_with_slide(
             sprite.on_ground = False
     elif sprite.vy > 0.0:
         sprite.y = y_before_vertical + delta_y
-        ground_y = self._find_walkable_ground_y(
+        fall_info = self._find_walkable_ground_info(
             sprite,
             tileset_collision,
             tile_map,
@@ -470,13 +482,14 @@ def move_platformer_with_slide(
             include_one_way=True,
             previous_bottom=previous_bottom, world=world
         )
-        if ground_y is not None:
-            sprite.y = ground_y - bottom_offset - skin
+        if fall_info is not None:
+            sprite.y = fall_info.y - bottom_offset - skin
             sprite.vy = 0.0
             sprite.on_ground = True
             result.on_ground = True
             result.collided = True
             result.hit_wall_y = True
+            support_info = fall_info
         elif self._collides_at_platformer(
             sprite,
             tileset_collision,
@@ -505,10 +518,13 @@ def move_platformer_with_slide(
             result.on_ground = True
             result.collided = True
             result.hit_wall_y = True
+            # Non-walkable collision landing: no walkable support to report.
+            support_info = None
         else:
             sprite.on_ground = False
+            support_info = None
     elif not jumped:
-        ground_y = self._find_walkable_ground_y(
+        snap_info = self._find_walkable_ground_info(
             sprite,
             tileset_collision,
             tile_map,
@@ -517,16 +533,24 @@ def move_platformer_with_slide(
             include_one_way=True,
             previous_bottom=previous_bottom, world=world
         )
-        if ground_y is not None:
-            sprite.y = ground_y - bottom_offset - skin
+        if snap_info is not None:
+            sprite.y = snap_info.y - bottom_offset - skin
             sprite.vy = 0.0
             sprite.on_ground = True
             result.on_ground = True
+            support_info = snap_info
         else:
             sprite.on_ground = False
+            support_info = None
 
     result.final_x = sprite.x
     result.final_y = sprite.y
     result.on_ground = getattr(sprite, "on_ground", False)
+    if result.on_ground and support_info is not None:
+        result.ground_angle = support_info.angle
+        result.ground_normal = support_info.normal
+    else:
+        result.ground_angle = None
+        result.ground_normal = None
     return result
 

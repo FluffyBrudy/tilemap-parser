@@ -13,7 +13,7 @@ from .collision_cache import (
     load_tileset_collision,
 )
 from .map_object import MapObject, load_map_objects
-from .movement import CollisionResult, CollisionRunner, MovementMode
+from .movement import CollisionResult, CollisionRunner, GroundInfo, MovementMode
 from .polygon_query import rect_vs_tilemap
 from .protocols import ICollidable, ICollidableObject, ICollidableSprite
 from .map_loader import BackgroundLayer, TilemapData, load_map
@@ -50,6 +50,7 @@ __all__ = [
     "CollisionHit",
     "CollisionResult",
     "CollisionRunner",
+    "GroundInfo",
     "ICollidable",
     "ICollidableObject",
     "ICollidableSprite",

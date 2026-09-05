@@ -21,6 +21,7 @@ __all__ = [
     "CollisionPolygon",
     "CollisionResult",
     "CollisionRunner",
+    "GroundInfo",
     "ICollidable",
     "ICollidableObject",
     "ICollidableSprite",

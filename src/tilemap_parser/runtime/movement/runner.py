@@ -30,7 +30,9 @@ class CollisionRunner:
     _first_colliding_shape = queries._first_colliding_shape
     _collides_at_platformer = queries._collides_at_platformer
     _walkable_edge_y_at_x = queries._walkable_edge_y_at_x
+    _walkable_edge_info_at_x = queries._walkable_edge_info_at_x
     _find_walkable_ground_y = queries._find_walkable_ground_y
+    _find_walkable_ground_info = queries._find_walkable_ground_info
 
     def __init__(
         self,

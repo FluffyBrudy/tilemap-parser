@@ -74,6 +74,8 @@ def move_grounded(
     result.hit_ceiling = False
     result.on_ground = False
     result.slide_vector = None
+    result.ground_angle = None
+    result.ground_normal = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 
