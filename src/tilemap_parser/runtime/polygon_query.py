@@ -1,8 +1,4 @@
-"""Zero-allocation polygon-vs-shape query primitives.
-
-Pure math: sprite shape vs tile polygon tests with the tile offset applied
-inline during computation. Shared by the movement resolver and tile queries.
-"""
+"""Offset-inline polygon tests; zero allocation shared by movement and queries."""
 
 from __future__ import annotations
 
@@ -17,11 +13,11 @@ from ..parser.collision import (
     TilesetCollision,
 )
 from .protocols import ICollidable
+from .world import flipped_data, iter_cell_entries
 
 Point = Tuple[float, float]
 
 def point_in_polygon(point: Point, vertices: List[Point]) -> bool:
-    """Check if point is inside polygon using ray casting (tile-local coordinates)."""
     if not vertices:
         return False
     x, y = point
@@ -48,7 +44,6 @@ def _point_in_polygon_offset(
     oy: float,
     scale: float = 1.0,
 ) -> bool:
-    """Ray-cast with tile offset applied inline — no allocation."""
     if not vertices:
         return False
     n = len(vertices)
@@ -77,7 +72,7 @@ def _segments_intersect(
     dx: float,
     dy: float,
 ) -> bool:
-    """Check if segment AB intersects CD (open — ignores collinear/endpoint)."""
+    """Open segments: collinear and endpoint touches don't count."""
     o1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
     o2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax)
     o3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx)
@@ -90,10 +85,8 @@ def _segments_intersect(
 def rect_polygon_collision(
     rect_x: float, rect_y: float, rect_w: float, rect_h: float, vertices: List[Point]
 ) -> bool:
-    """Check if rectangle collides with polygon (world-space vertices)."""
     if not vertices:
         return False
-    # AABB pre-reject
     n = len(vertices)
     min_vx = max_vx = vertices[0][0]
     min_vy = max_vy = vertices[0][1]
@@ -112,7 +105,7 @@ def rect_polygon_collision(
     if rect_x > max_vx or rx2 < min_vx or rect_y > max_vy or ry2 < min_vy:
         return False
 
-    # Corner tests — no tuple allocation
+    # Corner tests
     if point_in_polygon((rect_x, rect_y), vertices):
         return True
     if point_in_polygon((rx2, rect_y), vertices):
@@ -122,14 +115,13 @@ def rect_polygon_collision(
     if point_in_polygon((rx2, ry2), vertices):
         return True
 
-    # Vertex-in-rect — half-open right/bottom edges: a vertex sitting exactly
-    # on the rect's bottom/right edge is resting contact, not an overlap
-    # (consistent with the ray-cast and segment tests, which are exclusive).
+    # Half-open edges: vertex on bottom/right is rest, not overlap,
+    # matching the exclusive ray-cast and segment tests.
     for vx, vy in vertices:
         if rect_x <= vx < rx2 and rect_y <= vy < ry2:
             return True
 
-    # Edge-edge intersection (catches triangle-vs-rectangle cases)
+    # Edge-edge intersection
     rect_edges = (
         (rect_x, rect_y, rx2, rect_y),
         (rx2, rect_y, rx2, ry2),
@@ -154,10 +146,8 @@ def _rect_polygon_collision_offset(
     oy: float,
     scale: float = 1.0,
 ) -> bool:
-    """Rectangle vs polygon with tile offset applied inline — no allocation."""
     if not vertices:
         return False
-    # AABB pre-reject with offset
     n = len(vertices)
     v0x, v0y = vertices[0][0] * scale + ox, vertices[0][1] * scale + oy
     min_vx = max_vx = v0x
@@ -191,13 +181,13 @@ def _rect_polygon_collision_offset(
     if _point_in_polygon_offset(rx2, ry2, vertices, ox, oy, scale):
         return True
 
-    # Vertex-in-rect — half-open right/bottom edges (resting contact, see above)
+    # Vertex-in-rect, same half-open rule as above.
     for vx, vy in vertices:
         wx, wy = vx * scale + ox, vy * scale + oy
         if rect_x <= wx < rx2 and rect_y <= wy < ry2:
             return True
 
-    # Edge-edge intersection (catches triangle-vs-rectangle cases)
+    # Edge-edge intersection
     for i in range(n):
         p1x = vertices[i][0] * scale + ox
         p1y = vertices[i][1] * scale + oy
@@ -216,7 +206,6 @@ def _rect_polygon_collision_offset(
 def circle_polygon_collision(
     center: Point, radius: float, vertices: List[Point]
 ) -> bool:
-    """Check if circle collides with polygon (world-space vertices)."""
     if point_in_polygon(center, vertices):
         return True
 
@@ -249,7 +238,6 @@ def _circle_polygon_collision_offset(
     oy: float,
     scale: float = 1.0,
 ) -> bool:
-    """Circle vs polygon with tile offset applied inline — no allocation."""
     if _point_in_polygon_offset(cx, cy, vertices, ox, oy, scale):
         return True
     n = len(vertices)
@@ -275,7 +263,6 @@ def _circle_polygon_collision_offset(
     return False
 
 def get_shape_bounds(sprite: ICollidable) -> Tuple[float, float, float, float]:
-    """Get AABB bounds for sprite (left, top, right, bottom)"""
     shape = sprite.collision_shape
     if isinstance(shape, RectangleShape):
         left = sprite.x + shape.offset[0]
@@ -309,7 +296,7 @@ def get_shape_bounds(sprite: ICollidable) -> Tuple[float, float, float, float]:
 def check_sprite_polygon_collision(
     sprite: ICollidable, polygon: CollisionPolygon
 ) -> bool:
-    """Check if sprite collides with a world-space polygon (legacy / public API)."""
+    # Legacy entry; polygon sprites always miss here.
     shape = sprite.collision_shape
     if isinstance(shape, RectangleShape):
         left, top, right, bottom = get_shape_bounds(sprite)
@@ -333,10 +320,6 @@ def _check_sprite_polygon_offset(
     oy: float,
     scale: float = 1.0,
 ) -> bool:
-    """
-    Check if sprite collides with a tile-local polygon at world offset (ox, oy).
-    No allocation — offset is applied inline during math.
-    """
     shape = sprite.collision_shape
     if isinstance(shape, RectangleShape):
         left = sprite.x + shape.offset[0]
@@ -373,12 +356,7 @@ def _polygon_polygon_collision_offset(
     oy: float,
     scale: float = 1.0,
 ) -> bool:
-    """Polygon vs polygon with offsets applied inline — no allocation.
-
-    *verts_a* is sprite-local (translated by the sprite origin *ax*, *ay*);
-    *verts_b* is tile-local (translated by the tile offset *ox*, *oy* and
-    scaled by *scale*).
-    """
+    # a is sprite-local, b is tile-local scaled; caller frames differ.
     if not verts_a or not verts_b:
         return False
 
@@ -415,7 +393,6 @@ def _polygon_polygon_collision_offset(
     if a_min_x > b_max_x or a_max_x < b_min_x or a_min_y > b_max_y or a_max_y < b_min_y:
         return False
 
-    # Vertex-in-polygon (either polygon containing a vertex of the other)
     for vx, vy in verts_a:
         if _point_in_polygon_offset(ax + vx, ay + vy, verts_b, ox, oy, scale):
             return True
@@ -423,7 +400,6 @@ def _polygon_polygon_collision_offset(
         if _point_in_polygon_offset(ox + vx * scale, oy + vy * scale, verts_a, ax, ay, 1.0):
             return True
 
-    # Edge-edge intersection
     n_a, n_b = len(verts_a), len(verts_b)
     for i in range(n_a):
         a1x, a1y = ax + verts_a[i][0], ay + verts_a[i][1]
@@ -440,31 +416,16 @@ def rect_vs_tilemap(
     top: float,
     right: float,
     bottom: float,
-    tile_map: Dict[Tuple[int, int], int],
+    tile_map: Dict[Tuple[int, int], object],
     tileset_collision: TilesetCollision,
     tile_size: Tuple[int, int],
     render_scale: float = 1.0,
+    collision_mask: int | None = None,
 ) -> bool:
-    """Check if an AABB collides with any collision tile in a tile map.
-
-    Iterates overlapping tiles, transforms each tile's collision polygons to
-    world space, and tests for intersection with the given rectangle.
-
-    Args:
-        left, top, right, bottom: World-space AABB of the query rect.
-        tile_map: Dict mapping (col, row) -> tile_variant_id.
-        tileset_collision: TilesetCollision with per-tile polygon shapes.
-        tile_size: Raw tile size as (width, height) from map data.
-        render_scale: Multiplier from tile-local to world pixels.
-
-    Returns:
-        True if the rect overlaps any tile collision polygon.
-    """
+    """Unioned entries, flips applied; mask=None tests all (tile-side only)."""
     tw = tile_size[0] * render_scale
     th = tile_size[1] * render_scale
-    # Half-open rect [left, right): visit every tile the rect overlaps, including
-    # a tile the right/bottom edge intrudes into by less than a pixel (a whole-
-    # pixel subtraction would skip it for sub-pixel query rects).
+    # Half-open edges with 1e-9 (not whole-pixel) so sub-pixel intrusions count.
     tx0 = math.floor(left / tw)
     tx1 = math.floor((right - 1e-9) / tw)
     ty0 = math.floor(top / th)
@@ -474,17 +435,25 @@ def rect_vs_tilemap(
 
     for ty in range(ty0, ty1 + 1):
         for tx in range(tx0, tx1 + 1):
-            tile_id = tile_map.get((tx, ty))
-            if tile_id is None:
+            cell = tile_map.get((tx, ty))
+            if cell is None:
                 continue
-            tile_data = tileset_collision.tiles.get(tile_id)
-            if tile_data is None:
-                continue
-            ox = tx * tw
-            oy = ty * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
+            for tile_data in _iter_cell_datas(tileset_collision, cell):
+                if collision_mask is not None and not (collision_mask & tile_data.collision_layer):
                     continue
-                if _rect_polygon_collision_offset(left, top, rw, rh, poly.vertices, ox, oy, render_scale):
-                    return True
+                ox = tx * tw
+                oy = ty * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if _rect_polygon_collision_offset(left, top, rw, rh, poly.vertices, ox, oy, render_scale):
+                        return True
     return False
+
+
+def _iter_cell_datas(tileset_collision: TilesetCollision, cell: object):
+    for gid, flags in iter_cell_entries(cell):
+        base = tileset_collision.tiles.get(gid)
+        if base is None:
+            continue
+        yield base if not flags else flipped_data(base, flags, tileset_collision.tile_size)

@@ -17,7 +17,7 @@ MINIMAL_MAP_META = {
 }
 
 
-def _make_minimal_png(path: Path, size: tuple[int, int] = (32, 16)) -> None:
+def _make_minimal_png(path: Path, size: tuple[int, int] = (64, 64)) -> None:
     surf = pygame.Surface(size)
     surf.fill((255, 0, 255))
     pygame.image.save(surf, str(path))
@@ -132,7 +132,7 @@ class TestObjectSurfaces:
         assert result is not None
         surf, x, y = result
         assert isinstance(surf, pygame.Surface)
-        assert surf.get_size() == (16, 16)
+        assert surf.get_size() == (32, 32)
         assert x == 50
         assert y == 60
 
@@ -186,6 +186,31 @@ class TestObjectSurfaces:
             tileset_type="object",
             variant=0,
         )
+        assert td.get_object_surface(obj) is None
+
+    def test_get_object_surface_multi_tile_single_rect(self, map_data):
+        td, *_ = map_data
+        # Contiguous stamp: single rect at variant, not single tile.
+        obj = ParsedObject(
+            area=ParsedObjectArea(x=193, y=239, w=48, h=32),
+            ttype=0,
+            tileset_type="tile",
+            variant=0,
+        )
+        surf = td.get_object_surface(obj)
+        assert surf is not None
+        assert surf.get_size() == (48, 32)
+
+    def test_get_object_surface_row_wrap_miss_returns_none(self, map_data):
+        td, *_ = map_data
+        # variant 3 on a 64px-wide (4-col) sheet: 48px-wide rect wraps rows.
+        obj = ParsedObject(
+            area=ParsedObjectArea(x=0, y=0, w=48, h=16),
+            ttype=0,
+            tileset_type="tile",
+            variant=3,
+        )
+        assert td.get_object_surface(obj) is None
 
 
 class TestParsedLayerTtypes:

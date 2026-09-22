@@ -1,5 +1,3 @@
-"""Top-down sliding movement (move_and_slide)."""
-
 from __future__ import annotations
 
 import math
@@ -14,29 +12,15 @@ def move_and_slide(
     self,
     sprite: ICollidable,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     delta_x: float,
     delta_y: float,
     slope_slide: bool = False,
     world: PhysicsWorld | None = None,
 ) -> CollisionResult:
     """
-    Move sprite with sliding collision response.
-
-    Best for top-down games where sprite should slide along walls.
-
-    Args:
-        sprite: Sprite to move (must implement ICollidableSprite)
-        tileset_collision: Tileset collision data. Optional when a world is
-            attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
-            when a world is attached (or passed as ``world=``).
-        delta_x: X movement amount
-        delta_y: Y movement amount
-        slope_slide: If True, allows sliding along slopes instead of blocking
-
-    Returns:
-        CollisionResult with final position and collision info
+    Top-down slide: full move first, then per-axis retract; leftovers
+    reported as slide_vector.
     """
     world = self._resolve_world(world)
     if world is not None:
@@ -99,7 +83,7 @@ def move_and_slide(
         result.final_y = sprite.y
         return result
 
-    # Non-slope: try full move first (fast path — no collision)
+    # Fast path: full move when nothing collides.
     sprite.x = old_x + delta_x
     sprite.y = old_y + delta_y
     if not self._collides_at(sprite, tileset_collision, tile_map, world=world):
@@ -109,7 +93,6 @@ def move_and_slide(
 
     result.collided = True
 
-    # X axis — spatially correct scan at the x-only position
     sprite.x = old_x + delta_x
     sprite.y = old_y
     x_collided = self._collides_at(sprite, tileset_collision, tile_map, world=world)
@@ -117,7 +100,6 @@ def move_and_slide(
         sprite.x = old_x
         result.hit_wall_x = True
 
-    # Y axis — spatially correct scan at the y-only position
     sprite.y = old_y + delta_y
     y_collided = self._collides_at(sprite, tileset_collision, tile_map, world=world)
     if y_collided:
@@ -157,15 +139,13 @@ def _get_collision_normal_from_motion(
     scale: float = 1.0,
 ) -> tuple[float, float] | None:
     """
-    Calculate the collision normal for a tile-local polygon at offset (ox, oy).
-    Returns the outward normal of the edge most aligned against motion.
+    Outward normal of the edge most aligned against motion.
     """
     vertices = polygon.vertices
     n = len(vertices)
     if n < 2:
         return None
 
-    # Compute polygon centroid, then translate to world space
     poly_cx = 0.0
     poly_cy = 0.0
     for vx, vy in vertices:

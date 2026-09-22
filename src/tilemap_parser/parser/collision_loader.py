@@ -1,10 +1,3 @@
-"""
-Collision data loading utilities.
-
-Provides file I/O functions that read collision JSON files from disk
-and dispatch to the appropriate parser functions.
-"""
-
 from __future__ import annotations
 
 import json
@@ -25,21 +18,7 @@ from .collision import (
 def load_tileset_collision(
     collision_path: Union[str, Path],
 ) -> TilesetCollision | None:
-    """
-    Load tileset collision data from a collision JSON file.
-
-    The editor stores tileset collision files at:
-        <data_root>/collision/<tileset_stem>.collision.json
-
-    Args:
-        collision_path: Direct path to the .collision.json file.
-
-    Returns:
-        TilesetCollision object, or None if the file does not exist.
-
-    Raises:
-        CollisionParseError: If the file exists but cannot be parsed.
-    """
+    """Missing file gives None; unparsable file raises."""
     collision_path = Path(collision_path)
 
     if not collision_path.exists():
@@ -57,23 +36,7 @@ def load_character_collision(
     collision_path: Union[str, Path],
     render_scale: float = 1.0,
 ) -> CharacterCollision | None:
-    """
-    Load character collision data from a collision JSON file.
-
-    The editor stores character collision files at:
-        <data_root>/character_collision/<character_name>.collision.json
-
-    Args:
-        collision_path: Direct path to the .collision.json file.
-        render_scale: Multiplier applied to shape dimensions and offsets
-            (no-op when 1.0).
-
-    Returns:
-        CharacterCollision object, or None if the file does not exist.
-
-    Raises:
-        CollisionParseError: If the file exists but cannot be parsed.
-    """
+    """Missing file gives None; unparsable file raises."""
     collision_path = Path(collision_path)
 
     if not collision_path.exists():
@@ -90,21 +53,7 @@ def load_character_collision(
 def load_object_collision(
     collision_path: Union[str, Path],
 ) -> ObjectCollisionData | None:
-    """
-    Load object collision data from a collision JSON file.
-
-    File format: ``<tileset_name>.object_collision.json``
-    Typical path: ``<data_root>/collision/<tileset_name>.object_collision.json``
-
-    Args:
-        collision_path: Direct path to the .object_collision.json file.
-
-    Returns:
-        ObjectCollisionData object, or None if the file does not exist.
-
-    Raises:
-        CollisionParseError: If the file exists but cannot be parsed.
-    """
+    """Missing file gives None; unparsable file raises."""
     collision_path = Path(collision_path)
 
     if not collision_path.exists():

@@ -31,11 +31,10 @@ export default function ObjectCollision() {
       <h2 id="why">WHY IT'S SEPARATE</h2>
       <ul>
         <li>
-          The world's job is <em>movement resolution</em> (don't let sprites
-          walk into solids).
+          The world's job is keeping sprites out of solids.
         </li>
         <li>
-          The manager's job is <em>contact detection</em> between moving things
+          The manager's job is finding touches between moving things
           (who touched who, how deep).
         </li>
         <li>
@@ -146,7 +145,7 @@ export default function ObjectCollision() {
         </tbody>
       </table>
 
-      <h2 id="wiring">WIRING IT IN</h2>
+      <h2 id="setup">CONNECTING IT</h2>
       <CodeBlock title="the sprite-vs-sprite lane" code={LOOP} />
       <Callout
         kind="warn"
@@ -161,7 +160,8 @@ export default function ObjectCollision() {
       <p>
         <code>cell_size</code> is a cost trade-off. Too small: many empty cells,
         grid rebuild overhead. Too big: every object ends up in the same cell
-        and the broadphase is a lie. For 32px tiles, 128 is a sane default; the{" "}
+        and the broadphase stops filtering. For 32px tiles, 128 is a
+        reasonable default; the{" "}
         <a href="/examples">comparison example</a>{" "}
         <code>spatial-cell-size-tuning.py</code> benchmarks this empirically.{" "}
         <code>cell_size</code> must be finite and positive; anything else

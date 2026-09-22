@@ -1,11 +1,3 @@
-"""
-Shared collision geometry utilities.
-
-Pure math layer used by both tile collision (tile_collision.py) and
-object collision (object_collision.py).  No runtime state — only
-deterministic functions and data types.
-"""
-
 from __future__ import annotations
 
 import math
@@ -17,25 +9,15 @@ from ..parser.collision import CapsuleShape, CircleShape, CollisionPolygon, Rect
 
 @dataclass(slots=True)
 class CollisionInfo:
-    """Low-level collision result from a narrow-phase test."""
-
-    normal: tuple[float, float]  # Separation direction
-    depth: float  # Penetration depth
+    normal: tuple[float, float]
+    depth: float
 
 
 def aabb_overlap(
     bounds1: tuple[float, float, float, float],
     bounds2: tuple[float, float, float, float],
 ) -> bool:
-    """
-    Fast AABB overlap test (broadphase).
-
-    Bounds are (left, top, right, bottom).
-
-    Important: edge-touching counts as collision.  This is intentional
-    to avoid floating-point gap issues and keeps broadphase / narrowphase
-    semantics consistent.
-    """
+    """Edge-touching counts, matching narrowphase; avoids float gaps."""
     l1, t1, r1, b1 = bounds1
     l2, t2, r2, b2 = bounds2
     return not (r1 < l2 or r2 < l1 or b1 < t2 or b2 < t1)
@@ -46,16 +28,6 @@ def get_shape_aabb(
     y: float,
     shape: Union[RectangleShape, CircleShape, CollisionPolygon, CapsuleShape],
 ) -> tuple[float, float, float, float]:
-    """
-    Return AABB (left, top, right, bottom) for any supported shape.
-
-    Parameters
-    ----------
-    x, y : float
-        World-space origin of the shape's owner.
-    shape : RectangleShape | CircleShape | CollisionPolygon | CapsuleShape
-        The collision shape to compute bounds for.
-    """
     if isinstance(shape, RectangleShape):
         left = x + shape.offset[0]
         top = y + shape.offset[1]
@@ -73,7 +45,6 @@ def get_shape_aabb(
         r = shape.radius
         return (ox - r, oy - r, ox + r, oy + shape.height + r)
 
-    # CollisionPolygon — min / max over all vertices
     if isinstance(shape, CollisionPolygon):
         ox = x
         oy = y
@@ -102,19 +73,14 @@ def circle_vs_circle(
     c2_center: tuple[float, float],
     c2_radius: float,
 ) -> Optional[CollisionInfo]:
-    """
-    Circle-circle collision detection.
-
-    Returns CollisionInfo with normal pointing from c1 to c2, or None.
-    Edge-touching counts as collision (depth=0).
-    """
+    """Normal c1 to c2; edge-touching counts (depth 0)."""
     dx = c2_center[0] - c1_center[0]
     dy = c2_center[1] - c1_center[1]
     dist_sq = dx * dx + dy * dy
     radius_sum = c1_radius + c2_radius
 
     if dist_sq > radius_sum * radius_sum:
-        return None  # separated
+        return None
 
     dist = math.sqrt(dist_sq)
     if dist < 0.0001:
@@ -129,13 +95,7 @@ def rect_vs_rect(
     r1_bounds: tuple[float, float, float, float],
     r2_bounds: tuple[float, float, float, float],
 ) -> Optional[CollisionInfo]:
-    """
-    AABB-AABB collision detection.
-
-    Returns CollisionInfo with normal pointing from r1 to r2, or None.
-    Chooses the axis with minimum penetration for separation.
-    Edge-touching counts as collision (depth=0).
-    """
+    """Normal r1 to r2 along min penetration; edge-touching counts (depth 0)."""
     if not aabb_overlap(r1_bounds, r2_bounds):
         return None
 
@@ -160,13 +120,7 @@ def rect_vs_circle(
     circle_center: tuple[float, float],
     circle_radius: float,
 ) -> Optional[CollisionInfo]:
-    """
-    AABB-circle collision detection.
-
-    Returns CollisionInfo with normal pointing from rect to circle, or None.
-    Handles circle-center-inside-rect using minimal translation distance.
-    Edge-touching counts as collision (depth=0).
-    """
+    """Normal rect to circle; center-inside uses min translation."""
     l, t, r, b = rect_bounds
     cx, cy = circle_center
 
@@ -178,12 +132,11 @@ def rect_vs_circle(
     dist_sq = dx * dx + dy * dy
 
     if dist_sq > circle_radius * circle_radius:
-        return None  # no collision
+        return None
 
     dist = math.sqrt(dist_sq)
 
     if dist < 0.0001:
-        # Circle center inside rect — minimal translation distance
         dist_left = cx - l
         dist_right = r - cx
         dist_top = cy - t
@@ -210,15 +163,10 @@ def rect_vs_circle(
     return CollisionInfo(normal=normal, depth=depth)
 
 
-# ---------------------------------------------------------------------------
-# Polygon collision (SAT-based)
-# ---------------------------------------------------------------------------
-
 def _project_polygon(
     vertices: List[tuple[float, float]],
     axis: tuple[float, float],
 ) -> tuple[float, float]:
-    """Project all vertices onto an axis, return (min, max)."""
     ax, ay = axis
     dot = vertices[0][0] * ax + vertices[0][1] * ay
     proj_min = proj_max = dot
@@ -234,7 +182,6 @@ def _project_polygon(
 def _polygon_center(
     vertices: List[tuple[float, float]],
 ) -> tuple[float, float]:
-    """Compute centroid of a polygon."""
     n = len(vertices)
     cx = sum(v[0] for v in vertices) / n
     cy = sum(v[1] for v in vertices) / n
@@ -245,19 +192,10 @@ def polygon_vs_polygon(
     p1_vertices: List[tuple[float, float]],
     p2_vertices: List[tuple[float, float]],
 ) -> Optional[CollisionInfo]:
-    """
-    Convex polygon-polygon collision using the Separating Axis Theorem (SAT).
-
-    Note: Polygons must be convex.  No validation is performed — the caller
-    (editor) guarantees convexity.
-
-    Returns CollisionInfo with normal pointing from p1 toward p2, or None.
-    Edge-touching counts as collision (depth=0).
-    """
+    """SAT, convex only (caller guarantees, no validation); normal p1 to p2."""
     n1 = len(p1_vertices)
     n2 = len(p2_vertices)
 
-    # Compute centers once for normal orientation
     c1x = sum(v[0] for v in p1_vertices) / n1
     c1y = sum(v[1] for v in p1_vertices) / n1
     c2x = sum(v[0] for v in p2_vertices) / n2
@@ -268,7 +206,6 @@ def polygon_vs_polygon(
     min_overlap = float("inf")
     best_axis: Optional[tuple[float, float]] = None
 
-    # Test edge normals from p1
     for i in range(n1):
         j = (i + 1) % n1
         ex = p1_vertices[j][0] - p1_vertices[i][0]
@@ -277,23 +214,21 @@ def polygon_vs_polygon(
         if edge_len < 0.0001:
             continue
 
-        # Perpendicular axis (outward)
         ax = -ey / edge_len
         ay = ex / edge_len
 
         min1, max1 = _project_polygon(p1_vertices, (ax, ay))
         min2, max2 = _project_polygon(p2_vertices, (ax, ay))
 
-        # Check overlap (touching counts)
+        # Touching counts as overlap.
         if max1 < min2 or max2 < min1:
-            return None  # separating axis found
+            return None
 
         overlap = min(max1, max2) - max(min1, min2)
         if overlap < min_overlap:
             min_overlap = overlap
             best_axis = (ax, ay)
 
-    # Test edge normals from p2
     for i in range(n2):
         j = (i + 1) % n2
         ex = p2_vertices[j][0] - p2_vertices[i][0]
@@ -317,10 +252,9 @@ def polygon_vs_polygon(
             best_axis = (ax, ay)
 
     if best_axis is None:
-        # Degenerate case: all edges too short, treat as collision
+        # All edges degenerate; treat as touching.
         return CollisionInfo(normal=(1.0, 0.0), depth=0.0)
 
-    # Ensure normal points from p1 toward p2
     ax, ay = best_axis
     if ax * to_c2_x + ay * to_c2_y < 0:
         ax = -ax
@@ -332,7 +266,6 @@ def polygon_vs_polygon(
 def _point_in_polygon(
     px: float, py: float, vertices: List[tuple[float, float]]
 ) -> bool:
-    """Ray-casting point-in-polygon test."""
     n = len(vertices)
     inside = False
     j = n - 1
@@ -352,7 +285,6 @@ def _closest_point_on_segment(
     ax: float, ay: float,
     bx: float, by: float,
 ) -> tuple[float, float]:
-    """Find closest point on segment AB to point P."""
     abx = bx - ax
     aby = by - ay
     ab_len_sq = abx * abx + aby * aby
@@ -367,14 +299,7 @@ def polygon_vs_circle(
     circle_center: tuple[float, float],
     circle_radius: float,
 ) -> Optional[CollisionInfo]:
-    """
-    Convex polygon-circle collision.
-
-    Note: Polygon must be convex.
-
-    Returns CollisionInfo with normal pointing from polygon toward circle,
-    or None.  Edge-touching counts as collision (depth=0).
-    """
+    """Convex only (caller guarantees); normal polygon to circle."""
     cx, cy = circle_center
     r = circle_radius
 
@@ -405,7 +330,7 @@ def polygon_vs_circle(
                 best_normal_x = dx / dist
                 best_normal_y = dy / dist
             else:
-                # Degenerate: circle center on edge — use edge normal
+                # Center on edge: fall back to edge normal.
                 ex = bx - ax
                 ey = by - ay
                 edge_len = math.sqrt(ex * ex + ey * ey)
@@ -417,7 +342,6 @@ def polygon_vs_circle(
                     best_normal_y = 0.0
 
     if inside:
-        # Circle center inside polygon — depth = radius + distance to edge
         depth = r + math.sqrt(min_dist_sq)
     else:
         if min_dist_sq > r * r:
@@ -434,27 +358,17 @@ def polygon_vs_rect(
     poly_vertices: List[tuple[float, float]],
     rect_bounds: tuple[float, float, float, float],
 ) -> Optional[CollisionInfo]:
-    """
-    Convex polygon-rectangle (AABB) collision.
-
-    Converts rect to a 4-vertex polygon and delegates to polygon_vs_polygon.
-    Normal points from polygon toward rect.
-    """
+    """Rect as 4-vertex polygon; delegates to polygon_vs_polygon."""
     l, t, r, b = rect_bounds
     rect_verts: List[tuple[float, float]] = [(l, t), (r, t), (r, b), (l, b)]
     return polygon_vs_polygon(poly_vertices, rect_verts)
 
-
-# ---------------------------------------------------------------------------
-# Capsule collision
-# ---------------------------------------------------------------------------
 
 def _segment_closest_point_to_point(
     ax: float, ay: float,
     bx: float, by: float,
     px: float, py: float,
 ) -> tuple[float, float]:
-    """Closest point on segment AB to point P."""
     abx = bx - ax
     aby = by - ay
     ab_len_sq = abx * abx + aby * aby
@@ -469,11 +383,6 @@ def _segment_closest_point_to_aabb(
     bx: float, by: float,
     l: float, t: float, r: float, b: float,
 ) -> tuple[float, float, float]:
-    """
-    Closest point on segment AB to AABB (l,t,r,b).
-
-    Returns (closest_x, closest_y, distance_squared).
-    """
     abx = bx - ax
     aby = by - ay
     ab_len_sq = abx * abx + aby * aby
@@ -510,11 +419,6 @@ def _segments_closest_points(
     a1x: float, a1y: float, a2x: float, a2y: float,
     b1x: float, b1y: float, b2x: float, b2y: float,
 ) -> tuple[tuple[float, float], tuple[float, float], float]:
-    """
-    Closest points between two segments and distance² between them.
-
-    Returns ((pa_x, pa_y), (pb_x, pb_y), dist_sq).
-    """
     d1x = a2x - a1x
     d1y = a2y - a1y
     d2x = b2x - b1x
@@ -523,20 +427,18 @@ def _segments_closest_points(
     d1_len_sq = d1x * d1x + d1y * d1y
     d2_len_sq = d2x * d2x + d2y * d2y
 
-    # Both degenerate — closest points are the segment starts
+    # Both points.
     if d1_len_sq < 0.0001 and d2_len_sq < 0.0001:
         dx = b1x - a1x
         dy = b1y - a1y
         return (a1x, a1y), (b1x, b1y), dx * dx + dy * dy
 
-    # First degenerate (point)
     if d1_len_sq < 0.0001:
         px, py = _segment_closest_point_to_point(b1x, b1y, b2x, b2y, a1x, a1y)
         dx = px - a1x
         dy = py - a1y
         return (a1x, a1y), (px, py), dx * dx + dy * dy
 
-    # Second degenerate (point)
     if d2_len_sq < 0.0001:
         px, py = _segment_closest_point_to_point(a1x, a1y, a2x, a2y, b1x, b1y)
         dx = px - b1x
@@ -554,7 +456,6 @@ def _segments_closest_points(
 
     det = a * c - b * b
     if det < 0.0001:
-        # Parallel — check all endpoint-edge combinations
         best_dsq = float("inf")
         best_p = (a1x, a1y)
         best_q = (b1x, b1y)
@@ -595,11 +496,7 @@ def capsule_vs_circle(
     circle_center: tuple[float, float],
     circle_radius: float,
 ) -> Optional[CollisionInfo]:
-    """
-    Capsule-circle collision.
-
-    Normal points from capsule toward circle.
-    """
+    """Normal capsule toward circle."""
     px, py = _segment_closest_point_to_point(
         cap_p1[0], cap_p1[1], cap_p2[0], cap_p2[1],
         circle_center[0], circle_center[1],
@@ -618,11 +515,7 @@ def capsule_vs_capsule(
     q2: tuple[float, float],
     r2: float,
 ) -> Optional[CollisionInfo]:
-    """
-    Capsule-capsule collision.
-
-    Normal points from capsule A (p1-p2) toward capsule B (q1-q2).
-    """
+    """Normal A toward B."""
     (pa_x, pa_y), (pb_x, pb_y), _ = _segments_closest_points(
         p1[0], p1[1], p2[0], p2[1],
         q1[0], q1[1], q2[0], q2[1],
@@ -639,13 +532,7 @@ def capsule_vs_rect(
     cap_radius: float,
     rect_bounds: tuple[float, float, float, float],
 ) -> Optional[CollisionInfo]:
-    """
-    Capsule-rectangle (AABB) collision.
-
-    Finds closest point on capsule segment to rect, then delegates to
-    rect_vs_circle.  Normal points from capsule toward rect (flipped
-    from rect_vs_circle output).
-    """
+    """Closest segment point to rect, then rect_vs_circle; flipped."""
     px, py, _ = _segment_closest_point_to_aabb(
         cap_p1[0], cap_p1[1], cap_p2[0], cap_p2[1],
         rect_bounds[0], rect_bounds[1], rect_bounds[2], rect_bounds[3],
@@ -665,10 +552,7 @@ def _segment_closest_point_to_polygon(
     vertices: List[tuple[float, float]],
 ) -> tuple[float, float, float]:
     """
-    Closest point on segment AB to convex polygon and distance squared.
-
-    Checks segment endpoints, projected polygon vertices, and
-    segment-to-edge pairs.  O(n²) but polygons are small.
+    Endpoints, projected vertices, segment pairs; small-n O(n²).
     """
     abx = bx - ax
     aby = by - ay
@@ -680,13 +564,11 @@ def _segment_closest_point_to_polygon(
     best_y = ay
 
     def _dist_to_poly_sq(px: float, py: float) -> float:
-        """Minimum distance² from point to any polygon edge (0 if inside)."""
         inside = True
         min_dsq = float("inf")
         for i in range(n):
             vax, vay = vertices[i]
             vbx, vby = vertices[(i + 1) % n]
-            # Edge normal direction check for inside test
             ex = vbx - vax
             ey = vby - vay
             nx = -ey
@@ -737,13 +619,7 @@ def capsule_vs_polygon(
     cap_radius: float,
     poly_vertices: List[tuple[float, float]],
 ) -> Optional[CollisionInfo]:
-    """
-    Capsule-convex-polygon collision.
-
-    Finds closest point on capsule segment to polygon, then delegates to
-    polygon_vs_circle.  Normal points from capsule toward polygon
-    (flipped from polygon_vs_circle output).
-    """
+    """Closest segment point to polygon, then polygon_vs_circle; flipped."""
     px, py, _ = _segment_closest_point_to_polygon(
         cap_p1[0], cap_p1[1], cap_p2[0], cap_p2[1],
         poly_vertices,

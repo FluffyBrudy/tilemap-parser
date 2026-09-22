@@ -35,7 +35,7 @@ const DIAGRAM_NODES: FlowNode[] = [
     w: 256,
     h: 80,
     title: "PhysicsWorld",
-    lines: ["owns the tile layer", "bodies + tile size"],
+    lines: ["holds the tile layer", "bodies + tile size"],
     accent: "teal",
     link: "#world",
   },
@@ -111,12 +111,12 @@ const READING_ORDER = [
   {
     to: "#world",
     label: "world.py",
-    text: "the space. It owns the tile layer, the tileset collision data and the bodies; nothing moves here.",
+    text: "the space. It holds the tile layer, the tileset collision data and the bodies; nothing moves here.",
   },
   {
     to: "#player",
     label: "player.py",
-    text: "the sprite contract. A plain class with the attributes every movement function reads, plus procedural art.",
+    text: "the fields your sprite needs. A plain class with the attributes every movement function reads, plus procedural art.",
   },
   {
     to: "#crate",
@@ -235,8 +235,8 @@ python main.py`}
       </ol>
       <p>
         Then the two guides this example builds on:{" "}
-        <Link to="/physics">Physics &amp; Bodies</Link> for the object
-        contract and <Link to="/runner">CollisionRunner</Link> for the
+        <Link to="/physics">Physics &amp; Bodies</Link> for the required
+        sprite fields and <Link to="/runner">CollisionRunner</Link> for the
         movement presets. The{" "}
         <a
           href={`${REPO}/tree/main/examples/full-physics-world`}

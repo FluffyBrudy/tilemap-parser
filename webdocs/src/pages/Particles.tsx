@@ -7,7 +7,7 @@ export default function Particles() {
       <h1>Particles: visual effects</h1>
       <p>
         One config per effect, one <code>ParticleSystem</code> per emitter. A
-        system owns exactly one emitter; for two effects you build two
+        system has exactly one emitter; for two effects you build two
         systems. Configs come from the tilemap-editor's particle JSON or are
         built by hand with <code>ParticleSystemConfig</code>.
       </p>
@@ -56,7 +56,7 @@ snow.draw(screen, camera_x, camera_y, 1.0)`}
 
       <h2 id="kinds">TWO WAYS TO SPEND THE AREA RECT</h2>
       <p>
-        The area rect is simply the rect where <em>new particles spawn</em>.
+        The area rect is the rect where <em>new particles spawn</em>.
         What it should be depends on the effect you want.
       </p>
       <ul>
@@ -105,7 +105,7 @@ spark.draw(screen, cam.x, cam.y, 1.0)`}
       <p>
         Same config, same loop — only the rectangle changes. Map rect makes
         the effect stay in place; screen rect makes it travel with the camera;
-        a zero rect means "no new particles, just finish the ones alive".
+        a zero rect means "no new particles, finish the ones alive".
       </p>
 
       <h2 id="setup">LOADING AND BUILDING</h2>
@@ -228,7 +228,7 @@ for parsed in parse_nodes_file("data/map.nodes.json"):
         The three modes above are for one-off or streaming particles. Fog,
         haze, and dust are different: they should <em>already be there</em> and
         only drift. That's what <code>ParticleField</code> is for — it creates
-        the sheets once, then just moves them. Nothing is ever created or
+        the sheets once, then moves them. Nothing is ever created or
         destroyed, so the fog never flickers and costs almost nothing per
         frame.
       </p>
@@ -470,7 +470,7 @@ fog.draw(screen)`}
             <td>
               <p>
                 <code>0</code> (default) = normal soft alpha. Overlapping sheets
-                just look denser. This is the option for atmosphere: fog, mist,
+                look denser. This is the option for atmosphere: fog, mist,
                 haze.
               </p>
               <p>
@@ -506,7 +506,7 @@ fog.draw(screen)`}
       <p>
         One layer reads flat: same size, same speed, same alpha — a uniform
         haze. Run three stacked layers, each with its own size, speed and
-        alpha, and the eye reads depth. The working recipe:
+        alpha, and the eye reads depth. The example that works:
       </p>
       <table>
         <thead>
@@ -544,10 +544,10 @@ fog.draw(screen)`}
       </table>
       <p>
         Wrap preserves each sheet's y-offset forever, so sheets that share a
-        speed stay aligned as coherent rows or streaks — the giveaway that it
-        is particles. Spreading speeds and sizes <em>across</em> layers is what
-        dissolves that. The recipe below is a known-good fog; start from it and
-        only touch the dials you care about.
+        speed stay aligned as coherent rows or streaks — the sign it
+        is made of particles. Spreading speeds and sizes <em>across</em> layers is what
+        dissolves that. The example below is tested fog; start from it and
+        only change the settings you care about.
       </p>
       <CodeBlock
         title="layered fog"
@@ -569,7 +569,7 @@ fog.update(dt)
 fog.draw(screen, 0, 0, 1)`}
       />
       <Callout kind="tip" title="FOG_PROFILE IS A STARTING POINT">
-        <code>FOG_PROFILE</code> is just data. Copy it, edit the numbers, and
+        <code>FOG_PROFILE</code> is data. Copy it, edit the numbers, and
         you have your own mood — dust, ash, underwater shimmer. Starting
         points: light mist — halve <code>global_alpha</code>; heavy fog — raise{" "}
         <code>density</code>; dust — watch the wind and use a generic field.
@@ -577,7 +577,7 @@ fog.draw(screen, 0, 0, 1)`}
 
       <h3 id="generic-field">GENERIC CONTINUOUS FIELDS</h3>
       <p>
-        Fog is only a preset. For dust, pollen, ash, or magic haze, use{" "}
+        Fog is only a preset. For dust, pollen, ash, or glowing haze, use{" "}
         <code>ParticleField</code> without a profile — it still fills once and
         wraps forever, and you pick the shape, alpha, density, size and motion.
       </p>
@@ -657,7 +657,7 @@ dust.draw(screen)`}
         A few hundred big sheets still means per-pixel work every frame. Fog is
         a soft blur anyway, so render it into a half-resolution buffer and
         upscale once — a quarter of the blit area, visually identical. This is
-        a rendering recipe, not a <code>ParticleField</code> responsibility:
+        a rendering pattern, not a <code>ParticleField</code> responsibility:
       </p>
       <CodeBlock
         title="natural atmosphere"
@@ -671,7 +671,7 @@ scaled = pygame.transform.smoothscale(mist_buffer, (W, H))
 screen.blit(scaled, (0, 0))         # plain alpha composite`}
       />
       <p>
-        If you want the fog to <em>add light</em> instead of just tint —
+        If you want the fog to <em>add light</em> instead of tinting —
         glowing haze in a dark scene — swap the buffer to plain RGB and
         composite additively. The fog then brightens the scene where it lies
         instead of occluding it.
@@ -694,10 +694,10 @@ screen.blit(scaled, (0, 0), special_flags=pygame.BLEND_RGB_ADD)`}
 
       <h3 id="manual-field">MANUAL FIELDS</h3>
       <p>
-        <code>ParticleField</code> is a friendly wrapper around the primitive.
-        If you need full control, build the contract yourself:{" "}
-        <code>wrap=True</code>, <code>spawn_rate=0</code>, fill once with{" "}
-        <code>emit_field()</code>, then update and draw normally.
+        <code>ParticleField</code> is a helper around the low-level setup.
+        If you need full control, create the <code>ParticleSystemConfig</code>{" "}
+        directly: <code>wrap=True</code>, <code>spawn_rate=0</code>, fill once
+        with <code>emit_field()</code>, then update and draw normally.
       </p>
       <CodeBlock
         title="manual field"

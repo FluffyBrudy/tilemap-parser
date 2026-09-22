@@ -13,7 +13,7 @@ const BLOCK_NODES: FlowNode[] = [
     w: 256,
     h: 80,
     title: "build_scene()",
-    lines: ["hand-rolled tile layer", "loads tileset collision"],
+    lines: ["manually built tile layer", "loads tileset collision"],
     accent: "amber",
   },
   {
@@ -196,7 +196,7 @@ export default function Pipeline() {
     <div className="content">
       <h1>The Pipeline: one world, one runner</h1>
       <p>
-        The entire flow in one readable script: load map → build the world →
+        The entire flow in one clear script: load map → build the world →
         attach the runner → move the player → push a kinematic crate → draw
         everything. This is the update loop from{" "}
         <code>docs/physics-world.md</code>, assembled exactly as the examples
@@ -220,8 +220,8 @@ export default function Pipeline() {
               <code>build_scene()</code>
             </td>
             <td>
-              Hand-rolls the collision tile layer and loads the tileset
-              collision. The world owns tiles, geometry and bodies.{" "}
+              Builds the collision tile layer by hand and loads the tileset
+              collision. The world holds tiles, geometry and bodies.{" "}
               <code>add_body</code> is what makes crates solid.
             </td>
           </tr>
@@ -298,8 +298,8 @@ export default function Pipeline() {
         </li>
       </ul>
       <Callout kind="tip" title="FROM HERE">
-        The full object contract and each <code>move_*</code>'s input model are
-        on <a href="/physics">Physics &amp; Bodies</a>. Tunables and presets
+        The required sprite fields and what each <code>move_*</code> reads
+        are on <a href="/physics">Physics &amp; Bodies</a>. Tunables and presets
         live on the <a href="/runner">CollisionRunner guide</a>.
       </Callout>
     </div>
