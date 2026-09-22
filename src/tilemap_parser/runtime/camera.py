@@ -18,11 +18,14 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import pygame
 
 from ..utils.geometry import get_shape_aabb
+
+if TYPE_CHECKING:
+    from .map_loader import TilemapData
 
 
 class Camera:
@@ -58,7 +61,7 @@ class Camera:
         self.mode = mode
         self.target = None
         self.lerp_speed = 0.0
-        self.bounds = None
+        self.bounds: tuple[float, float, float, float] | None = None
 
         if mode == "deadzone":
             dw = viewport_width * 0.5
@@ -84,6 +87,22 @@ class Camera:
         (any sprite managed by the collision runner satisfies this).
         """
         self.target = target
+
+    def set_bounds(
+        self,
+        min_x: float,
+        min_y: float,
+        max_x: float,
+        max_y: float,
+    ) -> Camera:
+        self.bounds = (min_x, min_y, max_x, max_y)
+        return self
+
+    def set_bounds_from_map(self, tilemap_data: TilemapData) -> Camera:
+        tw, th = tilemap_data.tile_size
+        mw, mh = tilemap_data.map_size
+        rs = tilemap_data.render_scale
+        return self.set_bounds(0.0, 0.0, float(mw * int(tw * rs)), float(mh * int(th * rs)))
 
     def shake(self, duration: float, intensity: float) -> None:
         """Trigger a screen-shake effect.
@@ -122,8 +141,14 @@ class Camera:
         # Bounds clamp
         if self.bounds is not None:
             min_x, min_y, max_x, max_y = self.bounds
-            self.x = max(min_x, min(self.x, max_x - self.viewport_w))
-            self.y = max(min_y, min(self.y, max_y - self.viewport_h))
+            if max_x - min_x < self.viewport_w:
+                self.x = min_x - (self.viewport_w - (max_x - min_x)) / 2
+            else:
+                self.x = max(min_x, min(self.x, max_x - self.viewport_w))
+            if max_y - min_y < self.viewport_h:
+                self.y = min_y - (self.viewport_h - (max_y - min_y)) / 2
+            else:
+                self.y = max(min_y, min(self.y, max_y - self.viewport_h))
 
         # Shake
         if self._shake_timer > 0:

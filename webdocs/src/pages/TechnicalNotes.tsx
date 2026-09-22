@@ -48,7 +48,7 @@ export default function TechnicalNotes() {
         </li>
       </ul>
 
-      <h2 id="modes">BODY MODES ARE PROMISES</h2>
+      <h2 id="modes">BODY MODES ARE SETTINGS</h2>
       <p>
         <code>"static"</code> and <code>"kinematic"</code> do not imply
         physics-engine dynamics. Velocity is scripted, Godot{" "}
@@ -60,19 +60,21 @@ export default function TechnicalNotes() {
       <h2 id="oneway">ONE-WAY, PRECISELY</h2>
       <ul>
         <li>
-          Only <code>move_platformer</code> and{" "}
-          <code>move_platformer_with_slide</code> honor <code>one_way</code>{" "}
-          polygons (block from above, pass from below).
+          <code>move_platformer</code> and{" "}
+          <code>move_platformer_with_slide</code> handle <code>one_way</code>{" "}
+          polygons (block from above, pass from below);{" "}
+          <code>move_grounded</code> does the same when called with{" "}
+          <code>one_way=&quot;directional&quot;</code>.
         </li>
         <li>
-          The flag is <strong>authored in the collision JSON</strong>, per
-          polygon — never in the map JSON, and never auto-detected. Control is
-          authoring-level only: there is no runtime per-sprite "make platforms
-          solid" override. Your levers are the JSON flag and the movement
-          method you call.
+          The flag is <strong>set in the collision JSON</strong>, per
+          polygon — never in the map JSON, and never auto-detected. There is
+          no per-sprite "make platforms solid" switch at runtime. You control
+          this with two settings: the JSON flag and which movement function
+          you call.
         </li>
         <li>
-          Gating is approach-based: a one-way polygon blocks only when the
+          How one-way blocking works: a one-way polygon blocks only when the
           sprite is <em>falling</em> (<code>vy &gt; 0</code>) and its previous
           bottom was above the platform top — fast falls can't tunnel, and
           jumping up through always passes.
@@ -83,7 +85,7 @@ export default function TechnicalNotes() {
         </li>
         <li>
           <code>move_grounded</code> treats one-way polygons as plain solid
-          geometry.
+          geometry by default (<code>one_way=&quot;solid&quot;</code>).
         </li>
         <li>Bodies are never one-way; they block from every direction.</li>
         <li>
@@ -94,7 +96,7 @@ export default function TechnicalNotes() {
         </li>
       </ul>
 
-      <h2 id="velocity">VELOCITY CONTRACT, RECAP</h2>
+      <h2 id="velocity">EXPLICIT VELOCITY, RECAP</h2>
       <p>
         Physics modes with <code>velocity=(vx, vy)</code>: skip
         gravity/input/jump, adopt the velocity onto the sprite, zero{" "}
@@ -164,15 +166,15 @@ export default function TechnicalNotes() {
         it; if you can move it, it can be pushed.
       </p>
 
-      <h2 id="gid">GID OWNERSHIP IS A RANGE TEST, NOT A SUBTRACTION</h2>
+      <h2 id="gid">GID LOOKUP IS A RANGE TEST, NOT A SUBTRACTION</h2>
       <p>
         With <code>use_gids=True</code>, tile ids are{" "}
         <code>firstgid + local_variant</code> per grid resource. Collision
         files stay local-keyed. Resolving a gid therefore never does a blind{" "}
         <code>gid - firstgid_of_owner</code>: the world first finds which grid
-        resource's window <code>[firstgid, firstgid+count)</code> owns the id,
-        rejects ids owned by non-collision resources (decoration grids), and
-        only then subtracts. This kills cross-tileset aliasing — e.g. gid{" "}
+        resource's window <code>[firstgid, firstgid+count)</code> holds the
+        id, rejects ids held by non-collision resources (decoration grids),
+        and only then subtracts. This stops cross-tileset aliasing — e.g. gid{" "}
         <code>1813 - 90 = 1723</code> must not light up jungle-local key 1723.
         See <a href="/runner#gid-routing">GID routing</a> on the runner page.
       </p>

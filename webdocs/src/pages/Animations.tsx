@@ -6,6 +6,10 @@ export default function Animations() {
     <div className="content">
       <h1>Animations: frame-based sprites</h1>
       <p>
+        <a href="/animations/tile-clips">Tile Clips →</a> per-cell tile animations
+        from <code>*.tanim.json</code> sidecars (docs moved there).
+      </p>
+      <p>
         The animation system is two objects and one rule.{" "}
         <code>SpriteAnimationSet</code> holds the parsed clips and the loaded
         spritesheet; <code>AnimationPlayer</code> is a pure frame clock that
@@ -52,7 +56,7 @@ player = AnimationPlayer(anim_set, "idle")   # animation_name is REQUIRED`}
 
       <h2 id="playback">PLAYBACK: ONE CALL PER FRAME</h2>
       <p>
-        Advance the clock, grab the frame image, draw it. The player owns no
+        Advance the clock, grab the frame image, draw it. The player has no
         position. You decide where to blit.
       </p>
       <CodeBlock
@@ -108,7 +112,7 @@ if player.animation_name != target:
 
       <h2 id="anchoring">ANCHORING AND PIXEL-PERFECT DRAW</h2>
       <p>
-        Frames are cut from the spritesheet on a grid, honoring the library's{" "}
+        Frames are cut from the spritesheet on a grid, using the library's{" "}
         <code>tile_size</code> and <code>grid_offset</code>. If the JSON enables{" "}
         <code>trim_transparent</code>, each frame is trimmed to its content. Use{" "}
         <code>get_content_bounds()</code> to ask where the visible pixels are,

@@ -155,8 +155,8 @@ export default function Home() {
 
       <h2 id="what">WHAT YOU GET</h2>
       <p>
-        Everything hangs off one spine: load data, build a world, resolve
-        movement through the runner. The rooms below are the whole engine.
+        Everything follows one flow: load data, build a world, resolve
+        movement through the runner. The sections below are the whole engine.
       </p>
       <FlowDiagram title="engine map" nodes={MAP_NODES} edges={MAP_EDGES} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -183,7 +183,7 @@ export default function Home() {
         </li>
         <li>
           <Link to="/physics">Physics & Bodies</Link>: collision, explained
-          without the fog of war. Includes the sliding-box walkthrough.
+          directly. Includes the sliding-box walkthrough.
         </li>
         <li>
           <Link to="/pipeline">The Pipeline</Link>: map → world → runner →

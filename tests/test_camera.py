@@ -2,6 +2,7 @@
 Tests for Camera.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 from tilemap_parser.parser.collision import RectangleShape
 from tilemap_parser.runtime.camera import Camera
+from tilemap_parser.runtime.map_loader import TilemapData
 
 
 class MockTarget:
@@ -332,3 +334,63 @@ class TestCameraEdgeCases:
         """Centered mode has no deadzone rect."""
         cam = Camera(800, 600, mode="centered")
         assert cam.deadzone is None
+
+
+# ------------------------------------------------------------------
+# Bounds helpers
+# ------------------------------------------------------------------
+
+
+def _write_map(data_dir: Path, name: str = "test_map.json"):
+    payload = {
+        "meta": {
+            "tile_size": "32;32",
+            "map_size": "10;8",
+            "initial_map_size": "10;8",
+            "render_scale": 1.0,
+            "scroll": "0;0",
+            "version": "1.1",
+        },
+        "resources": {"tilesets": []},
+        "project_state": {"rules": [], "groups": []},
+        "data": {"layers": []},
+    }
+    mp = data_dir / name
+    with open(mp, "w") as f:
+        json.dump(payload, f, indent=2)
+    return mp
+
+
+class TestCameraSetBounds:
+    def test_set_bounds_returns_self(self):
+        cam = Camera(800, 600, mode="centered")
+        assert cam.set_bounds(0, 0, 1600, 1200) is cam
+        assert cam.bounds == (0, 0, 1600, 1200)
+
+    def test_set_bounds_from_map(self, tmp_path):
+        mp = _write_map(tmp_path)
+        td = TilemapData.load(mp)
+        cam = Camera(800, 600, mode="centered")
+        assert cam.set_bounds_from_map(td) is cam
+        assert cam.bounds == (0.0, 0.0, 320.0, 256.0)
+
+    def test_set_bounds_from_map_with_offset(self, tmp_path):
+        mp = _write_map(tmp_path)
+        td = TilemapData.load(mp, offset_tiles=(0, 5))
+        cam = Camera(800, 600, mode="centered")
+        cam.set_bounds_from_map(td)
+        assert cam.bounds == (0.0, 0.0, 320.0, 416.0)
+        target = MockTarget(x=160, y=400)
+        cam.follow(target)
+        cam.update(0.016)
+        assert cam.x == pytest.approx(0 - (800 - 320) / 2)
+        assert cam.y == pytest.approx(0 - (600 - 416) / 2)
+
+    def test_small_map_centers(self):
+        cam = Camera(800, 600, mode="centered")
+        cam.set_bounds(0, 0, 320, 256)
+        target = MockTarget(x=160, y=128)
+        cam.follow(target)
+        cam.update(0.016)
+        assert cam.x == pytest.approx(0 - (800 - 320) / 2)
+        assert cam.y == pytest.approx(0 - (600 - 256) / 2)

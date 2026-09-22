@@ -11,7 +11,7 @@ import pytest
 
 import pygame
 
-from tilemap_parser.parser.particle import ParticleSystemConfig
+from tilemap_parser.parser.particle import EmitterTiming, ParticleSystemConfig
 from tilemap_parser.runtime.particles import (
     FOG_PROFILE,
     FieldLayerSpec,
@@ -599,3 +599,206 @@ class TestParticleField:
     def test_invalid_direction_string_errors(self):
         with pytest.raises(ValueError, match="direction"):
             ParticleField(area=(0, 0, 200, 150), direction="up")
+
+
+class TestEditorKeyRoundTrip:
+    """Editor-authored keys (mode/burst/timing/field) survive the parser."""
+
+    def _editor_dict(self, **over):
+        d = dict(
+            emission_shape="rect",
+            particle_shape="circle",
+            particle_size_min=2,
+            particle_size_max=6,
+            spawn_rate=20,
+            max_particles=100,
+            lifetime_min=0.5,
+            lifetime_max=2.0,
+            speed_min=20,
+            speed_max=60,
+            direction=-1,
+            spread=45,
+            gravity_x=0,
+            gravity_y=30,
+            start_scale=1.0,
+            end_scale=0.3,
+            rotation_speed=0,
+            alpha_fade="fade_out",
+            wrap=False,
+            fade_peak_alpha=None,
+            mode="burst",
+            burst_count=30,
+            coverage=1.0,
+            field_quality="high",
+            ground_bias=True,
+            timing={"emitter_duration": 2.0, "start_delay": 0.5, "loop": False, "burst_interval": 0.1},
+        )
+        d.update(over)
+        return d
+
+    def test_all_editor_keys_parsed_and_round_tripped(self):
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(), name="ed")
+        assert cfg.mode == "burst"
+        assert cfg.burst_count == 30
+        assert cfg.coverage == 1.0
+        assert cfg.field_quality == "high"
+        assert cfg.ground_bias is True
+        assert cfg.timing.emitter_duration == 2.0
+        assert cfg.timing.start_delay == 0.5
+        assert cfg.timing.loop is False
+        assert cfg.timing.burst_interval == 0.1
+        again = ParticleSystemConfig.from_dict(cfg.to_dict(), name="ed")
+        assert again == cfg
+
+    def test_unknown_mode_and_quality_fall_back(self):
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(mode="party", field_quality="ultra"))
+        assert cfg.mode == "continuous"
+        assert cfg.field_quality == "medium"
+
+    def test_bad_timing_falls_back_to_defaults(self):
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(timing="nope"))
+        assert cfg.timing == EmitterTiming()
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(
+            timing={"emitter_duration": -3, "start_delay": -1, "burst_interval": -0.5}))
+        assert cfg.timing.emitter_duration == 0.0
+        assert cfg.timing.start_delay == 0.0
+        assert cfg.timing.loop is True  # absent -> default
+        assert cfg.timing.burst_interval == 0.0
+        # Non-bool loop normalizes to True, mirroring the editor.
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(timing={"loop": "yes"}))
+        assert cfg.timing.loop is True
+        cfg = ParticleSystemConfig.from_dict(self._editor_dict(timing={"loop": 0}))
+        assert cfg.timing.loop is True
+
+    def test_malformed_new_keys_fall_back_silently(self):
+        cfg = ParticleSystemConfig.from_dict(
+            self._editor_dict(burst_count="30.5", coverage="bad", field_quality=None)
+        )
+        assert cfg.burst_count == 30
+        assert cfg.coverage == 1.0
+        assert cfg.field_quality == "medium"
+
+
+class TestEmitterClock:
+    def _sys(self, **over):
+        base = dict(
+            name="clock", wrap=True, spawn_rate=60, max_particles=1000,
+            particle_size_min=4, particle_size_max=4,
+            lifetime_min=30.0, lifetime_max=30.0,
+        )
+        base.update(over)
+        return ParticleSystem(ParticleSystemConfig(**base))
+
+    def _step(self, ps, secs, area=(0, 0, 200, 200)):
+        n = int(secs / (1.0 / 60.0))
+        for _ in range(n):
+            ps.update(1.0 / 60.0, *area)
+
+    def test_default_timing_always_active(self):
+        ps = self._sys()
+        assert ps.phase == "active"
+        self._step(ps, 1.0)
+        assert ps.phase == "active"
+        assert len(ps.emitter.particles) > 0
+
+    def test_start_delay_gates_spawning(self):
+        ps = self._sys(timing=EmitterTiming(start_delay=1.0))
+        assert ps.phase == "delay"
+        self._step(ps, 0.5)
+        assert len(ps.emitter.particles) == 0
+        self._step(ps, 0.7)
+        assert ps.phase == "active"
+        assert len(ps.emitter.particles) > 0
+
+    def test_expiry_stops_spawning_without_loop(self):
+        ps = self._sys(timing=EmitterTiming(emitter_duration=0.5, loop=False))
+        self._step(ps, 1.0)
+        assert ps.phase == "expired"
+        before = len(ps.emitter.particles)
+        assert before > 0
+        self._step(ps, 0.5)
+        assert len(ps.emitter.particles) == before
+
+    def test_loop_restarts_clock(self):
+        ps = self._sys(timing=EmitterTiming(emitter_duration=0.3, loop=True))
+        self._step(ps, 0.5)
+        assert ps.phase == "active"
+        assert ps.clock < 0.3
+
+
+class TestTriggerBurst:
+    def _sys(self, **over):
+        base = dict(
+            name="burst", wrap=False, spawn_rate=0, max_particles=1000,
+            particle_size_min=4, particle_size_max=4,
+            lifetime_min=30.0, lifetime_max=30.0,
+        )
+        base.update(over)
+        return ParticleSystem(ParticleSystemConfig(**base))
+
+    def test_trigger_uses_config_burst_count(self):
+        ps = self._sys(burst_count=25)
+        assert ps.trigger_burst(0, 0, 100, 100) == 25
+
+    def test_trigger_explicit_count(self):
+        ps = self._sys()
+        assert ps.trigger_burst(0, 0, 100, 100, count=7) == 7
+
+    def test_trigger_fires_while_expired(self):
+        ps = self._sys(timing=EmitterTiming(emitter_duration=0.2, loop=False))
+        for _ in range(30):
+            ps.update(1.0 / 60.0, 0, 0, 100, 100)
+        assert ps.phase == "expired"
+        assert ps.trigger_burst(0, 0, 100, 100, count=5) == 5
+
+    def test_interval_spread_pops(self):
+        ps = self._sys(timing=EmitterTiming(burst_interval=0.1))
+        first = ps.trigger_burst(0, 0, 100, 100, count=30)
+        assert first == 3  # ceil(30/10) immediate
+        for _ in range(70):
+            ps.update(1.0 / 60.0, 0, 0, 100, 100)
+        assert len(ps.emitter.particles) == 30
+
+
+class TestRefillIfField:
+    def _sys(self, **over):
+        base = dict(
+            name="refill", wrap=True, spawn_rate=0, emission_shape="rect",
+            particle_shape="square", particle_size_min=10, particle_size_max=10,
+            speed_min=5, speed_max=10, max_particles=500,
+            lifetime_min=30.0, lifetime_max=30.0,
+        )
+        base.update(over)
+        return ParticleSystem(ParticleSystemConfig(**base))
+
+    def test_first_update_auto_fills_field(self):
+        ps = self._sys()
+        assert len(ps.emitter.particles) == 0
+        ps.update(1.0 / 60.0, 0, 0, 200, 200)
+        assert len(ps.emitter.particles) == 400  # 200*200/100, medium density
+
+    def test_non_field_never_fills(self):
+        ps = self._sys(spawn_rate=20)
+        assert ps.refill_if_field(0, 0, 200, 200) == 0
+
+    def test_ground_bias_fills_lower_band(self):
+        ps = self._sys(ground_bias=True)
+        ps.update(1.0 / 60.0, 0, 0, 200, 200)
+        assert len(ps.emitter.particles) == 260  # 200*130/100
+
+    def test_quality_scales_fill(self):
+        ps = self._sys(field_quality="low")
+        ps.update(1.0 / 60.0, 0, 0, 200, 200)
+        assert len(ps.emitter.particles) == 288  # 400 * 0.72
+
+    def test_set_config_rearms_autofill(self):
+        ps = self._sys()
+        ps.update(1.0 / 60.0, 0, 0, 200, 200)
+        assert len(ps.emitter.particles) == 400
+        ps.set_config(ParticleSystemConfig(
+            name="refill", wrap=True, spawn_rate=0, emission_shape="rect",
+            particle_shape="square", particle_size_min=10, particle_size_max=10,
+            speed_min=5, speed_max=10, max_particles=500,
+            lifetime_min=30.0, lifetime_max=30.0))
+        ps.update(1.0 / 60.0, 0, 0, 200, 200)
+        assert len(ps.emitter.particles) == 400

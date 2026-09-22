@@ -48,7 +48,7 @@ export default function ApiReference() {
             <code>TileLayerRenderer</code> and{" "}
             <code>PhysicsWorld.from_map</code>. Exposes <code>tile_size</code>,{" "}
             <code>render_scale</code>, <code>parsed</code> and{" "}
-            <code>build_tile_map()</code>. Full wiring on the{" "}
+            <code>build_tile_map()</code>. Full example on the{" "}
             <a href="/map-parsing">Map Parsing &amp; Rendering</a> page.
           </p>
         </Entry>
@@ -67,7 +67,7 @@ export default function ApiReference() {
             <code>
               {"{"} (col, row): tile_id {"}"}
             </code>{" "}
-            , the layer the runner iterates and <code>PhysicsWorld</code> owns.{" "}
+            , the layer the runner iterates and <code>PhysicsWorld</code> holds.{" "}
             <code>use_gids=True</code> keys by global tile id.
           </p>
         </Entry>
@@ -102,8 +102,32 @@ export default function ApiReference() {
             Eagerly loaded image layer: <code>image_path</code>,{" "}
             <code>image_rect: (x,y,w,h) | None</code>,{" "}
             <code>surface: Surface | None</code>. Exposed as{" "}
-            <code>TilemapData.background_layer</code> (first image layer).{" "}
-            <code>get_layers(layer_type="image")</code> lists all.
+            <code>TilemapData.background_layer</code> (first visible image
+            layer). <code>get_layers(layer_type="image")</code> lists all.
+          </p>
+        </Entry>
+        <Entry name="TilemapData.get_image_layer_surface / get_image_layer_surfaces">
+          <p>
+            Lazy <code>Surface</code> loading for any image layer (by{" "}
+            <code>ParsedLayer</code>, id, or name), with{" "}
+            <code>../../assets</code>-style paths resolved against the map
+            directory and results cached. Hidden layers are skipped unless you
+            pass <code>include_hidden=True</code>;{" "}
+            <code>copy_surface=True</code> returns a copy instead of the cached
+            view. Missing files warn and yield <code>None</code> (or raise when
+            loaded with <code>skip_missing_images=False</code>).
+          </p>
+        </Entry>
+        <Entry name="TilemapData.get_placed_image_layer_surface(layer, render_scale=1.0, include_hidden=False) → Surface | None">
+          <p>
+            Composites one surface from <code>image_rect</code> plus{" "}
+            <code>image_placements</code> (editor duplicates, paint order),
+            sized to their union and scaled by <code>render_scale</code>{" "}
+            (default <code>1.0</code>). Fresh caller-owned surface — bake
+            once, reuse. Hidden layers return <code>None</code> unless you
+            pass <code>include_hidden=True</code>; unknown layers, layers
+            without <code>image_path</code>, missing files, and layers with
+            no rects also yield <code>None</code>.
           </p>
         </Entry>
         <Entry name="TilemapData.get_object_animation(obj, render_scale=1.0) → AnimData | None">
@@ -173,7 +197,7 @@ export default function ApiReference() {
             Tile/object polygon. <code>transform(tile_x, tile_y, scale)</code>{" "}
             moves it to world space; <code>is_valid()</code> requires ≥ 3
             vertices. <code>one_way=True</code> = platform pass-through from
-            below (honored by the platformer family).
+            below (platformer movement passes through from below).
           </p>
         </Entry>
       </Group>
@@ -253,10 +277,13 @@ export default function ApiReference() {
             stops both axes.
           </p>
         </Entry>
-        <Entry name="move_grounded(sprite, tileset, tiles, dt, velocity=None, world=None)">
+        <Entry name="move_grounded(sprite, tileset, tiles, dt, velocity=None, world=None, one_way='solid')">
           <p>
             Gravity + landing. <code>velocity=(vx, vy)</code> skips gravity.
-            Ledge detection when the sprite was grounded.
+            Ledge detection when the sprite was grounded.{" "}
+            <code>one_way=&quot;directional&quot;</code> lets horizontal and
+            upward movement pass through one-way platforms while falling
+            still lands from above.
           </p>
         </Entry>
         <Entry name="move_platformer(sprite, tileset, tiles, dt, input_x=0.0, jump_pressed=False, velocity=None, world=None)">
@@ -324,8 +351,8 @@ export default function ApiReference() {
         </Entry>
         <Entry name="collides_with_body(sprite) → Body | None">
           <p>
-            First overlapping body in insertion order, self excluded, layers
-            honored. Bodies are always solid both ways.
+            First overlapping body in insertion order, self excluded, after
+            layer/mask checks. Bodies are always solid both ways.
           </p>
         </Entry>
         <Entry name="__contains__ / __len__">
@@ -345,10 +372,10 @@ export default function ApiReference() {
           </p>
         </Entry>
       </Group>
-      <Group title="Protocols: the sprite contract">
+      <Group title="Protocols: what fields your sprite needs">
         <Entry name="ICollidable / ICollidableObject / ICollidableSprite">
           <p>
-            The duck-type contracts the runner and world accept.{" "}
+            The field shapes the runner and world accept.{" "}
             <code>ICollidable</code>: <code>x</code>, <code>y</code>,{" "}
             <code>collision_shape</code>. <code>ICollidableObject</code> adds{" "}
             <code>collision_layer/mask</code>. <code>ICollidableSprite</code>{" "}
@@ -420,7 +447,7 @@ export default function ApiReference() {
           <p>
             Frame clock: <code>update(dt_ms)</code>,{" "}
             <code>get_current_image()</code>, <code>reset()</code>,{" "}
-            <code>finished</code>, <code>frame_index</code>. Honors per-frame
+            <code>finished</code>, <code>frame_index</code>. Uses per-frame
             durations and <code>loop</code>.
           </p>
         </Entry>
@@ -459,7 +486,7 @@ export default function ApiReference() {
         </Entry>
         <Entry name="ParticleSystemConfig(particle_shape, spawn_rate, max_particles, lifetime_min/max, speed_min/max, direction, spread, start_color_r/g/b/a, end_color_r/g/b/a, alpha_fade, gravity_x, gravity_y)">
           <p>
-            Low-level particle config and advanced escape hatch. Full wiring on
+            Low-level particle config and advanced option. Full example on
             the <a href="/particles">Particles</a> page.
           </p>
         </Entry>
@@ -480,8 +507,8 @@ export default function ApiReference() {
         <Entry name="NavGrid / Pathfinder / PathFollower">
           <p>
             NavGrid builds the walkable grid from a tile layer; Pathfinder
-            computes a path; PathFollower moves an entity along it. Full wiring
-            on the <a href="/pathfinding">Pathfinding</a> page and in{" "}
+            computes a path; PathFollower moves an entity along it. Full
+            example on the <a href="/pathfinding">Pathfinding</a> page and in{" "}
             <code>examples/rpg-pathfinding/main.py</code>.
           </p>
         </Entry>
@@ -504,7 +531,7 @@ export default function ApiReference() {
         </Entry>
         <Entry name="should_collide(a, b)">
           <p>
-            The mutual-agreement layer rule:{" "}
+            Both sides must allow the pair:{" "}
             <code>(a_mask &amp; b_layer) and (b_mask &amp; a_layer)</code>.
           </p>
         </Entry>

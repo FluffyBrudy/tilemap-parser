@@ -21,13 +21,71 @@ def _resolve_tile_data(
     With an attached world built via ``from_map(..., use_gids=True)`` the id
     is range-routed against the map's grid resources (decoration tilesets can
     never alias into the collision owner's local keys).  Without a world the
-    historic literal lookup applies.
+    historic literal lookup applies.  Unflipped base data only — use
+    :func:`_iter_tile_datas` for flip-aware, filtered iteration.
     """
     if tile_id is None:
+        return None
+    if isinstance(tile_id, bool):
         return None
     if world is not None:
         return world.resolve_collision(tile_id)
     return tileset_collision.tiles.get(tile_id)
+
+
+def _iter_cell_ids(cell: object) -> tuple:
+    """Gids stacked in one cell (all supported cell shapes, order kept)."""
+    from ..world import iter_cell_ids as _world_ids
+
+    return _world_ids(cell)
+
+
+def _literal_entry_data(
+    tileset_collision: TilesetCollision,
+    entry: tuple,
+) -> TileCollisionData | None:
+    """Flip-aware resolution without a world (literal gid lookup).
+
+    Transforms on the fly (no cache — the literal path is the legacy
+    fallback; the world path caches per ``(gid, flipbits)``).
+    """
+    from ..world import flipped_data
+
+    gid, flags = entry
+    base = tileset_collision.tiles.get(gid)
+    if base is None:
+        return None
+    if not flags:
+        return base
+    return flipped_data(base, flags, tileset_collision.tile_size)
+
+
+def _iter_tile_datas(world, tileset_collision: TilesetCollision, cell: object, sprite=None):
+    """Yield flip-aware collision datas for every entry stacked in one cell.
+
+    Union semantics (Godot-style): all layers contribute.  When *sprite* is
+    given, entries failing mutual layer/mask agreement
+    (``should_collide`` — same rule as bodies) are skipped, so tiles on
+    filtered physics layers never block that sprite.
+    """
+    from ..world import iter_cell_entries
+
+    if world is not None:
+        for entry in iter_cell_entries(cell):
+            data = world.resolve_stack_entry(entry)
+            if data is None:
+                continue
+            if sprite is not None and not should_collide(sprite, data):
+                continue
+            yield data
+    else:
+        for entry in iter_cell_entries(cell):
+            data = _literal_entry_data(tileset_collision, entry)
+            if data is None:
+                continue
+            if sprite is not None and not should_collide(sprite, data):
+                continue
+            yield data
 
 
 def _collides_at(
@@ -37,6 +95,7 @@ def _collides_at(
     tile_map: dict,
     margin: int = 1,
     world=None,
+    skip_one_way: bool = False,
 ) -> bool:
     """
     Check if sprite collides with any tile at its current position.
@@ -54,17 +113,17 @@ def _collides_at(
 
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if poly.is_valid() and _check_sprite_polygon_offset(
-                    sprite, poly, ox, oy, self.render_scale
-                ):
-                    return True
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if skip_one_way and poly.one_way:
+                        continue
+                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
+                        return True
     return world is not None and world.collides_with_body(sprite) is not None
 
 
@@ -90,17 +149,15 @@ def _first_colliding_shape(
 
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if poly.is_valid() and _check_sprite_polygon_offset(
-                    sprite, poly, ox, oy, self.render_scale
-                ):
-                    return (poly, ox, oy)
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if poly.is_valid() and _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
+                        return (poly, ox, oy)
     if world is not None:
         body = world.collides_with_body(sprite)
         if body is not None:
@@ -130,30 +187,23 @@ def _collides_at_platformer(
 
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
-                    continue
-                if poly.one_way:
-                    if not include_one_way:
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
                         continue
-                    platform_y = (
-                        min(v[1] for v in poly.vertices) * self.render_scale + oy
-                    )
-                    if (
-                        previous_bottom is not None
-                        and previous_bottom > platform_y + 0.5
-                    ):
-                        continue
-                if _check_sprite_polygon_offset(
-                    sprite, poly, ox, oy, self.render_scale
-                ):
-                    return True
+                    if poly.one_way:
+                        if not include_one_way:
+                            continue
+                        platform_y = min(v[1] for v in poly.vertices) * self.render_scale + oy
+                        if previous_bottom is not None and previous_bottom > platform_y + 0.5:
+                            continue
+                    if _check_sprite_polygon_offset(sprite, poly, ox, oy, self.render_scale):
+                        return True
     return world is not None and world.collides_with_body(sprite) is not None
 
 
@@ -290,49 +340,50 @@ def _find_walkable_ground_info(
     best: GroundInfo | None = None
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
-                    continue
-                if poly.one_way and not include_one_way:
-                    continue
-                # polygon constant data, shared by every edge/sample
-                verts = poly.vertices
-                n_verts = len(verts)
-                cx = sum(v[0] for v in verts) / n_verts * self.render_scale + ox
-                cy = sum(v[1] for v in verts) / n_verts * self.render_scale + oy
-                world_verts = [
-                    (v[0] * self.render_scale + ox, v[1] * self.render_scale + oy)
-                    for v in verts
-                ]
-                for sample_x in sample_xs:
-                    for i in range(len(poly.vertices)):
-                        edge = self._walkable_edge_info_at_x(
-                            poly, ox, oy, sample_x, i, min_upness,
-                            centroid=(cx, cy),
-                            world_verts=world_verts,
-                        )
-                        if edge is None:
-                            continue
-                        ground_y, nx, ny = edge
-                        one_way_from_above = True
-                        if poly.one_way and previous_bottom is not None:
-                            one_way_from_above = previous_bottom <= ground_y + 0.5
-                        if not one_way_from_above:
-                            continue
-                        if (bottom - max_up <= ground_y <= bottom + max_down) and (
-                            best is None or ground_y < best.y
-                        ):
-                            best = GroundInfo(
-                                y=ground_y,
-                                normal=(nx, ny),
-                                angle=_angle_from_normal(nx, ny),
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if poly.one_way and not include_one_way:
+                        continue
+                    verts = poly.vertices
+                    n_verts = len(verts)
+                    cx = sum(v[0] for v in verts) / n_verts * self.render_scale + ox
+                    cy = sum(v[1] for v in verts) / n_verts * self.render_scale + oy
+                    world_verts = [(v[0] * self.render_scale + ox, v[1] * self.render_scale + oy) for v in verts]
+                    for sample_x in sample_xs:
+                        for i in range(len(poly.vertices)):
+                            edge = self._walkable_edge_info_at_x(
+                                poly,
+                                ox,
+                                oy,
+                                sample_x,
+                                i,
+                                min_upness,
+                                centroid=(cx, cy),
+                                world_verts=world_verts,
                             )
+                            if edge is None:
+                                continue
+                            ground_y, nx, ny = edge
+                            one_way_from_above = True
+                            if poly.one_way and previous_bottom is not None:
+                                one_way_from_above = previous_bottom <= ground_y + 0.5
+                            if not one_way_from_above:
+                                continue
+                            if (bottom - max_up <= ground_y <= bottom + max_down) and (
+                                best is None or ground_y < best.y
+                            ):
+                                best = GroundInfo(
+                                    y=ground_y,
+                                    normal=(nx, ny),
+                                    angle=_angle_from_normal(nx, ny),
+                                )
     if world is not None:
         for body in world.bodies:
             if body is sprite:

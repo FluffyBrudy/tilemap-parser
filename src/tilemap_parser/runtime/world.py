@@ -1,8 +1,8 @@
 """PhysicsWorld — the single space bodies and tiles are resolved in.
 
 Godot's global physics space, simplified: the world owns the tile layer
-(the same ``{(col, row): tile_id}`` map the runner iterates) and the list
-of :class:`~.body.Body` solids.  A :class:`~.movement.CollisionRunner`
+(the same ``{(col, row): ((gid, flipbits), ...)}`` union map the runner iterates)
+and the list of :class:`~.body.Body` solids.  A :class:`~.movement.CollisionRunner`
 attaches to a world (``CollisionRunner.from_world(world, game_type)``) and
 resolves movement against the world's tiles AND bodies uniformly.
 """
@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from ..parser.collision import TileCollisionData, TilesetCollision
+from ..parser.collision import CollisionPolygon, TileCollisionData, TilesetCollision
 from .body import Body
 from .collision.hit import check_collision
 from .map_loader import TilemapData
@@ -22,12 +22,148 @@ if TYPE_CHECKING:  # pragma: no cover
     from ..parser.map_parse import ParsedTileset
 
 
+FLIP_H = 1
+FLIP_V = 2
+FLIP_D = 4
+
+StackEntry = Tuple[int, int]  # (gid, flipbits)
+TileCell = Tuple[StackEntry, ...]
+TileMap = Dict[Tuple[int, int], TileCell]
+
+
+def flip_flags(flip_h: bool = False, flip_v: bool = False, flip_d: bool = False) -> int:
+    """Encode tile flip bools (ParsedTile / TMX) to a stack-entry bitmask."""
+    return (FLIP_H if flip_h else 0) | (FLIP_V if flip_v else 0) | (FLIP_D if flip_d else 0)
+
+
+def flip_vertices(
+    vertices: List[Tuple[float, float]],
+    flags: int,
+    tile_size: Tuple[float, float],
+) -> List[Tuple[float, float]]:
+    """Mirror/transpose tile-local vertices per flip flags (Tiled order).
+
+    Diagonal transpose first (axes swap, so the mirror extents swap too),
+    then horizontal / vertical mirrors.  Identity when ``flags == 0``.
+    For non-square tiles the transpose swaps the mirror extents
+    ``(w, h) -> (h, w)`` while the grid cell itself is unchanged (standard
+    2D-engine behavior for transposed non-square tiles).
+    Winding may flip (CW<->CCW); the narrowphase is winding-independent
+    (ray-cast containment, orientation-agnostic segments, centroid-tested
+    outward normals), so no re-winding is needed.
+    """
+    if not flags:
+        return list(vertices)
+    tw, th = float(tile_size[0]), float(tile_size[1])
+    w, h = (th, tw) if flags & FLIP_D else (tw, th)
+    out: List[Tuple[float, float]] = []
+    for x, y in vertices:
+        if flags & FLIP_D:
+            x, y = y, x
+        if flags & FLIP_H:
+            x = w - x
+        if flags & FLIP_V:
+            y = h - y
+        out.append((x, y))
+    return out
+
+
+def flipped_data(
+    base: TileCollisionData,
+    flags: int,
+    tile_size: Tuple[float, float],
+) -> TileCollisionData:
+    """Return *base* with every shape's vertices flip-transformed.
+
+    Identity (same object) when ``flags == 0``.  Preserves ``one_way``,
+    ``collision_layer`` and ``collision_mask``.
+    """
+    if not flags:
+        return base
+    return TileCollisionData(
+        tile_id=base.tile_id,
+        shapes=[
+            CollisionPolygon(
+                vertices=flip_vertices(list(poly.vertices), flags, tile_size),
+                one_way=poly.one_way,
+            )
+            for poly in base.shapes
+        ],
+        collision_layer=base.collision_layer,
+        collision_mask=base.collision_mask,
+    )
+
+
+def _as_entry(value: object) -> Optional[StackEntry]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return (value, 0)
+    if isinstance(value, (tuple, list)) and len(value) == 2:
+        gid, flags = value
+        if (
+            isinstance(gid, int)
+            and not isinstance(gid, bool)
+            and isinstance(flags, int)
+            and not isinstance(flags, bool)
+        ):
+            return (gid, flags)
+    return None
+
+
+def iter_cell_entries(cell: object) -> TileCell:
+    """Normalize one tile_map cell to ``((gid, flipbits), ...)``.
+
+    Accepts ``None``, legacy ``int``, legacy flat ``(gid, ...)`` tuples /
+    lists (flags default 0), and the canonical nested form.  Dedups
+    identical entries, preserving first-seen (z-)order.
+
+    Convention (ambiguous by necessity, pinned here): a flat 2-tuple of
+    ints is ALWAYS two legacy tiles — ``(23, 1)`` means gids 23 and 1,
+    never "gid 23 with FLIP_H".  A single flipped tile must be nested:
+    ``((23, 1),)``.  ``build_tile_map()`` only ever emits the nested form.
+    """
+    if cell is None:
+        return ()
+    if isinstance(cell, bool):
+        return ()
+    if isinstance(cell, int):
+        return ((cell, 0),)
+    if isinstance(cell, (tuple, list)):
+        out: List[StackEntry] = []
+        for v in cell:
+            entry = _as_entry(v)
+            if entry is None:
+                if isinstance(v, int) and not isinstance(v, bool):
+                    entry = (v, 0)
+                else:
+                    continue
+            if entry not in out:
+                out.append(entry)
+        return tuple(out)
+    return ()
+
+
+def iter_cell_ids(cell: object) -> Tuple[int, ...]:
+    """Gids stacked in one cell (legacy-int tolerant, order-preserving)."""
+    return tuple(gid for gid, _flags in iter_cell_entries(cell))
+
+
+def _normalize_tile_map(tile_map: Optional[Dict[Tuple[int, int], object]]) -> TileMap:
+    normalized: TileMap = {}
+    for pos, cell in dict(tile_map or {}).items():
+        entries = iter_cell_entries(cell)
+        if entries:
+            normalized[tuple(pos)] = entries
+    return normalized
+
+
 class PhysicsWorld:
     """A space containing a tile layer and solid bodies."""
 
     def __init__(
         self,
-        tile_map: Optional[Dict[Tuple[int, int], int]] = None,
+        tile_map: Optional[Dict[Tuple[int, int], object]] = None,
         tileset_collision: Optional[TilesetCollision] = None,
         tile_size: Tuple[int, int] = (32, 32),
         render_scale: float = 1.0,
@@ -36,19 +172,24 @@ class PhysicsWorld:
         Create an empty world.
 
         Args:
-            tile_map: ``{(col, row): tile_id}`` tile layer (see
-                :meth:`TilemapData.build_tile_map`).  Defaults to empty.
+            tile_map: ``{(col, row): ((gid, flipbits), ...)}`` tile layer
+                (see :meth:`TilemapData.build_tile_map`).  Legacy
+                ``{(col, row): tile_id}`` and flat ``(gid, ...)`` cells
+                normalize to stacked entries with zero flips.  Defaults
+                to empty.
             tileset_collision: Collision data for the tiles in *tile_map*.
             tile_size: Tile dimensions in pixels ``(width, height)`` —
-                the space's grid, adopted by a runner on attach.
+                the space's grid, adopted by a runner on attach.  Also the
+                mirror extents for flip transforms.
             render_scale: Effective-pixel scale of the space (see
                 :attr:`TilemapData.render_scale`).
         """
-        self.tile_map: Dict[Tuple[int, int], int] = dict(tile_map or {})
+        self.tile_map: TileMap = _normalize_tile_map(tile_map)
         self.tileset_collision = tileset_collision
         self.tile_size = tuple(tile_size)
         self.render_scale = render_scale
         self.bodies: List[Body] = []
+        self._flipped_cache: Dict[Tuple[int, int], TileCollisionData] = {}
         # GID routing (see `resolve_collision`): (firstgid, tile_count, stem)
         # for every *grid* resource of the source map, plus the stem that the
         # single collision file belongs to.  Empty => literal local lookups.
@@ -71,6 +212,10 @@ class PhysicsWorld:
     ) -> "PhysicsWorld":
         """
         Build a world from loaded map data.
+
+        Tile layers are unioned Godot-style: overlapping cells keep every
+        layer's gid, so deco layers can never erase solid ground.  Layers
+        with ``collision_enabled=False`` and *exclude_layers* are skipped.
 
         Args:
             tilemap_data: Loaded tilemap (see :func:`~.runtime.load_map`).
@@ -104,10 +249,7 @@ class PhysicsWorld:
             world._capture_grid_ownership(tilemap_data, tileset_collision)
         return world
 
- 
-    def _capture_grid_ownership(
-        self, map_data: TilemapData, tileset_collision: TilesetCollision
-    ) -> None:
+    def _capture_grid_ownership(self, map_data: TilemapData, tileset_collision: TilesetCollision) -> None:
         """Record every grid resource's GID range and the collision owner.
 
         Only ``type=="tile"`` resources participate; object tilesets are
@@ -161,6 +303,54 @@ class PhysicsWorld:
         data = self.resolve_collision(tile_id)
         return data is not None and data.has_collision()
 
+    def tile_ids_at(self, pos: Tuple[int, int]) -> Tuple[int, ...]:
+        """Gids stacked at *pos* (legacy tolerant, ``()`` when empty)."""
+        return tuple(gid for gid, _flags in iter_cell_entries(self.tile_map.get(tuple(pos))))
+
+    def tile_entries_at(self, pos: Tuple[int, int]) -> TileCell:
+        """``((gid, flipbits), ...)`` stacked at *pos* (``()`` when empty)."""
+        return iter_cell_entries(self.tile_map.get(tuple(pos)))
+
+    def resolve_stack_entry(self, entry: StackEntry) -> Optional[TileCollisionData]:
+        """Resolve one ``(gid, flipbits)`` entry to flip-aware collision data.
+
+        GID routing matches :meth:`resolve_collision`; flipped geometry is
+        transformed once and cached per ``(gid, flipbits)``.  ``flags == 0``
+        returns the shared base object (no copy).
+        """
+        gid, flags = entry
+        data = self.resolve_collision(gid)
+        if data is None:
+            return None
+        if not flags:
+            return data
+        key = (gid, flags)
+        cached = self._flipped_cache.get(key)
+        if cached is None:
+            cached = flipped_data(data, flags, self.tile_size)
+            self._flipped_cache[key] = cached
+        return cached
+
+    def iter_cell_data(self, cell: object) -> "List[TileCollisionData]":
+        """Flip-aware collision datas for every entry in one cell (union).
+
+        Skips entries with no data.  Does NOT layer/mask-filter — callers
+        with a sprite apply ``should_collide`` (see movement queries).
+        """
+        datas: "List[TileCollisionData]" = []
+        for entry in iter_cell_entries(cell):
+            data = self.resolve_stack_entry(entry)
+            if data is not None:
+                datas.append(data)
+        return datas
+
+    def cell_has_collision(self, pos: Tuple[int, int]) -> bool:
+        """True when any stacked gid at *pos* has collision shapes."""
+        for data in self.iter_cell_data(self.tile_map.get(tuple(pos))):
+            if data.has_collision():
+                return True
+        return False
+
     # body
     def add_body(self, body: Body) -> None:
         """Add a body to the world.  Adding the same body twice is a no-op."""
@@ -172,9 +362,7 @@ class PhysicsWorld:
         try:
             self.bodies.remove(body)
         except ValueError:
-            raise ValueError(
-                f"{body!r} is not in this world"
-            ) from None
+            raise ValueError(f"{body!r} is not in this world") from None
 
     def clear_bodies(self) -> None:
         """Remove all bodies from the world."""

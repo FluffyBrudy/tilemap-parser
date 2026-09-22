@@ -36,6 +36,9 @@ from tilemap_parser.runtime.polygon_query import (
 # ---------------------------------------------------------------------------
 
 class DummySprite:
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
+
     def __init__(self, x=0, y=0, shape=None, vx=0, vy=0, on_ground=False):
         self.x = x
         self.y = y

@@ -68,7 +68,7 @@ camera.shake(intensity=10.0, duration=0.5)`}
       />
 
       <Callout kind="tip" title="SMOOTHING">
-        Set <code>camera.lerp_speed = 5.0</code> (or similar) to make the camera lag slightly behind the player for a smoother feel. A value of 0.0 disables smoothing.
+        Set <code>camera.lerp_speed = 5.0</code> (or similar) to make the camera lag slightly behind the player for smoother motion. A value of 0.0 disables smoothing.
       </Callout>
     </div>
   );

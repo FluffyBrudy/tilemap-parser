@@ -11,7 +11,7 @@ exactly three things:
 
 | Owned by the world | What it is |
 |---|---|
-| `tile_map` | The collision tile layer — `{(col, row): tile_id}` |
+| `tile_map` | The collision tile layer — `{(col, row): ((gid, flipbits), ...)}` stacked union entries |
 | `tileset_collision` | Tile geometry — `TilesetCollision` (polygon per tile id) |
 | `bodies` | Solid `Body` objects — static walls, kinematic crates |
 
@@ -53,8 +53,8 @@ class Player:
         self.vy = 0.0
         self.on_ground = True      # grounded state (platformer)
         self.collision_shape = RectangleShape(width=24, height=28)
-        self.collision_layer = 1   # optional, defaults
-        self.collision_mask = 0xFFFFFFFF
+        self.collision_layer = 1   # required, no defaults
+        self.collision_mask = 0xFFFFFFFF  # required, no defaults
 ```
 
 | Attribute | Required | Used by |
@@ -63,7 +63,7 @@ class Player:
 | `collision_shape` | yes | `RectangleShape`, `CircleShape`, or `CapsuleShape` (primitives only — polygon objects use `MapObject`) |
 | `vx`, `vy` | physics modes | `move_platformer`, `move_platformer_with_slide`, `move_grounded` |
 | `on_ground` | platformer | grounded state, step-up, jump |
-| `collision_layer` / `collision_mask` | optional | body filtering — both sides must agree (`should_collide`) |
+| `collision_layer` / `collision_mask` | yes — missing members raise `TypeError` | body *and tile* filtering — both sides must agree (`should_collide`) |
 
 `Body` is the same contract plus a `mode` ("static" / "kinematic") and
 `game_id`; it is the authoring surface for *solids*, not sprites.  Draw
@@ -109,7 +109,11 @@ world = PhysicsWorld.from_map(game_data, tileset)  # collision layer + grid geom
 ```
 
 If you draw `world.tile_map` yourself, tile `(col, row)` occupies the
-pixel rect `(col * tile_w, row * tile_h, tile_w, tile_h)`.  Your sprites
+pixel rect `(col * tile_w, row * tile_h, tile_w, tile_h)`. Each cell holds
+stacked `((gid, flipbits), ...)` entries — iterate them with
+`iter_cell_entries(cell)` and resolve each via
+`world.resolve_stack_entry(entry)` (GID-routed, flip-aware, `None` for
+deco/empty). Your sprites
 are drawn in the same pixel space — that is the only coordinate system;
 `render_scale` (from the map's `TilemapData.render_scale`) is adopted
 by both the world and the runner on attach.

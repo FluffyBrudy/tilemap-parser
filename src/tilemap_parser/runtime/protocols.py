@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, Union
-
-from pygame import Surface
+from typing import Protocol, runtime_checkable
 
 from ..parser.collision import (
     CapsuleShape,
@@ -14,58 +12,37 @@ from ..parser.collision import (
 )
 
 
+@runtime_checkable
 class ICollidable(Protocol):
-    """Base protocol for anything with a world position and collision shape.
+    """Structural contract for anything in the collision space.
 
-    This is the minimal interface for participating in collision detection.
-    All collidable protocols (ICollidableSprite, ICollidableObject) extend this.
-
-    Required attributes:
-        x (float): World X position
-        y (float): World Y position
-        collision_shape: Shape used for collision detection
-            (RectangleShape, CircleShape, CapsuleShape, or CollisionPolygon)
+    Duck-typed: any object satisfying these members works with
+    :class:`ObjectCollisionManager`, :func:`check_collision`, and the
+    movement runners. All members are required — no implicit defaults.
+    Forgetting ``collision_layer`` / ``collision_mask`` raises a loud
+    ``TypeError`` at first use instead of silently colliding (or not)
+    with everything.
     """
 
     x: float
     y: float
     collision_shape: RectangleShape | CircleShape | CapsuleShape | CollisionPolygon
+    collision_layer: int
+    collision_mask: int
 
-class ICollidableObject(ICollidable, Protocol):
-    """
-    Protocol for objects that can collide.
 
-    All required attributes (x, y, collision_shape) are inherited from ICollidable.
-
-    Optional attributes (with defaults):
-        collision_layer: Layer this object is on (default: 1)
-        collision_mask: Layers to collide with (default: 0xFFFFFFFF)
-    """
-
+@runtime_checkable
 class ICollidableSprite(ICollidable, Protocol):
+    """A collidable with motion state for the movement runners.
+
+    Extends :class:`ICollidable`, so sprites pass anywhere a plain
+    collidable is expected (e.g. ``ObjectCollisionManager``). Motion
+    state is the sole distinction — no parallel hierarchy.
     """
-    Interface that any sprite/character class must implement to use collision runners.
-
-    Required attributes:
-        x (float): World X position
-        y (float): World Y position
-        collision_shape (RectangleShape | CircleShape | CapsuleShape): Collision shape
-
-    Optional attributes:
-        vx (float): X velocity (for physics-based runners)
-        vy (float): Y velocity (for physics-based runners)
-        on_ground (bool): Whether sprite is on ground (for platformer)
-    """
-
-    x: float
-    y: float
-    collision_shape: Union[RectangleShape, CircleShape, CapsuleShape]
 
     vx: float
     vy: float
     on_ground: bool
-class ExtraObject(Protocol):
-    surface: Surface | None
-    x: float
-    y: float
 
+
+ICollidableObject = ICollidable

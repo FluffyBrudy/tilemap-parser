@@ -51,6 +51,11 @@ export const SEO: Record<string, Seo> = {
     description:
       "Frame-based sprites: SpriteAnimationSet loads JSON + spritesheet, AnimationPlayer is the per-frame clock.",
   },
+  "/animations/tile-clips": {
+    title: "Tile Clips — tilemap-parser docs",
+    description:
+      "Sidecar tile animations: tanim clips, anim_clip assignment, renderer loading, precedence and fallbacks.",
+  },
   "/camera": {
     title: "Camera — tilemap-parser docs",
     description:
@@ -115,6 +120,7 @@ export const SITEMAP_ROUTES: SitemapRoute[] = [
   { path: "/pipeline", priority: "0.6" },
   { path: "/map-parsing", priority: "0.8" },
   { path: "/animations", priority: "0.7" },
+  { path: "/animations/tile-clips", priority: "0.7" },
   { path: "/camera", priority: "0.7" },
   { path: "/particles", priority: "0.8" },
   { path: "/pathfinding", priority: "0.8" },

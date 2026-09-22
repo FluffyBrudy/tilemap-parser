@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import math
 import warnings
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 from ...parser.collision import (
     CapsuleShape,
+    CharacterShapeType,
     CircleShape,
     CollisionPolygon,
     RectangleShape,
 )
-from ..protocols import ICollidableObject
 from ...utils.geometry import (
     CollisionInfo,
     capsule_vs_capsule,
@@ -26,21 +27,35 @@ from ...utils.geometry import (
     rect_vs_circle,
     rect_vs_rect,
 )
+from ..protocols import ICollidable
+
+if TYPE_CHECKING:
+    from ...parser.collision import (
+        CharacterCollision,
+        TileCollisionData,
+        TilesetCollision,
+    )
+    from ..world import PhysicsWorld
 
 
-def _get_shapes(obj: ICollidableObject) -> List:
+def _get_shapes(obj: ICollidable) -> list:
     """Return all collision shapes for an object.
 
     Objects with a :attr:`collision_shapes` attribute (e.g.
     :class:`MapObject`) may carry multiple polygons per region;
     single-shape objects return ``[obj.collision_shape]``.
+    Shapeless objects return ``[]`` (never ``[None]``) — callers
+    warn and skip instead of crashing in AABB computation.
     """
     shapes = getattr(obj, "collision_shapes", None)
     if shapes is not None and len(shapes) > 0:
         return list(shapes)
-    return [obj.collision_shape]
+    shape = getattr(obj, "collision_shape", None)
+    if shape is None:
+        return []
+    return [shape]
 
-def _combined_aabb(x: float, y: float, shapes: List) -> tuple[float, float, float, float]:
+def _combined_aabb(x: float, y: float, shapes: list) -> tuple[float, float, float, float]:
     """Union AABB across all shapes at position *(x, y)*."""
     left = top = float("inf")
     right = bottom = float("-inf")
@@ -57,13 +72,13 @@ def _combined_aabb(x: float, y: float, shapes: List) -> tuple[float, float, floa
     return (left, top, right, bottom)
 
 def _check_pair(
-    obj_a: ICollidableObject,
-    obj_b: ICollidableObject,
+    obj_a: ICollidable,
+    obj_b: ICollidable,
     shape_a,
     shape_b,
     aabb_a: tuple[float, float, float, float],
     aabb_b: tuple[float, float, float, float],
-) -> Optional[CollisionInfo]:
+) -> CollisionInfo | None:
     """Run narrowphase for a single shape pair."""
     if isinstance(shape_a, CircleShape) and isinstance(shape_b, CircleShape):
         ca = (obj_a.x + shape_a.offset[0], obj_a.y + shape_a.offset[1])
@@ -159,7 +174,7 @@ def _check_pair(
         )
         return None
 
-def _flip_result(info: Optional[CollisionInfo]) -> Optional[CollisionInfo]:
+def _flip_result(info: CollisionInfo | None) -> CollisionInfo | None:
     """Flip the normal of a :class:`CollisionInfo` in place."""
     if info is None:
         return None
@@ -167,4 +182,156 @@ def _flip_result(info: Optional[CollisionInfo]) -> Optional[CollisionInfo]:
         normal=(-info.normal[0], -info.normal[1]),
         depth=info.depth,
     )
+
+
+def shape_to_points(
+    shape: CharacterShapeType, x: float = 0.0, y: float = 0.0, scale: float = 1.0
+) -> list[tuple[float, float]]:
+    if isinstance(shape, RectangleShape):
+        left = x + shape.offset[0] * scale
+        top = y + shape.offset[1] * scale
+        w = shape.width * scale
+        h = shape.height * scale
+        return [(left, top), (left + w, top), (left + w, top + h), (left, top + h)]
+    if isinstance(shape, CircleShape):
+        cx = x + shape.offset[0] * scale
+        cy = y + shape.offset[1] * scale
+        r = shape.radius * scale
+        return [(cx + r * math.cos(2 * math.pi * i / 16), cy + r * math.sin(2 * math.pi * i / 16)) for i in range(16)]
+    if isinstance(shape, CapsuleShape):
+        px = x + shape.offset[0] * scale
+        py = y + shape.offset[1] * scale
+        r = shape.radius * scale
+        bx = px
+        by = py + shape.height * scale
+        verts: list[tuple[float, float]] = []
+        for k in range(5):
+            a = math.pi + (math.pi * k / 4)
+            verts.append((px + r * math.cos(a), py + r * math.sin(a)))
+        for k in range(5):
+            a = math.pi * k / 4
+            verts.append((bx + r * math.cos(a), by + r * math.sin(a)))
+        return verts
+    if isinstance(shape, CollisionPolygon):
+        return [(x + vx * scale, y + vy * scale) for vx, vy in shape.vertices]
+    raise TypeError(f"Unsupported shape type: {type(shape).__name__}")
+
+
+def describe_shape(shape: CharacterShapeType, x: float = 0.0, y: float = 0.0, scale: float = 1.0) -> dict[str, object]:
+    scaled = shape.scaled(scale)
+    aabb = get_shape_aabb(x, y, scaled)
+    if isinstance(shape, RectangleShape):
+        return {
+            "kind": "rect",
+            "draw_kind": "rect",
+            "valid": bool(shape.width > 0 and shape.height > 0),
+            "aabb": aabb,
+            "rect": (aabb[0], aabb[1], aabb[2] - aabb[0], aabb[3] - aabb[1]),
+            "points": shape_to_points(shape, x, y, scale),
+        }
+    if isinstance(shape, CircleShape):
+        center = (x + scaled.offset[0], y + scaled.offset[1])
+        return {
+            "kind": "circle",
+            "draw_kind": "circle",
+            "valid": bool(shape.radius > 0),
+            "aabb": aabb,
+            "center": center,
+            "radius": scaled.radius,
+            "points": shape_to_points(shape, x, y, scale),
+        }
+    if isinstance(shape, CapsuleShape):
+        top = (x + scaled.offset[0], y + scaled.offset[1])
+        bottom = (top[0], top[1] + scaled.height)
+        return {
+            "kind": "capsule",
+            "draw_kind": "capsule",
+            "valid": bool(shape.radius > 0 and shape.height >= 0),
+            "aabb": aabb,
+            "segment": (top, bottom),
+            "radius": scaled.radius,
+            "points": shape_to_points(shape, x, y, scale),
+        }
+    if isinstance(shape, CollisionPolygon):
+        return {
+            "kind": "polygon",
+            "draw_kind": "polygon",
+            "valid": bool(shape.is_valid()),
+            "aabb": aabb,
+            "one_way": bool(shape.one_way),
+            "points": shape_to_points(shape, x, y, scale),
+        }
+    raise TypeError(f"Unsupported shape type: {type(shape).__name__}")
+
+
+def describe_tile_collision(data: TileCollisionData | None, scale: float = 1.0) -> dict[str, object]:
+    if data is None:
+        return {"has_collision": False, "shapes": []}
+    return {
+        "tile_id": data.tile_id,
+        "has_collision": bool(data.has_collision()),
+        "collision_layer": data.collision_layer,
+        "collision_mask": data.collision_mask,
+        "shapes": [describe_shape(s, 0.0, 0.0, scale) for s in data.shapes],
+    }
+
+
+def describe_tileset_collision(
+    tileset: TilesetCollision,
+    tile_ids: list[int] | tuple[int, ...] | set[int] | None = None,
+    scale: float = 1.0,
+) -> dict[int, dict[str, object]]:
+    ids = sorted(tileset.tiles.keys()) if tile_ids is None else list(tile_ids)
+    return {tid: describe_tile_collision(tileset.tiles.get(tid), scale) for tid in ids}
+
+
+def describe_character_collision(char: CharacterCollision, scale: float = 1.0) -> dict[str, object]:
+    return {
+        "name": char.name,
+        "collision_layer": char.collision_layer,
+        "collision_mask": char.collision_mask,
+        "shape": describe_shape(char.shape, 0.0, 0.0, scale),
+    }
+
+
+def describe_sprite(sprite: ICollidable, scale: float = 1.0) -> list[dict[str, object]]:
+    return [
+        describe_shape(shape, sprite.x, sprite.y, scale)
+        for shape in _get_shapes(sprite)
+        if shape is not None
+    ]
+
+
+def describe_tile_cell(
+    cell: object,
+    *,
+    world: PhysicsWorld | None = None,
+    tileset: TilesetCollision | None = None,
+    scale: float | None = None,
+) -> list[dict[str, object]]:
+    from ..world import flipped_data, iter_cell_entries
+
+    if scale is None:
+        scale = world.render_scale if world is not None else 1.0
+    out: list[dict[str, object]] = []
+    for gid, flags in iter_cell_entries(cell):
+        data = None
+        if world is not None:
+            data = world.resolve_stack_entry((gid, flags))
+        elif tileset is not None:
+            base = tileset.tiles.get(gid)
+            if base is not None:
+                data = base if not flags else flipped_data(base, flags, tileset.tile_size)
+        if data is None:
+            out.append({"gid": gid, "flipbits": flags, "has_collision": False, "shapes": []})
+        else:
+            out.append(
+                {
+                    "gid": gid,
+                    "flipbits": flags,
+                    "has_collision": bool(data.has_collision()),
+                    "shapes": [describe_shape(s, 0.0, 0.0, scale) for s in data.shapes],
+                }
+            )
+    return out
 

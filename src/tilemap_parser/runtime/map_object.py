@@ -3,7 +3,7 @@ Runtime map object loading and representation.
 
 Bridges the gap between parsed map objects, collision data, and
 the collision manager.  Provides a ready-to-use :class:`MapObject`
-that implements :class:`ICollidableObject` and carries a pygame
+that implements :class:`ICollidable` and carries a pygame
 :class:`~pygame.Surface` for rendering.
 
 Usage::
@@ -16,7 +16,6 @@ Usage::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union, final
 
 import pygame
 from pygame import Surface
@@ -39,7 +38,7 @@ class MapObject:
     The object is ready for direct use in a game loop that runs in
     effective-pixel space — no additional scaling needed.
 
-    Satisfies the :class:`ICollidableObject` protocol so it can be
+    Satisfies the :class:`ICollidable` protocol so it can be
     added directly to an :class:`ObjectCollisionManager`.
 
     When a region contains multiple disjoint polygons, *all* shapes
@@ -113,7 +112,7 @@ def load_map_objects(
     collision_dir: str | Path,
     *,
     cache: CollisionCache | None = None,
-    require_collision: bool = True,
+    require_collision: bool = False,
 ) -> list[MapObject]:
     """Load objects from a tilemap.
 
@@ -149,9 +148,12 @@ def load_map_objects(
             files (typically ``<map_path>/collision/``).
         cache: Optional :class:`CollisionCache` for caching parsed
             collision data across calls.
-        require_collision: If True (default), only objects with matching
-            collision regions are returned. If False, visual-only objects
-            without collision are also included.
+        require_collision: If False (default), visual-only objects
+            without collision are also included (with empty
+            ``collision_shapes`` — gate on ``has_collision`` before
+            adding to :class:`ObjectCollisionManager`, which refuses
+            shapeless objects with a warning). If True, only objects
+            with matching collision regions are returned.
 
     Returns:
         List of :class:`MapObject` instances.
@@ -240,8 +242,8 @@ def _load_collision_for_tileset(
     tilemap_data: TilemapData,
     ttype: int,
     collision_dir: Path,
-    cache: Optional[CollisionCache],
-) -> Optional[ObjectCollisionData]:
+    cache: CollisionCache | None,
+) -> ObjectCollisionData | None:
     """Load (or retrieve from cache) collision data for a tileset index."""
     if ttype < 0 or ttype >= len(tilemap_data.parsed.tilesets):
         return None

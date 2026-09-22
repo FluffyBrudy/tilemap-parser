@@ -32,6 +32,9 @@ SLOPE_POLY = [(0.0, 32.0), (32.0, 0.0), (32.0, 32.0)]
 
 
 class MockSprite:
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
+
     def __init__(self, x=0, y=0, shape=None):
         self.x = x
         self.y = y
@@ -306,3 +309,88 @@ class TestMoveGrounded:
         assert sprite.on_ground is True
         assert sprite.vy == 0.0
         assert abs(sprite.y - 128.0) < 1.0
+
+    def test_directional_walks_through_one_way_side(self):
+        one_way_tileset = TilesetCollision(
+            tileset_name="one_way",
+            tile_size=(32, 32),
+            tiles={
+                0: TileCollisionData(
+                    tile_id=0,
+                    shapes=[
+                        CollisionPolygon(vertices=FULL_TILE_POLY, one_way=True)
+                    ],
+                )
+            },
+        )
+        tile_map = {(2, 5): 0}
+        sprite = MockSprite(x=30, y=160)
+        sprite.vx = 200
+        sprite.vy = 0
+        sprite.on_ground = False
+
+        result = self.runner.move_grounded(
+            sprite, one_way_tileset, tile_map, dt=0.2, one_way="directional"
+        )
+
+        assert result.hit_wall_x is False
+        assert sprite.x > 30
+
+    def test_directional_lands_on_one_way_top(self):
+        one_way_tileset = TilesetCollision(
+            tileset_name="one_way",
+            tile_size=(32, 32),
+            tiles={
+                0: TileCollisionData(
+                    tile_id=0,
+                    shapes=[
+                        CollisionPolygon(vertices=FULL_TILE_POLY, one_way=True)
+                    ],
+                )
+            },
+        )
+        tile_map = {(0, 5): 0}
+        sprite = MockSprite(x=4, y=100)
+        sprite.vx = 0
+        sprite.vy = 0
+        sprite.on_ground = False
+
+        self.runner.move_grounded(
+            sprite, one_way_tileset, tile_map, dt=0.3, one_way="directional"
+        )
+
+        assert sprite.on_ground is True
+        assert sprite.vy == 0.0
+        assert abs(sprite.y - 128.0) < 1.0
+
+    def test_directional_rises_through_one_way(self):
+        one_way_tileset = TilesetCollision(
+            tileset_name="one_way",
+            tile_size=(32, 32),
+            tiles={
+                0: TileCollisionData(
+                    tile_id=0,
+                    shapes=[
+                        CollisionPolygon(vertices=FULL_TILE_POLY, one_way=True)
+                    ],
+                )
+            },
+        )
+        tile_map = {(2, 5): 0}
+        sprite = MockSprite(x=68, y=200)
+        sprite.vx = 0
+        sprite.vy = -400
+        sprite.on_ground = False
+
+        result = self.runner.move_grounded(
+            sprite, one_way_tileset, tile_map, dt=0.2, one_way="directional"
+        )
+
+        assert result.hit_ceiling is False
+        assert sprite.y < 200
+
+    def test_rejects_unknown_one_way_mode(self):
+        sprite = MockSprite(x=0, y=0)
+
+        with pytest.raises(ValueError):
+            self.runner.move_grounded(sprite, self.tileset, {}, dt=0.016, one_way="ghost")

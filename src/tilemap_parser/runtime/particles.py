@@ -19,6 +19,10 @@ from ..parser.particle import FieldQuality, ParticleShape, ParticleSystemConfig
 PARTICLE_TEXTURE_SIZE = 24
 MAX_DT = 0.05
 
+CLOCK_EPS = 1e-9
+BURST_POPS = 10
+QUALITY_DENSITY = {"low": 0.72, "medium": 1.0, "high": 1.25}
+
 _SYMMETRIC_SHAPES = frozenset({"circle", "square", "diamond", "star", "sparkle", "smoke", "fog"})
 
 #: Field drift direction: compass degrees (0 = right, 90 = down, 180 = left,
@@ -393,7 +397,22 @@ class ParticleEmitter:
             if p is not None:
                 self.particles.append(p)
 
-    def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
+    def update(
+        self,
+        dt: float,
+        area_x: float,
+        area_y: float,
+        area_w: float,
+        area_h: float,
+        *,
+        spawn_enabled: bool = True,
+    ) -> None:
+        """Advance the simulation, optionally gating *stream* spawning.
+
+        Existing particles always move/expire — ``spawn_enabled=False``
+        only stops new stream spawns (emitter clock expiry). Manual
+        bursts bypass this flag; callers drive those explicitly.
+        """
         cfg = self.config
         if dt > MAX_DT:
             dt = MAX_DT
@@ -401,12 +420,13 @@ class ParticleEmitter:
             return
 
         max_p = cfg.max_particles
-        self.spawn_timer += dt * cfg.spawn_rate
-        while self.spawn_timer >= 1.0 and len(self.particles) < max_p:
-            self.spawn_timer -= 1.0
-            p = self._spawn(area_x, area_y, area_w, area_h)
-            if p is not None:
-                self.particles.append(p)
+        if spawn_enabled:
+            self.spawn_timer += dt * cfg.spawn_rate
+            while self.spawn_timer >= 1.0 and len(self.particles) < max_p:
+                self.spawn_timer -= 1.0
+                p = self._spawn(area_x, area_y, area_w, area_h)
+                if p is not None:
+                    self.particles.append(p)
 
         grav_x = cfg.gravity_x
         grav_y = cfg.gravity_y
@@ -645,19 +665,176 @@ class SpriteBatchRenderer(ParticleRenderer):
 
 
 class ParticleSystem:
+    """One live emitter: clock + burst state over a :class:`ParticleEmitter`.
+
+    The emitter clock (``timing`` block: start delay, duration, loop)
+    gates *stream* spawning only — manual triggers (burst, fill) always
+    fire, mirroring the editor. With default timing (delay ``0``,
+    infinite duration) the phase is always ``active`` and behavior is
+    identical to before.
+    """
+
     def __init__(self, config: ParticleSystemConfig, renderer: Optional[ParticleRenderer] = None):
         self.config = config
         self.emitter = ParticleEmitter(config)
         self.renderer = renderer if renderer is not None else SpriteBatchRenderer()
         self.renderer.on_config_change(config)
+        self.clock: float = 0.0
+        self._burst_pending: int = 0
+        self._burst_total: int = 0
+        self._burst_tick: float = 0.0
+        self._burst_area: Optional[Tuple[float, float, float, float]] = None
+        self._auto_filled: bool = False
+        self._last_area: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     def set_config(self, config: ParticleSystemConfig) -> None:
         self.config = config
         self.emitter.set_config(config)
         self.renderer.on_config_change(config)
+        self.clock = 0.0
+        self._burst_pending = 0
+        self._burst_total = 0
+        self._burst_tick = 0.0
+        self._burst_area = None
+        self._auto_filled = False
+
+    @property
+    def phase(self) -> str:
+        """Emitter phase: ``delay`` | ``active`` | ``expired``."""
+        timing = self.config.timing
+        if self.clock + CLOCK_EPS < timing.start_delay:
+            return "delay"
+        if timing.emitter_duration > 0 and self.clock + CLOCK_EPS >= timing.start_delay + timing.emitter_duration:
+            return "expired"
+        return "active"
+
+    def is_field_contract(self) -> bool:
+        """Fill-once contract holds: wrap on, spawn rate zero."""
+        return bool(self.config.wrap) and self.config.spawn_rate == 0
 
     def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
-        self.emitter.update(dt, area_x, area_y, area_w, area_h)
+        if dt > MAX_DT:
+            dt = MAX_DT
+        if not self._auto_filled:
+            # One attempt only: a zero-yield fill (degenerate area, zero
+            # cap) must not retry every frame. Matches the editor, which
+            # refills on load/restart rather than per-frame.
+            self._auto_filled = True
+            self.refill_if_field(area_x, area_y, area_w, area_h)
+        self.clock += dt
+        self._last_area = (area_x, area_y, area_w, area_h)
+        self._pump_clock()
+        spawn_open = self.phase == "active"
+        self._pump_burst_pops(dt, area_x, area_y, area_w, area_h)
+        self.emitter.update(dt, area_x, area_y, area_w, area_h, spawn_enabled=spawn_open)
+
+    def _pump_clock(self) -> None:
+        """Handle delay window and duration expiry (loop wraps)."""
+        timing = self.config.timing
+        if timing.emitter_duration <= 0 or self.clock + CLOCK_EPS < timing.start_delay + timing.emitter_duration:
+            return
+        if timing.loop:
+            # Deterministic restart: clear particles, zero the clock.
+            # A field contract re-fills (pulsing mist); otherwise empty.
+            self.emitter.clear()
+            self.clock = 0.0
+            self._burst_pending = 0
+            self._burst_total = 0
+            self._burst_tick = 0.0
+            self._burst_area = None
+            self.refill_if_field(*self._last_area)
+        # Non-looping: stay expired; live particles finish on their own.
+
+    def _pump_burst_pops(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
+        """Emit scheduled interval-spread pops. Manual pops fire in any
+        phase — a trigger is an explicit action, not stream spawn."""
+        if self._burst_pending <= 0:
+            return
+        interval = self.config.timing.burst_interval
+        if interval <= 0:
+            return
+        if self._burst_area is not None:
+            area_x, area_y, area_w, area_h = self._burst_area
+        self._burst_tick += dt
+        while self._burst_tick >= interval and self._burst_pending > 0:
+            self._burst_tick -= interval
+            chunk = max(1, math.ceil(self._burst_total / BURST_POPS))
+            want = min(chunk, self._burst_pending)
+            before = len(self.emitter.particles)
+            self.emitter.emit_burst(want, area_x, area_y, area_w, area_h)
+            fired = len(self.emitter.particles) - before
+            self._burst_pending -= fired
+            if fired < want:
+                self._burst_pending = 0
+
+    def trigger_burst(
+        self,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        count: Optional[int] = None,
+    ) -> int:
+        """Fire one burst, even outside the active window.
+
+        ``count`` defaults to ``config.burst_count``. With
+        ``timing.burst_interval > 0`` the burst goes out in up to
+        ``BURST_POPS`` pops spaced by the interval (first pop
+        immediate); returns particles emitted *now*, remainder pending.
+        Otherwise everything fires at once.
+        """
+        if count is None:
+            count = self.config.burst_count
+        count = max(0, int(count))
+        interval = self.config.timing.burst_interval
+        if interval > 0 and count > 0:
+            self._burst_total = count
+            self._burst_pending = count
+            self._burst_tick = 0.0
+            self._burst_area = (x, y, w, h)
+            return self._emit_burst_pop(x, y, w, h)  # first pop immediate
+        self._burst_pending = 0
+        self._burst_total = 0
+        self._burst_area = None
+        before = len(self.emitter.particles)
+        self.emitter.emit_burst(count, x, y, w, h)
+        return len(self.emitter.particles) - before
+
+    def _emit_burst_pop(self, x: float, y: float, w: float, h: float) -> int:
+        chunk = max(1, math.ceil(self._burst_total / BURST_POPS))
+        want = min(chunk, self._burst_pending)
+        before = len(self.emitter.particles)
+        self.emitter.emit_burst(want, x, y, w, h)
+        fired = len(self.emitter.particles) - before
+        self._burst_pending -= fired
+        if fired < want:
+            self._burst_pending = 0
+        return fired
+
+    def refill_if_field(self, x: float, y: float, w: float, h: float) -> int:
+        """Auto-fill when the field contract holds (wrap + spawn rate 0).
+
+        Fill count derives from ``config.coverage`` scaled by the
+        ``field_quality`` density (same factors as the editor), capped by
+        ``max_particles`` via ``emit_burst``. ``ground_bias`` fills the
+        lower band (same proportions as ``ParticleField._ground_area``).
+        Returns the filled count (0 when not a field). Field presets
+        show filled immediately instead of starting empty.
+        """
+        if not self.is_field_contract():
+            return 0
+        cfg = self.config
+        if cfg.ground_bias:
+            top = y + h * 0.35
+            y, h = top, h * 0.65
+        density = QUALITY_DENSITY.get(cfg.field_quality, 1.0)
+        try:
+            count = cfg.count_for_coverage(cfg.coverage * density, w, h)
+        except (ValueError, TypeError):
+            return 0
+        before = len(self.emitter.particles)
+        self.emitter.emit_burst(max(0, count), x, y, w, h)
+        return len(self.emitter.particles) - before
 
     def draw(
         self,
@@ -698,6 +875,11 @@ class ParticleSystem:
     def clear(self) -> None:
         self.emitter.clear()
         self.renderer.clear()
+        self._auto_filled = False
+        self._burst_pending = 0
+        self._burst_total = 0
+        self._burst_tick = 0.0
+        self._burst_area = None
 
 
 @dataclass(frozen=True)
@@ -956,6 +1138,7 @@ class ParticleField:
             system = ParticleSystem(cfg)
             coverage = preset.coverage * self.density * quality_density
             system.emit_field(coverage, *area)
+            system._auto_filled = True
             layers.append(ParticleFieldLayer(preset.name, system, area))
         self.layers = layers
 

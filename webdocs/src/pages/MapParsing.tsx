@@ -30,12 +30,14 @@ for layer in game_data.get_layers(layer_type="tile"):
       <p>
         The raw parsed structure lives on <code>game_data.parsed</code> (see the
         API reference's parsed data classes). For collision you usually want the
-        layer as a flat grid: <code>game_data.build_tile_map()</code> collapses
-        the tile layers into{" "}
+        union grid: <code>game_data.build_tile_map()</code> stacks every tile
+        layer Godot-style into{" "}
         <code>
-          {"{"}(col, row): tile_id{"}"}
+          {"{"}(col, row): ((gid, flipbits), ...){"}"}
         </code>
-        , which is what <code>PhysicsWorld</code> owns.
+        , which is what <code>PhysicsWorld</code> holds. Overlapping layers
+        never overwrite each other — a deco tile on top can't erase solid
+        ground below, and each entry keeps its own flip flags.
       </p>
 
       <h2 id="rendering">TILE RENDERING</h2>
@@ -84,7 +86,8 @@ stats = renderer.render(screen, camera.offset)
         <em>textures</em> from each layer's <code>ttype</code> /{" "}
         <code>variant</code> and has no idea whether a tile is solid, one-way,
         or air. Collision facts live in the world — <code>world.tile_map</code>{" "}
-        plus the collision tileset. The split is deliberate: render everything,
+        plus the collision tileset. The split is on purpose: render
+        everything,
         collide with a subset (<code>exclude_layers</code> only affects the
         world).
       </p>
@@ -94,32 +97,35 @@ stats = renderer.render(screen, camera.offset)
       </p>
       <CodeBlock
         title="overlay.py"
-        code={`tile_id = world.tile_map.get((tx, ty))          # world id space
-if tile_id is None:
-    continue
-tile_data = world.tileset_collision.tiles.get(tile_id)
-if tile_data is None:
-    continue
-if any(s.one_way for s in tile_data.shapes):
-    # dashed top edge at (tx * world.tile_size[0], ty * world.tile_size[1])`}
+        code={`from tilemap_parser import iter_cell_entries
+
+for entry in iter_cell_entries(world.tile_map.get((tx, ty))):
+    tile_data = world.resolve_stack_entry(entry)  # GID-routed + flipped
+    if tile_data is None:
+        continue
+    if any(s.one_way for s in tile_data.shapes):
+        # dashed top edge at (tx * world.tile_size[0], ty * world.tile_size[1])`}
       />
       <p>
         <code>one_way</code> is authored per polygon in the collision JSON —{" "}
-        <em>never</em> in the map JSON — and the platformer family honors it
-        automatically (blocks from above, passes from below), so the query is
+        <em>never</em> in the map JSON — and platformer movement already
+        handles it (blocks from above, passes from below), so the query is
         for <em>visuals</em> only. Two id-space caveats:
       </p>
       <ul>
         <li>
           The renderer keys tiles by layer <code>ttype</code>; the world keys by
-          the collision tile id. Same map, same ints — until{" "}
-          <code>use_gids=True</code> makes the world's ids global and the two
-          spaces diverge. Always query through <code>world.tile_map</code>,
-          never through the renderer.
+          stacked <code>(gid, flipbits)</code> entries. Same map, same gids —
+          until <code>use_gids=True</code> makes the world's ids global and the
+          two spaces diverge. Always query through <code>world.tile_map</code>{" "}
+          with <code>iter_cell_entries</code> /{" "}
+          <code>world.resolve_stack_entry</code>, never through the renderer.
         </li>
         <li>
           Tiles with no collision entry draw fine but collide as air; layers in{" "}
-          <code>exclude_layers</code> draw fine but don't exist for physics.
+          <code>exclude_layers</code> or with{" "}
+          <code>collision_enabled=False</code> draw fine but don't exist for
+          physics.
         </li>
       </ul>
 
@@ -151,9 +157,11 @@ if player_start is not None:
           first region's layer/mask are adopted by the object.
         </li>
         <li>
-          <code>require_collision=True</code> (the default) returns only objects
-          that have matching collision regions; pass <code>False</code> to also
-          get visual-only objects (with empty shapes).
+          <code>require_collision=False</code> (the default) also returns
+          visual-only objects (with empty shapes — gate on{" "}
+          <code>has_collision</code> before adding to the collision manager);
+          pass <code>True</code> to return only objects that have matching
+          collision regions.
         </li>
         <li>
           All spatial data is pre-scaled by the map's <code>render_scale</code>;
@@ -164,14 +172,17 @@ if player_start is not None:
       <h2 id="background">BACKGROUND (IMAGE) LAYERS</h2>
       <p>
         Image layers hold a single external image — a parallax sky, backdrop, or
-        full-screen art. They carry no tiles or objects, just{" "}
+        full-screen art. They carry no tiles or objects, only{" "}
         <code>image_path</code> and <code>image_rect</code>. The parser parses
         all image-layer metadata as <code>ParsedLayer</code> with{" "}
         <code>layer_type == "image"</code> (aliases{" "}
         <code>"background"</code> / <code>"background_layer"</code> are also
         accepted) but <code>TilemapData.load</code> eagerly loads only the first
-        image layer into <code>TilemapData.background_layer</code>; additional
-        image layers remain in <code>data.parsed.layers</code> for manual loading.
+        visible image layer into <code>TilemapData.background_layer</code>;
+        any image layer can be loaded on demand with{" "}
+        <code>get_image_layer_surface</code> /{" "}
+        <code>get_image_layer_surfaces</code>, which resolve{" "}
+        <code>../../assets</code>-style paths and cache results.
       </p>
       <CodeBlock
         title="background.py"
@@ -185,7 +196,15 @@ if bg is not None and bg.surface is not None:
 
 # Or query any image layer directly:
 for layer in data.get_layers(layer_type="image"):
-    print(layer.name, layer.image_path, layer.image_rect)`}
+    print(layer.name, layer.image_path, layer.image_rect)
+
+# Lazy surface loading (visible layers by default):
+surf = data.get_image_layer_surface("sky")  # by name, id, or ParsedLayer
+all_bgs = data.get_image_layer_surfaces()   # [(layer, surface)] in z-order
+hidden_too = data.get_image_layer_surfaces(include_hidden=True)
+
+# One image, placed N times (editor duplicates): single composited surface
+composed = data.get_placed_image_layer_surface("sky", render_scale=data.render_scale)`}
       />
       <ul>
         <li>
@@ -201,9 +220,16 @@ for layer in data.get_layers(layer_type="image"):
           the image is drawn. <code>None</code> when not authored.
         </li>
         <li>
-          Only the first image/background layer is exposed as{" "}
+          Only the first visible image/background layer is exposed as{" "}
           <code>background_layer</code>; all are still in{" "}
-          <code>data.parsed.layers</code>.
+          <code>data.parsed.layers</code>. Use{" "}
+          <code>get_image_layer_surface(layer)</code> /{" "}
+          <code>get_image_layer_surfaces()</code> to load any image layer on
+          demand — hidden layers are skipped unless you pass{" "}
+          <code>include_hidden=True</code>. Layers with editor duplicates
+          expose <code>image_placements</code>;{" "}
+          <code>get_placed_image_layer_surface()</code> composites base +{" "}
+          copies into one surface (no manual tiling loops).
         </li>
       </ul>
     </div>
