@@ -91,13 +91,63 @@ class TestShouldCollide:
         b = _make_rect(0, 0, 10, 10, collision_layer=2, collision_mask=8)
         assert should_collide(a, b) is False
 
-    def test_missing_attributes_use_defaults(self):
+    def test_missing_attributes_raise_loudly(self):
+        """Missing layer/mask is a loud TypeError, never an implicit default."""
+
         class BareObject:
             x = 0.0
             y = 0.0
             collision_shape = RectangleShape(width=10, height=10)
 
-        assert should_collide(BareObject(), BareObject()) is True
+        with pytest.raises(TypeError):
+            should_collide(BareObject(), BareObject())
+
+    def test_shapeless_check_warns_and_misses(self):
+        """Shapeless objects warn and return None instead of crashing."""
+
+        class Shapeless:
+            x = 0.0
+            y = 0.0
+            collision_shape = None
+            collision_layer = 1
+            collision_mask = 0xFFFFFFFF
+
+        solid = _make_rect(0, 0, 10, 10)
+        with pytest.warns(UserWarning):
+            assert check_collision(Shapeless(), solid) is None
+        with pytest.warns(UserWarning):
+            assert check_collision(solid, Shapeless()) is None
+
+    def test_manager_refuses_shapeless(self):
+        """add_object refuses shapeless objects with a warning (never stored)."""
+
+        class Shapeless:
+            x = 0.0
+            y = 0.0
+            collision_shape = None
+            collision_layer = 1
+            collision_mask = 0xFFFFFFFF
+
+        mgr = ObjectCollisionManager()
+        with pytest.warns(UserWarning):
+            mgr.add_object(Shapeless())
+        assert len(mgr) == 0
+
+    def test_manager_query_shapeless_warns_empty(self):
+        """Querying with a shapeless object warns and returns no hits."""
+
+        class Shapeless:
+            x = 0.0
+            y = 0.0
+            collision_shape = None
+            collision_layer = 1
+            collision_mask = 0xFFFFFFFF
+
+        mgr = ObjectCollisionManager([_make_rect(0, 0, 10, 10)])
+        with pytest.warns(UserWarning):
+            assert mgr.check_object(Shapeless()) == []
+        with pytest.warns(UserWarning):
+            assert mgr.check_object_first(Shapeless()) is None
 
 
 # ---------------------------------------------------------------------------

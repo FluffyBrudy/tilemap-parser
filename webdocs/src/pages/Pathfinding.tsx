@@ -141,7 +141,7 @@ export default function Pathfinding() {
           <code>update_rpg</code> resolves collision against{" "}
           <code>tile_map</code>/<code>tileset_collision</code> via{" "}
           <code>move_rpg</code>, so the follower never walks through walls; it
-          just gets stopped and you read <code>hit_wall_x/y</code>.
+          gets stopped and you read <code>hit_wall_x/y</code>.
         </li>
       </ul>
       <Callout kind="warn" title="REBUILD WHEN THE MAP CHANGES">

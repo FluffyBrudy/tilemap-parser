@@ -1,5 +1,3 @@
-"""Platformer movement (the stable core)."""
-
 from __future__ import annotations
 
 import math
@@ -8,7 +6,7 @@ from ...parser.collision import TilesetCollision
 from ..polygon_query import _check_sprite_polygon_offset, get_shape_bounds
 from ..protocols import ICollidableSprite
 from ..world import PhysicsWorld
-from .queries import _resolve_tile_data
+from .queries import _iter_tile_datas, _resolve_tile_data
 from .types import CollisionResult, Vector2
 
 
@@ -16,7 +14,7 @@ def move_platformer(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     dt: float,
     input_x: float = 0.0,
     jump_pressed: bool = False,
@@ -24,25 +22,8 @@ def move_platformer(
     world: PhysicsWorld | None = None,
 ) -> CollisionResult:
     """
-    Move sprite with platformer physics (gravity, jumping).
-
-    Best for side-scrolling platformer games.
-
-    Args:
-        sprite: Sprite to move (must have vx, vy, on_ground attributes)
-        tileset_collision: Tileset collision data. Optional when a world is
-            attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
-            when a world is attached (or passed as ``world=``).
-        dt: Delta time in seconds
-        input_x: Horizontal input (-1 to 1) for built-in movement
-        jump_pressed: Whether jump button is pressed for built-in movement
-        velocity: Optional explicit velocity (vx, vy). When provided, the
-            runner skips built-in input/gravity/jump velocity calculation
-            and only resolves collision for that velocity.
-
-    Returns:
-        CollisionResult with final position and collision info
+    Platformer physics: gravity, jumping, step-up, ground snap, directional
+    one-way platforms. Explicit ``velocity=`` skips input/gravity/jump.
     """
     world = self._resolve_world(world)
     if world is not None:
@@ -79,7 +60,6 @@ def move_platformer(
     old_x, old_y = sprite.x, sprite.y
     _, _, _, old_bottom = get_shape_bounds(sprite)
 
-    # X axis
     sprite.x = old_x + delta_x
     # Lift above ground snap overlap so ground doesn't block horizontal movement
     sprite.y = old_y - self.ground_snap_tolerance
@@ -88,7 +68,6 @@ def move_platformer(
         sprite, tileset_collision, tile_map, include_one_way=False, world=world
     ):
         if delta_x != 0:
-            # Try stepping up onto slope/stairs
             sprite.y = old_y - self.ground_snap_tolerance - self.step_height
             if not self._collides_at_platformer(
                 sprite, tileset_collision, tile_map, include_one_way=False, world=world
@@ -104,7 +83,6 @@ def move_platformer(
             sprite.vx = 0.0
             result.hit_wall_x = True
 
-    # Y axis — check one-way platforms
     if stepped_up:
         sprite.y = sprite.y + delta_y
     else:
@@ -120,29 +98,31 @@ def move_platformer(
 
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
-                    continue
-                if not _check_sprite_polygon_offset(
-                    sprite, poly, ox, oy, self.render_scale
-                ):
-                    continue
-                if poly.one_way and sprite.vy > 0:
-                    # one-way: only block if sprite was above the platform top
-                    min_vy = (
-                        min(v[1] for v in poly.vertices) * self.render_scale + oy
-                    )
-                    if old_y + (bottom - sprite.y) <= min_vy:
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if not _check_sprite_polygon_offset(
+                        sprite, poly, ox, oy, self.render_scale
+                    ):
+                        continue
+                    if poly.one_way and sprite.vy > 0:
+                        # one-way: only block if sprite was above the platform top
+                        min_vy = (
+                            min(v[1] for v in poly.vertices) * self.render_scale + oy
+                        )
+                        if old_y + (bottom - sprite.y) <= min_vy:
+                            collided_y = True
+                            break
+                    elif not poly.one_way:
                         collided_y = True
                         break
-                elif not poly.one_way:
-                    collided_y = True
+                if collided_y:
                     break
             if collided_y:
                 break
@@ -278,7 +258,7 @@ def move_platformer_with_slide(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     dt: float,
     input_x: float = 0.0,
     jump_pressed: bool = False,
@@ -286,51 +266,8 @@ def move_platformer_with_slide(
     world: PhysicsWorld | None = None,
 ) -> CollisionResult:
     """
-    Slope-aware platformer movement.
-
-    Supports:
-    - gravity and jumping
-    - one-way platforms
-    - walkable slopes
-    - stair stepping
-    - smooth ground following
-
-    Unlike move_platformer(), this mode follows polygon floor
-    surfaces and prevents steep slopes from being treated as
-    walkable terrain.
-
-    Args:
-        sprite:
-            Sprite being simulated. Expected to provide position,
-            velocity, and ground state attributes.
-
-        tileset_collision:
-            Collision definitions for tiles in the map. Optional when a
-            world is attached (or passed as ``world=``) — resolved from it.
-
-        tile_map:
-            Mapping of (tile_x, tile_y) coordinates to tile identifiers.
-            Optional when a world is attached (or passed as ``world=``).
-
-        dt:
-            Frame delta time in seconds.
-
-        input_x:
-            Horizontal movement input, typically in the range [-1, 1].
-
-        jump_pressed:
-            True if jump was pressed during this frame.
-
-        velocity:
-            Optional explicit velocity (vx, vy). When provided, the runner
-            skips built-in input/gravity/jump velocity calculation and only
-            resolves collision for that velocity. This is the preferred
-            path for dash, knockback, wind, moving-platform carry, or a
-            custom controller.
-
-    Returns:
-        CollisionResult describing the resolved movement and collision
-        state after simulation.
+    Slope-aware platformer movement: follows polygon floors, steep slopes
+    are walls not floors. Explicit ``velocity=`` is the dash/knockback path.
     """
 
     world = self._resolve_world(world)
@@ -383,10 +320,8 @@ def move_platformer_with_slide(
     max_ground_up = max(self.step_height, slope_follow + skin)
     max_ground_down = max(self.ground_snap_tolerance, slope_follow + skin)
 
-    # Horizontal movement first. Grounded sprites are allowed to follow
-    # walkable floor contours, but only when a jump did not start this frame.
-    # World-X velocity is preserved (dx = vx * dt); ground following only
-    # derives dy. support_info tracks the already-selected surface.
+    # Ground following needs dx preserved with dy derived, and no follow on
+    # jump frames; support_info tracks the already-selected surface.
     if delta_x != 0.0:
         sprite.x = old_x + delta_x
         sprite.y = old_y

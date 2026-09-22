@@ -24,7 +24,10 @@ from tilemap_parser.runtime.world import PhysicsWorld
 
 
 class Probe:
-    """Minimal ICollidableObject stand-in."""
+    """Minimal ICollidable stand-in."""
+
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
 
     def __init__(self, x, y, shape):
         self.x = x
@@ -356,6 +359,9 @@ def _ground_world():
 
 class Mover:
     """Minimal ICollidableSprite stand-in."""
+
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
 
     def __init__(self, x, y):
         self.x = x

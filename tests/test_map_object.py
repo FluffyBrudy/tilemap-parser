@@ -361,8 +361,15 @@ class TestLoadMapObjects:
         assert objects[0].surface is not objects[1].surface
 
     def test_missing_collision_file(self, map_no_collision_file):
+        """Default includes visual-only objects (require_collision=False)."""
         td, collision_dir = map_no_collision_file
         objects = load_map_objects(td, collision_dir)
+        assert len(objects) == 1
+        assert objects[0].has_collision is False
+
+    def test_require_collision_true_skips_visual_only(self, map_no_collision_file):
+        td, collision_dir = map_no_collision_file
+        objects = load_map_objects(td, collision_dir, require_collision=True)
         assert objects == []
 
     def test_no_object_layers(self):

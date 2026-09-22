@@ -1,85 +1,92 @@
-"""
-Collision data parser for tilemap collision systems.
-
-Provides parsing of collision data from JSON into data classes:
-- Tileset collision (grid-based polygon shapes)
-- Character collision (geometric shapes: rect, circle, capsule, polygon)
-- Object collision (region-based polygon paint with layer/mask per region)
-"""
-
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
-JsonDict = Dict[str, Any]
-Point = Tuple[float, float]
-IntPoint = Tuple[int, int]
+JsonDict = dict[str, Any]
+Point = tuple[float, float]
+IntPoint = tuple[int, int]
 
 
 class CollisionParseError(ValueError):
-    """Raised when collision data cannot be parsed"""
     pass
 
 
 @dataclass
 class CollisionPolygon:
-    """Polygon collision shape for a tile"""
-
-    vertices: List[Point]
+    vertices: list[Point]
     one_way: bool = False
 
     def transform(self, tile_x: float, tile_y: float, scale: float = 1.0) -> "CollisionPolygon":
-        """Transform polygon to world space coordinates"""
         world_vertices = [(tile_x + vx * scale, tile_y + vy * scale) for vx, vy in self.vertices]
         return CollisionPolygon(vertices=world_vertices, one_way=self.one_way)
 
     def scaled(self, scale: float) -> "CollisionPolygon":
-        """Return a copy with all vertices multiplied by *scale*."""
         return CollisionPolygon(
             vertices=[(vx * scale, vy * scale) for vx, vy in self.vertices],
             one_way=self.one_way,
         )
 
+    def inflated(self, amount: float) -> CollisionPolygon:
+        verts = list(self.vertices)
+        if len(verts) < 3 or amount == 0:
+            return CollisionPolygon(vertices=verts, one_way=self.one_way)
+        n = len(verts)
+        cx = sum(v[0] for v in verts) / n
+        cy = sum(v[1] for v in verts) / n
+        edge_normals: list[Point] = []
+        for i in range(n):
+            x1, y1 = verts[i]
+            x2, y2 = verts[(i + 1) % n]
+            dx, dy = x2 - x1, y2 - y1
+            length = math.hypot(dx, dy)
+            edge_normals.append((dy / length, -dx / length) if length > 0 else (0.0, 0.0))
+        out: list[Point] = []
+        for i in range(n):
+            nx = edge_normals[i - 1][0] + edge_normals[i][0]
+            ny = edge_normals[i - 1][1] + edge_normals[i][1]
+            length = math.hypot(nx, ny)
+            if length > 0:
+                nx, ny = nx / length, ny / length
+            vx, vy = verts[i]
+            if (vx - cx) * nx + (vy - cy) * ny < 0:
+                nx, ny = -nx, -ny
+            out.append((vx + nx * amount, vy + ny * amount))
+        return CollisionPolygon(vertices=out, one_way=self.one_way)
+
     def is_valid(self) -> bool:
-        """Check if polygon has at least 3 vertices"""
         return len(self.vertices) >= 3
 
 
 @dataclass
 class TileCollisionData:
-    """Collision data for a single tile"""
-
     tile_id: int
-    shapes: List[CollisionPolygon] = field(default_factory=list)
+    shapes: list[CollisionPolygon] = field(default_factory=list)
+    # Mutual layer/mask agreement required; defaults collide with everything.
+    collision_layer: int = 1
+    collision_mask: int = 0xFFFFFFFF
 
     def has_collision(self) -> bool:
-        """Check if tile has any valid collision shapes"""
         return any(shape.is_valid() for shape in self.shapes)
 
 
 @dataclass
 class TilesetCollision:
-    """Complete collision data for a tileset"""
-
     tileset_name: str
     tile_size: IntPoint
-    tiles: Dict[int, TileCollisionData] = field(default_factory=dict)
+    tiles: dict[int, TileCollisionData] = field(default_factory=dict)
 
-    def get_tile_collision(self, tile_id: int) -> Optional[TileCollisionData]:
-        """Get collision data for a specific tile"""
+    def get_tile_collision(self, tile_id: int) -> TileCollisionData | None:
         return self.tiles.get(tile_id)
 
     def has_collision(self, tile_id: int) -> bool:
-        """Check if tile has collision data"""
         tile_data = self.get_tile_collision(tile_id)
         return tile_data is not None and tile_data.has_collision()
 
     def get_world_shapes(
         self, tile_id: int, tile_x: float, tile_y: float, scale: float = 1.0
-    ) -> List[CollisionPolygon]:
-        """Get collision shapes transformed to world space"""
+    ) -> list[CollisionPolygon]:
         tile_data = self.get_tile_collision(tile_id)
         if not tile_data:
             return []
@@ -88,34 +95,22 @@ class TilesetCollision:
     @classmethod
     def merge(
         cls,
-        collisions: List["TilesetCollision"],
-        firstgids: List[int],
+        collisions: list["TilesetCollision"],
+        firstgids: list[int],
     ) -> "TilesetCollision":
-        """Merge multiple tileset collisions into one, offsetting keys by firstgid.
-
-        Each collision's tiles are re-keyed as ``firstgid + local_id`` so that
-        the resulting dict uses global tile IDs for lookup.
-
-        Args:
-            collisions: List of TilesetCollision objects to merge.
-            firstgids: List of firstgid offsets, one per collision, in the
-                       same order as *collisions*.  The offset is added to
-                       each tile's local ID to produce the global key.
-
-        Usage::
-
-            merged = TilesetCollision.merge([ts0, ts1], [0, 200])
-        """
+        """Re-keys as firstgid + local_id for global lookup."""
         if not collisions:
             return cls(tileset_name="merged", tile_size=(0, 0))
         tile_size = collisions[0].tile_size
-        merged_tiles: Dict[int, TileCollisionData] = {}
+        merged_tiles: dict[int, TileCollisionData] = {}
         for coll, offset in zip(collisions, firstgids, strict=True):
             for local_id, data in coll.tiles.items():
                 gid = offset + local_id
                 merged_tiles[gid] = TileCollisionData(
                     tile_id=gid,
                     shapes=data.shapes[:],
+                    collision_layer=data.collision_layer,
+                    collision_mask=data.collision_mask,
                 )
         return cls(
             tileset_name="merged",
@@ -126,86 +121,139 @@ class TilesetCollision:
 
 @dataclass
 class RectangleShape:
-    """Rectangle collision shape"""
-
     width: float
     height: float
     offset: Point = (0.0, 0.0)
 
-    def get_bounds(self, x: float, y: float) -> Tuple[float, float, float, float]:
-        """Get AABB bounds in world space (left, top, right, bottom)"""
+    def get_bounds(self, x: float, y: float) -> tuple[float, float, float, float]:
         left = x + self.offset[0]
         top = y + self.offset[1]
         return (left, top, left + self.width, top + self.height)
 
     def scaled(self, scale: float) -> "RectangleShape":
-        """Return a copy with dimensions and offset multiplied by *scale*."""
         return RectangleShape(
             width=self.width * scale,
             height=self.height * scale,
             offset=(self.offset[0] * scale, self.offset[1] * scale),
         )
 
+    def inflated(self, amount: float) -> RectangleShape:
+        amount = max(amount, -min(self.width, self.height) / 2)
+        return RectangleShape(
+            width=self.width + 2 * amount,
+            height=self.height + 2 * amount,
+            offset=(self.offset[0] - amount, self.offset[1] - amount),
+        )
+
 
 @dataclass
 class CircleShape:
-    """Circle collision shape"""
-
     radius: float
     offset: Point = (0.0, 0.0)
 
     def get_center(self, x: float, y: float) -> Point:
-        """Get center position in world space"""
         return (x + self.offset[0], y + self.offset[1])
 
     def scaled(self, scale: float) -> "CircleShape":
-        """Return a copy with radius and offset multiplied by *scale*."""
         return CircleShape(
             radius=self.radius * scale,
             offset=(self.offset[0] * scale, self.offset[1] * scale),
         )
 
+    def inflated(self, amount: float) -> CircleShape:
+        return CircleShape(
+            radius=max(0.0, self.radius + amount),
+            offset=self.offset,
+        )
+
 
 @dataclass
 class CapsuleShape:
-    """Capsule collision shape (vertical orientation)"""
-
     radius: float
     height: float
     offset: Point = (0.0, 0.0)
 
     def get_top_center(self, x: float, y: float) -> Point:
-        """Get top circle center in world space"""
         return (x + self.offset[0], y + self.offset[1])
 
     def get_bottom_center(self, x: float, y: float) -> Point:
-        """Get bottom circle center in world space"""
         return (x + self.offset[0], y + self.offset[1] + self.height)
 
     def scaled(self, scale: float) -> "CapsuleShape":
-        """Return a copy with radius, height, and offset multiplied by *scale*."""
         return CapsuleShape(
             radius=self.radius * scale,
             height=self.height * scale,
             offset=(self.offset[0] * scale, self.offset[1] * scale),
         )
 
+    def inflated(self, amount: float) -> CapsuleShape:
+        return CapsuleShape(
+            radius=max(0.0, self.radius + amount),
+            height=self.height,
+            offset=self.offset,
+        )
 
-CharacterShapeType = Union[RectangleShape, CircleShape, CapsuleShape, CollisionPolygon]
+
+CharacterShapeType = RectangleShape | CircleShape | CapsuleShape | CollisionPolygon
+
+SpriteShape = RectangleShape | CircleShape | CapsuleShape
+# Cast once at load; protocols stay wide for manager assignment.
+
+
+def flip_character_shape(
+    shape: CharacterShapeType,
+    sprite_size: tuple[float, float],
+    *,
+    flip_h: bool = True,
+    flip_v: bool = False,
+) -> CharacterShapeType:
+    """Sprite-local mirror; never mutates; twice is identity. Re-anchor
+    the owner after flipping to keep it planted."""
+    w, h = float(sprite_size[0]), float(sprite_size[1])
+    if not math.isfinite(w) or not math.isfinite(h) or w <= 0 or h <= 0:
+        raise ValueError(f"sprite_size must be finite and positive, got {sprite_size!r}")
+    if isinstance(shape, RectangleShape):
+        ox, oy = shape.offset
+        return RectangleShape(
+            width=shape.width,
+            height=shape.height,
+            offset=(
+                (w - (ox + shape.width)) if flip_h else ox,
+                (h - (oy + shape.height)) if flip_v else oy,
+            ),
+        )
+    if isinstance(shape, CircleShape):
+        ox, oy = shape.offset
+        return CircleShape(
+            radius=shape.radius,
+            offset=((w - ox) if flip_h else ox, (h - oy) if flip_v else oy),
+        )
+    if isinstance(shape, CapsuleShape):
+        ox, oy = shape.offset
+        return CapsuleShape(
+            radius=shape.radius,
+            height=shape.height,
+            offset=(
+                (w - ox) if flip_h else ox,
+                (h - (oy + shape.height)) if flip_v else oy,
+            ),
+        )
+    if isinstance(shape, CollisionPolygon):
+        verts = [(w - x, y) if flip_h else (x, y) for x, y in shape.vertices]
+        verts = [(x, h - y) if flip_v else (x, y) for x, y in verts]
+        return CollisionPolygon(vertices=verts, one_way=shape.one_way)
+    raise TypeError(f"Cannot flip unknown shape type: {type(shape).__name__}")
 
 
 @dataclass
 class CharacterCollision:
-    """Complete collision data for a character sprite or dynamic object."""
-
     name: str
     shape: CharacterShapeType
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
     collision_layer: int = 1
     collision_mask: int = 0xFFFFFFFF
 
     def scaled(self, scale: float) -> "CharacterCollision":
-        """Return a copy whose shape is scaled by *scale* (typically ``render_scale``)."""
         return CharacterCollision(
             name=self.name,
             shape=self.shape.scaled(scale),
@@ -217,24 +265,20 @@ class CharacterCollision:
 
 @dataclass
 class ObjectCollisionRegionData:
-    """A single collision region within an object collision file."""
-
     region_id: str
     name: str
-    region_rect: Tuple[int, int, int, int]  # (x, y, width, height)
-    shapes: List[CollisionPolygon] = field(default_factory=list)
+    region_rect: tuple[int, int, int, int]
+    shapes: list[CollisionPolygon] = field(default_factory=list)
     collision_layer: int = 1
     collision_mask: int = 0xFFFFFFFF
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
     def has_collision(self) -> bool:
-        """Check if region has any valid collision shapes."""
         return any(shape.is_valid() for shape in self.shapes)
 
     def get_world_shapes(
         self, world_x: float, world_y: float
-    ) -> List[CollisionPolygon]:
-        """Get collision shapes transformed to world space using region_rect offset."""
+    ) -> list[CollisionPolygon]:
         ox = world_x + self.region_rect[0]
         oy = world_y + self.region_rect[1]
         return [shape.transform(ox, oy) for shape in self.shapes]
@@ -242,52 +286,44 @@ class ObjectCollisionRegionData:
 
 @dataclass
 class ObjectCollisionData:
-    """Complete collision data for object/region-based collision (polygon paint)."""
-
     tileset_name: str
-    regions: Dict[str, ObjectCollisionRegionData] = field(default_factory=dict)
+    regions: dict[str, ObjectCollisionRegionData] = field(default_factory=dict)
 
-    def get_region(self, region_id: str) -> Optional[ObjectCollisionRegionData]:
-        """Get a specific region by ID."""
+    def get_region(self, region_id: str) -> ObjectCollisionRegionData | None:
         return self.regions.get(region_id)
 
     def has_collision(self, region_id: str) -> bool:
-        """Check if a region has collision data."""
         region = self.get_region(region_id)
         return region is not None and region.has_collision()
 
 
 def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
-    """
-    Parse tileset collision data from dictionary.
-
-    Args:
-        data: Dictionary loaded from .collision.json file
-
-    Returns:
-        TilesetCollision object
-
-    Raises:
-        CollisionParseError: If data format is invalid
-    """
     try:
         tileset_name = data["tileset_name"]
         tile_size_raw = data["tile_size"]
         tile_size = (int(tile_size_raw[0]), int(tile_size_raw[1]))
 
-        tiles: Dict[int, TileCollisionData] = {}
+        tiles: dict[int, TileCollisionData] = {}
         tiles_data = data.get("tiles", {})
 
         for tile_id_str, tile_data in tiles_data.items():
             tile_id = int(tile_id_str)
-            shapes: List[CollisionPolygon] = []
+            shapes: list[CollisionPolygon] = []
 
             for shape_data in tile_data.get("shapes", []):
                 vertices = [tuple(v) for v in shape_data["vertices"]]
                 one_way = shape_data.get("one_way", False)
                 shapes.append(CollisionPolygon(vertices=vertices, one_way=one_way))
 
-            tiles[tile_id] = TileCollisionData(tile_id=tile_id, shapes=shapes)
+            props = tile_data.get("properties", {})
+            if not isinstance(props, dict):
+                raise TypeError(f"tile {tile_id} properties must be an object")
+            tiles[tile_id] = TileCollisionData(
+                tile_id=tile_id,
+                shapes=shapes,
+                collision_layer=int(props.get("collision_layer", 1)),
+                collision_mask=int(props.get("collision_mask", 0xFFFFFFFF)),
+            )
 
         return TilesetCollision(
             tileset_name=tileset_name, tile_size=tile_size, tiles=tiles,
@@ -297,21 +333,7 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
 
 
 def parse_character_collision(data: JsonDict, render_scale: float = 1.0) -> CharacterCollision:
-    """
-    Parse character collision data from dictionary.
-
-    Args:
-        data: Dictionary loaded from .collision.json file
-        render_scale: Multiplier applied to shape dimensions and offsets
-            (no-op when 1.0).
-
-    Returns:
-        CharacterCollision object
-
-    Raises:
-        CollisionParseError: If data format is invalid or render_scale is not
-            finite and greater than zero.
-    """
+    """Non-finite/non-positive scale raises; shape scaled unless 1.0."""
     if (
         not isinstance(render_scale, (int, float))
         or not math.isfinite(render_scale)
@@ -368,27 +390,10 @@ def parse_character_collision(data: JsonDict, render_scale: float = 1.0) -> Char
 
 
 def parse_object_collision(data: JsonDict) -> ObjectCollisionData:
-    """
-    Parse object collision data (region-based polygon paint) from dictionary.
-
-    The editor stores object collision files with a ``regions`` structure where
-    each region contains polygon shapes and optional layer/mask properties.
-
-    File format: ``<tileset_name>.object_collision.json``
-    Typical path: ``<data_root>/collision/<tileset_name>.object_collision.json``
-
-    Args:
-        data: Dictionary loaded from an object collision JSON file.
-
-    Returns:
-        ObjectCollisionData object.
-
-    Raises:
-        CollisionParseError: If data format is invalid.
-    """
+    """File: <tileset_name>.object_collision.json under <data_root>/collision/."""
     try:
         tileset_name = data["tileset_name"]
-        regions: Dict[str, ObjectCollisionRegionData] = {}
+        regions: dict[str, ObjectCollisionRegionData] = {}
         regions_data = data.get("regions", {})
 
         for region_id, region_data in regions_data.items():
@@ -400,7 +405,7 @@ def parse_object_collision(data: JsonDict) -> ObjectCollisionData:
                 int(region_rect_raw[3]),
             )
 
-            shapes: List[CollisionPolygon] = []
+            shapes: list[CollisionPolygon] = []
             for shape_data in region_data.get("shapes", []):
                 vertices = [tuple(v) for v in shape_data["vertices"]]
                 one_way = shape_data.get("one_way", False)
