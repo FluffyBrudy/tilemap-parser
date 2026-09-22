@@ -179,12 +179,12 @@ export default function JsonFormats() {
             {"{"}x,y,w,h{"}"}
           </code>
           ). Parses all image-layer metadata but eagerly loads only the first
-          image layer into <code>TilemapData.background_layer</code> (
+          visible image layer into <code>TilemapData.background_layer</code> (
           <code>BackgroundLayer</code>
-          ); additional image layers remain in <code>
-            data.parsed.layers
+          ); load any image layer on demand with <code>
+            get_image_layer_surface / get_image_layer_surfaces
           </code>{" "}
-          for manual loading.
+          (<code>include_hidden=True</code> to include hidden layers).
         </li>
         <li>
           Object animation: <code>objects[].animation</code> with required{" "}
@@ -209,7 +209,9 @@ export default function JsonFormats() {
         </li>
         <li>
           Parser entry: <code>load_map(path)</code> → <code>TilemapData</code>;{" "}
-          <code>build_tile_map()</code> flattens layers into the collision dict.
+          <code>build_tile_map()</code> unions layers into stacked{" "}
+          <code>(gid, flipbits)</code> entries per cell (Godot-style — overlaps
+          never overwrite).
         </li>
       </ul>
 
@@ -231,6 +233,14 @@ export default function JsonFormats() {
         <li>
           Tiles missing from <code>tiles</code> are walkable. Tile{" "}
           <code>8</code> above is a one-way platform (top 16px solid).
+        </li>
+        <li>
+          Per-tile <code>properties.collision_layer</code> /{" "}
+          <code>collision_mask</code> (defaults 1 / all) filter which sprites
+          the tile blocks — both sides must agree, same rule as bodies.
+          Movement checks follow it; flip flags (<code>flip_h</code> /{" "}
+          <code>flip_v</code> / <code>flip_d</code> on the placed tile) mirror
+          the shapes.
         </li>
         <li>
           Parser: <code>parse_tileset_collision</code> /{" "}

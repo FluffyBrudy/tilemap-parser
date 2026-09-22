@@ -1,22 +1,6 @@
-"""
-Runtime map object loading and representation.
-
-Bridges the gap between parsed map objects, collision data, and
-the collision manager.  Provides a ready-to-use :class:`MapObject`
-that implements :class:`ICollidableObject` and carries a pygame
-:class:`~pygame.Surface` for rendering.
-
-Usage::
-
-    objects = load_map_objects(tilemap_data, MAPS_PATH / "collision")
-    for obj in objects:
-        collision_manager.add_object(obj)
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union, final
 
 import pygame
 from pygame import Surface
@@ -30,23 +14,8 @@ from .map_loader import TilemapData
 
 class MapObject:
     """
-    A game object loaded from a tilemap, carrying a surface for
-    rendering and collision data for physics.
-
-    All spatial data (``x``, ``y``, ``surface`` size, and collision
-    polygon vertices) is pre-scaled by the map's ``render_scale``.
-    Units are in *effective* pixels (``render_scale × tile_size``).
-    The object is ready for direct use in a game loop that runs in
-    effective-pixel space — no additional scaling needed.
-
-    Satisfies the :class:`ICollidableObject` protocol so it can be
-    added directly to an :class:`ObjectCollisionManager`.
-
-    When a region contains multiple disjoint polygons, *all* shapes
-    are stored in :attr:`collision_shapes` and the first shape is
-    used as :attr:`collision_shape` for protocol compatibility.
-    The collision system (:func:`check_collision`) iterates all
-    shape pairs when either object has multiple shapes.
+    Tilemap object with pre-scaled surface, position, and shapes in
+    effective pixels; first shape doubles as collision_shape.
     """
 
     __slots__ = tuple(
@@ -101,10 +70,6 @@ class MapObject:
 
 
 def _resolve_object_collision_filename(tileset_path: str | Path) -> str:
-    """Extract the object collision filename for a given tileset path.
-
-    Example: ``"building7.png"`` → ``"building7.object_collision.json"``
-    """
     return f"{Path(tileset_path).stem}.object_collision.json"
 
 
@@ -113,49 +78,10 @@ def load_map_objects(
     collision_dir: str | Path,
     *,
     cache: CollisionCache | None = None,
-    require_collision: bool = True,
+    require_collision: bool = False,
 ) -> list[MapObject]:
-    """Load objects from a tilemap.
-
-    Iterates every object layer in *tilemap_data*, resolves the
-    corresponding ``.object_collision.json`` from *collision_dir*, and
-    builds :class:`MapObject` instances with pre-scaled surfaces,
-    positions, and collision shapes.
-
-    **render_scale transparency**
-
-    All spatial data is automatically scaled by the map's
-    ``render_scale`` (from ``tilemap_data.render_scale``):
-
-    * ``MapObject.x`` / ``MapObject.y`` — raw map coords × ``rs``
-      (stored as ``float``; fractional pixel positions are preserved).
-    * ``MapObject.surface`` — surface is scaled by ``rs`` via
-      :func:`pygame.transform.scale` (no-op when ``rs == 1.0``).
-      Raster dimensions are truncated to integers via ``int()``
-      to satisfy :func:`pygame.transform.scale` requirements.
-    * Collision polygon vertices and ``region_rect`` offsets are
-      multiplied by ``rs`` via :meth:`CollisionPolygon.transform`.
-
-    The returned objects are ready for a game loop that runs in
-    effective-pixel space (``render_scale × tile_size``).  No
-    additional scaling is required by the caller.
-
-    Collision data is cached per tileset index so the same file is
-    never loaded twice.
-
-    Args:
-        tilemap_data: Loaded tilemap data (surfaces, tilesets, layers).
-        collision_dir: Directory containing ``*.object_collision.json``
-            files (typically ``<map_path>/collision/``).
-        cache: Optional :class:`CollisionCache` for caching parsed
-            collision data across calls.
-        require_collision: If True (default), only objects with matching
-            collision regions are returned. If False, visual-only objects
-            without collision are also included.
-
-    Returns:
-        List of :class:`MapObject` instances.
-    """
+    """Every object layer; pre-scaled; cached per tileset; require_collision
+    drops visual-only objects (gate the rest on has_collision)."""
     collision_dir = Path(collision_dir)
     objects: list[MapObject] = []
     object_layers = tilemap_data.get_layers(layer_type="object")
@@ -240,9 +166,8 @@ def _load_collision_for_tileset(
     tilemap_data: TilemapData,
     ttype: int,
     collision_dir: Path,
-    cache: Optional[CollisionCache],
-) -> Optional[ObjectCollisionData]:
-    """Load (or retrieve from cache) collision data for a tileset index."""
+    cache: CollisionCache | None,
+) -> ObjectCollisionData | None:
     if ttype < 0 or ttype >= len(tilemap_data.parsed.tilesets):
         return None
 

@@ -1,12 +1,10 @@
 """
-Tests for TileLayerRenderer y-sort and extra_objects.
+Tests for TileLayerRenderer y-sort.
 
 Covers:
 - y_sort read from parsed layer data
 - y-major iteration when layer.y_sort=True
-- extra_objects merged and sorted by (z_index, y)
-- Duck-typed extra objects (surface, x, y only)
-- Smoke test: render with extra_objects does not crash, stats correct
+- Game-side object blitting after render (renderer is tile-only)
 """
 
 import sys
@@ -96,21 +94,6 @@ def _dummy_tileset_surface(w=16, h=16) -> Surface:
     return surf
 
 
-class DummyVisual:
-    """Minimal duck-typed visual — surface, x, y, optional z_index."""
-
-    __slots__ = ("surface", "x", "y", "z_index")
-
-    def __init__(self, surface, x, y, z_index=0):
-        self.surface = surface
-        self.x = x
-        self.y = y
-        self.z_index = z_index
-
-    def __repr__(self):
-        return f"DummyVisual(x={self.x}, y={self.y}, z={self.z_index})"
-
-
 def _make_tile(pos, ttype=0, variant=0):
     from tilemap_parser.parser.map_parse import ParsedTile
 
@@ -138,96 +121,6 @@ def _make_map_data(layers, tile_size=(16, 16)) -> TilemapData:
     tw, th = tile_size
     resolved_paths = [Path("dummy.png")]
     return TilemapData(mock_map, [_dummy_tileset_surface(tw, th)], resolved_paths, [])
-
-
-# ---------------------------------------------------------------------------
-# TileLayerRenderer — extra_objects
-# ---------------------------------------------------------------------------
-
-
-class TestExtraObjects:
-    def make_map_data(self) -> TilemapData:
-        """Minimal 1-layer map with a single tile at (0,0)."""
-        layer = ParsedLayer(
-            id=0,
-            name="Ground",
-            layer_type="tile",
-            visible=True,
-            locked=False,
-            opacity=1.0,
-            z_index=0,
-        )
-        layer.tiles[(0, 0)] = _make_tile((0, 0))
-        return _make_map_data([layer])
-
-    def test_extra_objects_smoke(self):
-        """Render with extra_objects does not crash."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((100, 100))
-        objs = [DummyVisual(_dummy_tileset_surface(), 10, 20)]
-        stats = renderer.render(target, (0, 0), extra_objects=objs)
-        assert stats.drawn_tiles == 1
-        assert stats.visible_layers == 1
-
-    def test_extra_objects_merged_into_drawn_count(self):
-        """drawn_tiles only counts tiles, not extras (unchanged stat)."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((100, 100))
-        objs = [DummyVisual(_dummy_tileset_surface(), 10, 20)]
-        stats = renderer.render(target, (0, 0), extra_objects=objs)
-        assert stats.drawn_tiles == 1  # extras not counted here
-
-    def test_multiple_extra_objects(self):
-        """Multiple extra objects all blit without error."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((200, 200))
-        objs = [
-            DummyVisual(_dummy_tileset_surface(), 10, 20, z_index=0),
-            DummyVisual(_dummy_tileset_surface(), 30, 40, z_index=1),
-            DummyVisual(_dummy_tileset_surface(), 50, 60, z_index=0),
-        ]
-        renderer.render(target, (0, 0), extra_objects=objs)
-        # no crash is the assertion
-
-    def test_duck_typed_minimal(self):
-        """Object with only surface/x/y works (no z_index)."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((100, 100))
-
-        class MinimalVisual:
-            def __init__(self):
-                self.surface = _dummy_tileset_surface()
-                self.x = 5
-                self.y = 15
-
-        renderer.render(target, (0, 0), extra_objects=[MinimalVisual()])
-
-    def test_extra_object_with_none_surface_skipped(self):
-        """Objects with surface=None are silently skipped."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((100, 100))
-
-        class NoneSurfaceVisual:
-            def __init__(self):
-                self.surface = None
-                self.x = 0
-                self.y = 0
-
-        renderer.render(target, (0, 0), extra_objects=[NoneSurfaceVisual()])
-
-    def test_render_without_extra_objects_still_works(self):
-        """Calling render() without extra_objects is unchanged."""
-        data = self.make_map_data()
-        renderer = TileLayerRenderer(data)
-        target = Surface((100, 100))
-        stats = renderer.render(target, (0, 0))
-        assert stats.drawn_tiles == 1
-        assert stats.visible_layers == 1
 
 
 # ---------------------------------------------------------------------------
@@ -313,13 +206,13 @@ class TestLayerYSort:
 
 
 # ---------------------------------------------------------------------------
-# Integration — combined y_sort + extra_objects
+# Integration — y_sort tiles + game-side object blits (renderer is tile-only)
 # ---------------------------------------------------------------------------
 
 
 class TestIntegration:
-    def test_y_sort_with_extra_objects(self):
-        """y_sort layer renders tiles first, then extras in caller order."""
+    def test_game_side_blits_after_render(self):
+        """Objects blit in caller order after tiles (the extra_objects migration)."""
         layer = ParsedLayer(
             id=0,
             name="Bushes",
@@ -336,13 +229,16 @@ class TestIntegration:
         renderer = TileLayerRenderer(data)
         target = _SpySurface((200, 200))
         ef = 16
-        objs = [
-            DummyVisual(_dummy_tileset_surface(), 5, 25),
-            DummyVisual(_dummy_tileset_surface(), 5, 3),
-        ]
-        renderer.render(target, (0, 0), extra_objects=objs)
+        stats = renderer.render(target, (0, 0))
+        assert stats.drawn_tiles == 2
+        # Game side: blit object surfaces in caller order after render.
+        for surf, x, y in [
+            (_dummy_tileset_surface(), 5, 25),
+            (_dummy_tileset_surface(), 5, 3),
+        ]:
+            target.blit(surf, (x, y))
         assert len(target.blit_calls) == 4
         assert target.blit_calls[0] == (0.0, 0.0)  # tile y=0
         assert target.blit_calls[1] == (0.0, 5.0 * ef)  # tile y=5
-        assert target.blit_calls[2] == (5.0, 25.0)  # extra in caller order
-        assert target.blit_calls[3] == (5.0, 3.0)  # extra in caller order
+        assert target.blit_calls[2] == (5.0, 25.0)  # object in caller order
+        assert target.blit_calls[3] == (5.0, 3.0)  # object in caller order

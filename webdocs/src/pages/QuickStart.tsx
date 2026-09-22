@@ -8,9 +8,9 @@ export default function QuickStart() {
       <h1>Quick Start</h1>
       <p>
         The smallest thing that loads a map, moves a sprite against tiles, and
-        draws. Top-down slide movement: swap the runner preset and the sprite
-        contract for a platformer (see{" "}
-        <Link to="/physics">Physics &amp; Bodies</Link>).
+        draws. Top-down slide movement: swap the runner preset and add{" "}
+        <code>vx</code>, <code>vy</code>, <code>on_ground</code> for a
+        platformer (see <Link to="/physics">Physics &amp; Bodies</Link>).
       </p>
 
       <CodeBlock
