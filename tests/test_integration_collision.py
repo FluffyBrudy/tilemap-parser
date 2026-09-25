@@ -19,6 +19,9 @@ SLOPE_POLY = [(0.0, 32.0), (32.0, 0.0), (32.0, 32.0)]
 
 
 class SimpleSprite:
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
+
     def __init__(self, x=0, y=0, shape=None):
         self.x = x
         self.y = y

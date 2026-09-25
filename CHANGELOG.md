@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased (BREAKING)
+
+### Added
+
+- `flip_character_shape(shape, sprite_size, flip_h=True, flip_v=False)` mirrors rect, circle, capsule and polygon character shapes. Input is never mutated. Re-anchor the owner after flipping to keep it planted.
+- `PhysicsWorld.tile_ids_at()`, `tile_entries_at()`, `resolve_stack_entry()`, `iter_cell_data()` and `cell_has_collision()`, plus top level `StackEntry`, `TileCell`, `TileMap`, `FLIP_H/V/D`, `flip_flags`, `flip_vertices`, `flipped_data`, `iter_cell_entries` and `iter_cell_ids`.
+- `ParsedLayer.collision_enabled` (default True) excludes whole layers from physics. `exclude_layers` still works.
+- `TilemapData.get_image_layer_surface()` and `get_image_layer_surfaces()`, both defaulting to `include_hidden=False`.
+- `TilemapData.get_placed_image_layer_surface(layer, render_scale=1.0)` composes the base image plus placements into one caller owned surface.
+- Add collision debug data helpers.
+- `move_grounded()` accepts `one_way="solid"` (default) or `"directional"`: directional lets horizontal and upward movement pass through one-way platforms while falling still lands when approaching from above.
+- `Camera.set_bounds()` / `Camera.set_bounds_from_map()` clamp the camera to a world rect (map-sized, offset-aware); small worlds center instead of pinning to an edge.
+- `load_map()` / `TilemapData.load()` accept `offset_tiles=(ox, oy)` (tile units, default `(0, 0)`) with `offset_x=` / `offset_y=` overrides. Shifts tiles, objects, image rects/placements, nodes, `map_size`, `scroll` together; world-px origin is exposed as `TilemapData.origin_offset` / `TilemapData.tile_offset`.
+
+### Breaking
+
+- Tile cells are stacked unions. `TilemapData.build_tile_map()` returns `{(col, row): ((gid, flipbits), ...)}` in `(z_index, id)` order. `PhysicsWorld.tile_map` uses the same shape. Legacy int and flat tuple cells still load as zero flip entries.
+- Overlapping layers no longer overwrite each other. Every layer contributes its entry at a cell.
+- Tile flips (`flip_h/v/d`) now apply to collision polygons and rendered surfaces. They were parsed but ignored before.
+- `TileCollisionData` accepts `collision_layer` (default 1) and `collision_mask` (default all) from tile entry properties. `NavGrid` accepts `collision_mask`. `rect_vs_tilemap` accepts `collision_mask=None` for unfiltered queries.
+- `ICollidable` requires `x`, `y`, `collision_shape`, `collision_layer` and `collision_mask`. Missing members raise `TypeError` at first use. `ICollidableSprite` extends it with motion state. `ICollidableObject` stays as an alias. New `SpriteShape` alias covers rect, circle and capsule shapes.
+- `TileLayerRenderer.render()` draws tiles only. The `extra_objects` path is removed. Draw object surfaces from `get_object_surfaces()` in caller order with your own viewport culling.
+- `load_map_objects()` defaults to `require_collision=False`, so visual only objects are included. Check `has_collision` before adding objects to the physics manager. The manager refuses shapeless objects with a warning, and `check_collision` returns None for shapeless pairs.
+- `get_object_surface()` returns the single rect the editor paints, sized by area. Rects outside the sheet return None with a warning.
+- Eager `background_layer` now skips hidden image layers.
+- Removed `tilemap_parser.runtime.object_collision` and `tilemap_parser.runtime.tile_collision`. Import from `tilemap_parser.runtime.collision`, `tilemap_parser.runtime.movement` and `tilemap_parser.runtime.polygon_query`.
+- `ParsedLayer` accepts `image_placements` (paint order) plus `next_placement_id`. Layers without the keys parse exactly as before.
+
+### Migration
+
+- Cells read by hand must handle entries. Use `iter_cell_entries(cell)` with `resolve_stack_entry(entry)`. Use `tile_ids_at(pos)` when flips do not matter. Hand built cells must nest entries, for example `((23, 1),)`.
+- Custom renderers should mirror tile surfaces per entry flags, transpose first, then h/v.
+- User sprites and objects must set `collision_layer` and `collision_mask`. Library classes keep constructor defaults, so loader built objects are unaffected.
+- Gate object physics on `has_collision`. Pass `include_hidden=True` to read hidden image layers.
+
+### Fixed
+
+- Animated tiles keep cell flip flags, including prewarmed cache variants.
+- Non object tile properties (`null` or arrays) raise `CollisionParseError` instead of `AttributeError`.
+- Origin normalization measures object and node areas in unscaled tile size, so objects, nodes and tiles shift together.
+
 ## 5.2.1 — 2026-09-11
 
 ### Added

@@ -187,13 +187,120 @@ class TestTilemapDataLoad:
 
         td = TilemapData.load(map_path)
 
-        assert td.origin_offset == (64, 32)
-        assert td.map_size == (6, 5)
-        assert td.get_tile_at("Terrain", 0, 0).variant == 1
-        assert td.get_tile_at("Terrain", 3, 1).variant == 2
+        assert td.origin_offset == (96, 64)
+        assert td.map_size == (7, 6)
+        assert td.get_tile_at("Terrain", 1, 1).variant == 1
+        assert td.get_tile_at("Terrain", 4, 2).variant == 2
         obj = td.get_layer("Objects").objects[1]
-        assert (obj.area.x, obj.area.y) == (56, 12)
-        assert td.particle_emitters[0].rect == Rect(24, 32, 16, 16)
+        assert (obj.area.x, obj.area.y) == (40, 12)
+        assert td.particle_emitters[0].rect == Rect(8, 32, 16, 16)
+
+    def test_negative_coordinates_shift_image_layers(self, tmp_project):
+        _, data_dir, _ = tmp_project
+        payload = {
+            "meta": {
+                "tile_size": "16;16",
+                "map_size": "4;4",
+                "initial_map_size": "4;4",
+                "render_scale": 2,
+                "scroll": "0;0",
+                "version": "1.1",
+            },
+            "resources": {"tilesets": []},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "layers": [
+                    {
+                        "name": "Terrain",
+                        "type": "tile",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "tiles": {
+                            "-2;-1": {"pos": "-2;-1", "ttype": 0, "variant": 1},
+                        },
+                    },
+                    {
+                        "name": "Sky",
+                        "type": "image",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": -1,
+                        "tiles": {},
+                        "image_path": "../assets/bg.png",
+                        "image_rect": {"x": 0, "y": 0, "w": 16, "h": 16},
+                        "image_placements": [
+                            {"pid": 1, "x": 32, "y": 0, "w": 16, "h": 16, "mode": "stretch"},
+                        ],
+                    },
+                ]
+            },
+        }
+        map_path = data_dir / "test_map.json"
+        with open(map_path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+        td = TilemapData.load(map_path)
+
+        assert td.origin_offset == (64, 32)
+        assert td.get_tile_at("Terrain", 0, 0).variant == 1
+        sky = td.get_layer("Sky")
+        assert sky.image_rect == (32, 16, 16, 16)
+        assert [(p.x, p.y) for p in sky.image_placements] == [(64, 16)]
+        assert td.background_layer.image_rect == (32, 16, 16, 16)
+
+    def test_negative_image_rect_joins_normalization(self, tmp_project):
+        _, data_dir, _ = tmp_project
+        payload = {
+            "meta": {
+                "tile_size": "16;16",
+                "map_size": "4;4",
+                "initial_map_size": "4;4",
+                "render_scale": 2,
+                "scroll": "0;0",
+                "version": "1.1",
+            },
+            "resources": {"tilesets": []},
+            "project_state": {"rules": [], "groups": []},
+            "data": {
+                "layers": [
+                    {
+                        "name": "Terrain",
+                        "type": "tile",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": 0,
+                        "tiles": {
+                            "0;0": {"pos": "0;0", "ttype": 0, "variant": 1},
+                        },
+                    },
+                    {
+                        "name": "Sky",
+                        "type": "image",
+                        "visible": True,
+                        "locked": False,
+                        "opacity": 1.0,
+                        "z_index": -1,
+                        "tiles": {},
+                        "image_path": "../assets/bg.png",
+                        "image_rect": {"x": -16, "y": 0, "w": 16, "h": 16},
+                    },
+                ]
+            },
+        }
+        map_path = data_dir / "test_map.json"
+        with open(map_path, "w") as f:
+            json.dump(payload, f, indent=2)
+
+        td = TilemapData.load(map_path)
+
+        assert td.origin_offset == (32, 0)
+        assert td.get_tile_at("Terrain", 1, 0).variant == 1
+        assert td.get_layer("Sky").image_rect == (0, 0, 16, 16)
+        assert td.background_layer.image_rect == (0, 0, 16, 16)
 
 
 MINIMAL_NODES = {

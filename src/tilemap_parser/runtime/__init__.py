@@ -1,7 +1,20 @@
 from .camera import Camera
 from .animation_player import AnimationPlayer, SpriteAnimationSet
 from .body import Body
-from .world import PhysicsWorld
+from .world import (
+    FLIP_D,
+    FLIP_H,
+    FLIP_V,
+    PhysicsWorld,
+    StackEntry,
+    TileCell,
+    TileMap,
+    flip_flags,
+    flip_vertices,
+    flipped_data,
+    iter_cell_entries,
+    iter_cell_ids,
+)
 from .collision_cache import (
     CollisionCache,
     clear_collision_cache,
@@ -21,6 +34,13 @@ from .collision import (
     CollisionHit,
     ObjectCollisionManager,
     check_collision,
+    describe_character_collision,
+    describe_shape,
+    describe_sprite,
+    describe_tile_cell,
+    describe_tile_collision,
+    describe_tileset_collision,
+    shape_to_points,
 )
 from .renderer import LayerRenderStats, TileLayerRenderer
 from .area_node import AreaNode
@@ -63,6 +83,13 @@ __all__ = [
     "TilemapData",
     "check_collision",
     "clear_collision_cache",
+    "describe_character_collision",
+    "describe_shape",
+    "describe_sprite",
+    "describe_tile_cell",
+    "describe_tile_collision",
+    "describe_tileset_collision",
+    "shape_to_points",
     "get_cached_character_collision",
     "get_cached_object_collision",
     "get_cached_tileset_collision",
@@ -82,6 +109,17 @@ __all__ = [
     "ParticleRenderer",
     "ParticleSystem",
     "PhysicsWorld",
+    "StackEntry",
+    "TileCell",
+    "TileMap",
+    "FLIP_D",
+    "FLIP_H",
+    "FLIP_V",
+    "flip_flags",
+    "flip_vertices",
+    "flipped_data",
+    "iter_cell_entries",
+    "iter_cell_ids",
     "rect_vs_tilemap",
     "SpriteBatchRenderer",
     "clear_texture_caches",

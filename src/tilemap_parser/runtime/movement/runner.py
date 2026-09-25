@@ -149,23 +149,23 @@ class CollisionRunner:
         world_x: float,
         world_y: float,
     ) -> list[CollisionPolygon]:
-        """Get collision shapes at world position"""
+        """Get collision shapes at world position (union of stacked gids)."""
+        from .queries import _iter_tile_datas
+
         tile_x, tile_y = self.get_tile_at(world_x, world_y)
-        tile_id = tile_map.get((tile_x, tile_y))
+        cell = tile_map.get((tile_x, tile_y))
 
         world = self._resolve_world(None)
-        tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
-        if tile_data is None:
-            return []
-
-        tile_world_x = tile_x * self._eff_tw
-        tile_world_y = tile_y * self._eff_th
-
-        return [
-            shape.transform(tile_world_x, tile_world_y, self.render_scale)
-            for shape in tile_data.shapes
-            if shape.is_valid()
-        ]
+        shapes: list[CollisionPolygon] = []
+        for tile_data in _iter_tile_datas(world, tileset_collision, cell):
+            tile_world_x = tile_x * self._eff_tw
+            tile_world_y = tile_y * self._eff_th
+            shapes.extend(
+                shape.transform(tile_world_x, tile_world_y, self.render_scale)
+                for shape in tile_data.shapes
+                if shape.is_valid()
+            )
+        return shapes
 
     def get_nearby_tile_shapes(
         self,
@@ -193,22 +193,22 @@ class CollisionRunner:
         world = self._resolve_world(None)
         for tile_y in range(min_tile_y, max_tile_y + 1):
             for tile_x in range(min_tile_x, max_tile_x + 1):
-                tile_id = tile_map.get((tile_x, tile_y))
-                tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
-                if tile_data is None:
+                cell = tile_map.get((tile_x, tile_y))
+                if cell is None:
                     continue
-                tile_world_x = tile_x * tw
-                tile_world_y = tile_y * th
-                for poly in tile_data.shapes:
-                    if poly.is_valid():
-                        shapes.append(poly.transform(tile_world_x, tile_world_y, self.render_scale))
+                for tile_data in queries._iter_tile_datas(world, tileset_collision, cell):
+                    tile_world_x = tile_x * tw
+                    tile_world_y = tile_y * th
+                    for poly in tile_data.shapes:
+                        if poly.is_valid():
+                            shapes.append(poly.transform(tile_world_x, tile_world_y, self.render_scale))
         return shapes
 
     def move(
         self,
         sprite: ICollidable,
         tileset_collision: TilesetCollision | None,
-        tile_map: dict[tuple[int, int], int] | None,
+        tile_map: dict | None,
         delta_x: float = 0.0,
         delta_y: float = 0.0,
         dt: float = 0.016,
@@ -224,7 +224,7 @@ class CollisionRunner:
             sprite: Sprite to move
             tileset_collision: Tileset collision data. Optional when a world is
                 attached — resolved from it.
-            tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
+            tile_map: Dictionary mapping (tile_x, tile_y) to stacked ((gid, flipbits), ...) entries. Optional
                 when a world is attached — resolved from it.
             delta_x: X movement amount (for slide/rpg modes)
             delta_y: Y movement amount (for slide/rpg modes)

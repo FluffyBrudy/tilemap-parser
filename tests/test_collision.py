@@ -143,6 +143,28 @@ class TestParseTilesetCollision:
         result = parse_tileset_collision(data)
         assert len(result.tiles) == 0
 
+    def test_null_properties_raises(self):
+        import copy
+        bad = copy.deepcopy(TILESET_DATA)
+        bad["tiles"]["0"]["properties"] = None
+        with pytest.raises(CollisionParseError):
+            parse_tileset_collision(bad)
+
+    def test_array_properties_raises(self):
+        import copy
+        bad = copy.deepcopy(TILESET_DATA)
+        bad["tiles"]["0"]["properties"] = ["collision_layer"]
+        with pytest.raises(CollisionParseError):
+            parse_tileset_collision(bad)
+
+    def test_valid_properties_parse(self):
+        import copy
+        data = copy.deepcopy(TILESET_DATA)
+        data["tiles"]["0"]["properties"] = {"collision_layer": 2, "collision_mask": 4}
+        result = parse_tileset_collision(data)
+        assert result.tiles[0].collision_layer == 2
+        assert result.tiles[0].collision_mask == 4
+
 
 # ===========================================================================
 # parse_character_collision

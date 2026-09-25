@@ -14,7 +14,7 @@ def move_and_slide(
     self,
     sprite: ICollidable,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     delta_x: float,
     delta_y: float,
     slope_slide: bool = False,
@@ -29,7 +29,7 @@ def move_and_slide(
         sprite: Sprite to move (must implement ICollidableSprite)
         tileset_collision: Tileset collision data. Optional when a world is
             attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
+        tile_map: Dictionary mapping (tile_x, tile_y) to stacked ((gid, flipbits), ...) entries. Optional
             when a world is attached (or passed as ``world=``).
         delta_x: X movement amount
         delta_y: Y movement amount

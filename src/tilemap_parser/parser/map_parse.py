@@ -85,9 +85,7 @@ def _optional_dict(value: Any, path: str) -> Optional[JsonDict]:
 def _parse_point(text: str, path: str) -> Point:
     if not isinstance(text, str):
         raise MapParseError(_ctx(path, "expected point string"))
-    matched = re.search(
-        rf"(-?\d+)[{re.escape(string.punctuation)}](-?\d+)$", text.strip()
-    )
+    matched = re.search(rf"(-?\d+)[{re.escape(string.punctuation)}](-?\d+)$", text.strip())
     if matched is None:
         raise MapParseError(_ctx(path, f"invalid point {text!r}"))
     return int(matched.group(1)), int(matched.group(2))
@@ -169,6 +167,22 @@ class ParsedTileset:
 
 
 @dataclass
+class ParsedImagePlacement:
+    """One duplicate copy of an image layer's picture (paint order = list order).
+
+    ``pid`` is unique per layer (monotonic, never reused). ``mode`` is
+    ``stretch`` today; ``repeat`` is reserved for band fills.
+    """
+
+    pid: int
+    x: int
+    y: int
+    w: int
+    h: int
+    mode: str = "stretch"
+
+
+@dataclass
 class ParsedLayer:
     id: int
     name: str
@@ -179,6 +193,8 @@ class ParsedLayer:
     z_index: int
     y_sort: bool = False
     y_sort_origin: int = 0
+
+    collision_enabled: bool = True
     properties: JsonDict = field(default_factory=dict)
     tiles: Dict[Point, ParsedTile] = field(default_factory=dict)
     objects: Dict[int, ParsedObject] = field(default_factory=dict)
@@ -186,6 +202,8 @@ class ParsedLayer:
     ttypes: set[int] = field(default_factory=set)
     image_path: Optional[str] = None
     image_rect: Optional[Tuple[int, int, int, int]] = None
+    image_placements: List[ParsedImagePlacement] = field(default_factory=list)
+    next_placement_id: Optional[int] = None
 
 
 @dataclass
@@ -280,9 +298,7 @@ def _parse_object_animation(anim_obj: JsonDict, ctx: str) -> ObjectAnimation:
     frame_count = _coerce_int(anim_obj.get("frame_count"), f"{ctx}.frame_count")
     if frame_count < 1:
         raise MapParseError(_ctx(f"{ctx}.frame_count", "must be >= 1"))
-    frame_duration_ms = _coerce_float(
-        anim_obj.get("frame_duration_ms"), f"{ctx}.frame_duration_ms"
-    )
+    frame_duration_ms = _coerce_float(anim_obj.get("frame_duration_ms"), f"{ctx}.frame_duration_ms")
     if not math.isfinite(frame_duration_ms) or frame_duration_ms <= 0:
         raise MapParseError(_ctx(f"{ctx}.frame_duration_ms", "must be > 0 and finite"))
     frames_raw = anim_obj.get("frames")
@@ -299,20 +315,14 @@ def _parse_object_animation(anim_obj: JsonDict, ctx: str) -> ObjectAnimation:
         frames = [_coerce_int(f, f"{ctx}.frames[{i}]") for i, f in enumerate(frames_list)]
         for i, frame_idx in enumerate(frames):
             if frame_idx < 0:
-                raise MapParseError(
-                    _ctx(f"{ctx}.frames[{i}]", f"must be non-negative (got {frame_idx})")
-                )
+                raise MapParseError(_ctx(f"{ctx}.frames[{i}]", f"must be non-negative (got {frame_idx})"))
     return ObjectAnimation(
         frame_count=frame_count,
         frame_duration_ms=frame_duration_ms,
         speed=_coerce_float(anim_obj.get("speed", 1.0), f"{ctx}.speed"),
         loop=_coerce_bool(anim_obj.get("loop", True), f"{ctx}.loop"),
-        animation_mode=_require_str(
-            anim_obj.get("animation_mode", "default"), f"{ctx}.animation_mode"
-        ),
-        random_phase=_coerce_bool(
-            anim_obj.get("random_phase", False), f"{ctx}.random_phase"
-        ),
+        animation_mode=_require_str(anim_obj.get("animation_mode", "default"), f"{ctx}.animation_mode"),
+        random_phase=_coerce_bool(anim_obj.get("random_phase", False), f"{ctx}.random_phase"),
         frames=frames,
     )
 
@@ -325,9 +335,7 @@ def _parse_objects(objs_obj: JsonDict, ctx: str) -> Dict[int, ParsedObject]:
         area_dict = _require_dict(obj_dict.get("area"), f"{ctx}.{key}.area")
         area = _parse_object_area(area_dict, f"{ctx}.{key}.area")
         ttype = _coerce_int(obj_dict.get("ttype"), f"{ctx}.{key}.ttype")
-        tileset_type = _require_str(
-            obj_dict.get("tileset_type", "object"), f"{ctx}.{key}.tileset_type"
-        )
+        tileset_type = _require_str(obj_dict.get("tileset_type", "object"), f"{ctx}.{key}.tileset_type")
         variant = _coerce_int(obj_dict.get("variant"), f"{ctx}.{key}.variant")
         props = _optional_dict(obj_dict.get("properties"), f"{ctx}.{key}.properties")
         animation_raw = obj_dict.get("animation")
@@ -351,6 +359,12 @@ def _parse_objects(objs_obj: JsonDict, ctx: str) -> Dict[int, ParsedObject]:
 
 
 def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
+    props = _optional_dict(layer_obj.get("properties"), f"{ctx}.properties") or {}
+    collision_enabled: bool = True
+    if "collision_enabled" in layer_obj:
+        collision_enabled = _coerce_bool(layer_obj.get("collision_enabled"), f"{ctx}.collision_enabled")
+    elif "collision_enabled" in props:
+        collision_enabled = _coerce_bool(props.get("collision_enabled"), f"{ctx}.properties.collision_enabled")
     layer = ParsedLayer(
         id=layer_id,
         name=_require_str(layer_obj.get("name"), f"{ctx}.name"),
@@ -361,12 +375,10 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
         z_index=_coerce_int(layer_obj.get("z_index", layer_id), f"{ctx}.z_index"),
         y_sort=_coerce_bool(layer_obj.get("y_sort", False), f"{ctx}.y_sort"),
         y_sort_origin=layer_obj.get("y_sort_origin", 0),
-        properties=_optional_dict(layer_obj.get("properties"), f"{ctx}.properties")
-        or {},
+        collision_enabled=collision_enabled,
+        properties=dict(props),
     )
-    layer.tiles = _parse_tiles(
-        _require_dict(layer_obj.get("tiles", {}), f"{ctx}.tiles"), f"{ctx}.tiles"
-    )
+    layer.tiles = _parse_tiles(_require_dict(layer_obj.get("tiles", {}), f"{ctx}.tiles"), f"{ctx}.tiles")
 
     if layer.layer_type == "object":
         layer.objects = _parse_objects(
@@ -376,9 +388,7 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
         for obj in layer.objects.values():
             layer.ttypes.add(obj.ttype)
         if "next_object_id" in layer_obj and layer_obj["next_object_id"] is not None:
-            layer.next_object_id = _coerce_int(
-                layer_obj["next_object_id"], f"{ctx}.next_object_id"
-            )
+            layer.next_object_id = _coerce_int(layer_obj["next_object_id"], f"{ctx}.next_object_id")
 
     image_path_raw = layer_obj.get("image_path")
     if image_path_raw is not None:
@@ -396,6 +406,41 @@ def _parse_layer(layer_obj: JsonDict, layer_id: int, ctx: str) -> ParsedLayer:
             _coerce_int(rect_obj.get("w"), f"{ctx}.image_rect.w"),
             _coerce_int(rect_obj.get("h"), f"{ctx}.image_rect.h"),
         )
+
+    placements_raw = layer_obj.get("image_placements")
+    if placements_raw is not None:
+        placements_list = _require_list(placements_raw, f"{ctx}.image_placements")
+        seen_pids: set[int] = set()
+        for idx, raw in enumerate(placements_list):
+            entry = _require_dict(raw, f"{ctx}.image_placements[{idx}]")
+            try:
+                pid = int(entry["pid"])
+                placement = ParsedImagePlacement(
+                    pid=pid,
+                    x=_coerce_int(entry.get("x"), f"{ctx}.image_placements[{idx}].x"),
+                    y=_coerce_int(entry.get("y"), f"{ctx}.image_placements[{idx}].y"),
+                    w=_coerce_int(entry.get("w"), f"{ctx}.image_placements[{idx}].w"),
+                    h=_coerce_int(entry.get("h"), f"{ctx}.image_placements[{idx}].h"),
+                    mode=str(entry.get("mode", "stretch")),
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+            if placement.mode not in ("stretch", "repeat"):
+                placement.mode = "stretch"
+            if pid < 1 or pid in seen_pids:
+                continue
+            seen_pids.add(pid)
+            layer.image_placements.append(placement)
+            if layer.next_placement_id is None or pid >= layer.next_placement_id:
+                layer.next_placement_id = pid + 1
+    next_pid_raw = layer_obj.get("next_placement_id")
+    if next_pid_raw is not None:
+        try:
+            stored = int(next_pid_raw)
+        except (TypeError, ValueError):
+            stored = 1
+        current = layer.next_placement_id or 1
+        layer.next_placement_id = max(current, max(1, stored))
 
     return layer
 
@@ -415,16 +460,10 @@ def _parse_rule(rule_obj: JsonDict, ctx: str) -> ParsedAutotileRule:
         )
 
     variants_raw = _require_list(rule_obj.get("variant_ids", []), f"{ctx}.variant_ids")
-    variant_ids = [
-        _coerce_int(v, f"{ctx}.variant_ids[{i}]") for i, v in enumerate(variants_raw)
-    ]
+    variant_ids = [_coerce_int(v, f"{ctx}.variant_ids[{i}]") for i, v in enumerate(variants_raw)]
     tileset_path = _require_str(rule_obj.get("tileset_path", ""), f"{ctx}.tileset_path")
     tileset_index_raw = rule_obj.get("tileset_index")
-    tileset_index = (
-        _coerce_int(tileset_index_raw, f"{ctx}.tileset_index")
-        if tileset_index_raw is not None
-        else None
-    )
+    tileset_index = _coerce_int(tileset_index_raw, f"{ctx}.tileset_index") if tileset_index_raw is not None else None
     return ParsedAutotileRule(
         name=_require_str(rule_obj.get("name"), f"{ctx}.name"),
         neighbors=neighbors,
@@ -438,13 +477,8 @@ def _parse_rule(rule_obj: JsonDict, ctx: str) -> ParsedAutotileRule:
 
 def _parse_group(group_obj: JsonDict, ctx: str) -> ParsedAutotileGroup:
     rules_raw = _require_list(group_obj.get("rules", []), f"{ctx}.rules")
-    rules = [
-        _parse_rule(_require_dict(r, f"{ctx}.rules[{i}]"), f"{ctx}.rules[{i}]")
-        for i, r in enumerate(rules_raw)
-    ]
-    return ParsedAutotileGroup(
-        name=_require_str(group_obj.get("name"), f"{ctx}.name"), rules=rules
-    )
+    rules = [_parse_rule(_require_dict(r, f"{ctx}.rules[{i}]"), f"{ctx}.rules[{i}]") for i, r in enumerate(rules_raw)]
+    return ParsedAutotileGroup(name=_require_str(group_obj.get("name"), f"{ctx}.name"), rules=rules)
 
 
 def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTileset]:
@@ -462,9 +496,7 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
         if raw_tile_props is not None:
             tp_obj = _require_dict(raw_tile_props, f"{ctx}[{i}].tile_properties")
             for k, v in tp_obj.items():
-                tile_props[str(k)] = _require_dict(
-                    v, f"{ctx}[{i}].tile_properties[{k!r}]"
-                )
+                tile_props[str(k)] = _require_dict(v, f"{ctx}[{i}].tile_properties[{k!r}]")
         animation = None
         animation_raw = ts_obj.get("animation")
         if animation_raw is not None:
@@ -478,7 +510,9 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
             frame_w_raw = anim_obj.get("frame_w")
             frame_h_raw = anim_obj.get("frame_h")
             frame_count = _coerce_int(anim_obj.get("frame_count"), f"{ctx}[{i}].animation.frame_count")
-            frame_duration_ms = _coerce_float(anim_obj.get("frame_duration_ms"), f"{ctx}[{i}].animation.frame_duration_ms")
+            frame_duration_ms = _coerce_float(
+                anim_obj.get("frame_duration_ms"), f"{ctx}[{i}].animation.frame_duration_ms"
+            )
             if frame_count < 1:
                 raise MapParseError(_ctx(f"{ctx}[{i}].animation.frame_count", "must be >= 1"))
             if not math.isfinite(frame_duration_ms) or frame_duration_ms <= 0:
@@ -488,13 +522,18 @@ def _parse_tilesets_list(tilesets_raw: List[Any], ctx: str) -> List[ParsedTilese
                 frame_duration_ms=frame_duration_ms,
                 frame_stride=frame_stride,
                 loop=_coerce_bool(anim_obj.get("loop", True), f"{ctx}[{i}].animation.loop"),
-                animation_mode=_require_str(anim_obj.get("animation_mode", "default"), f"{ctx}[{i}].animation.animation_mode"),
+                animation_mode=_require_str(
+                    anim_obj.get("animation_mode", "default"), f"{ctx}[{i}].animation.animation_mode"
+                ),
                 frame_w=_coerce_int(frame_w_raw, f"{ctx}[{i}].animation.frame_w") if frame_w_raw is not None else None,
                 frame_h=_coerce_int(frame_h_raw, f"{ctx}[{i}].animation.frame_h") if frame_h_raw is not None else None,
             )
         out.append(
             ParsedTileset(
-                path=path, type=ts_type, properties=props, tile_properties=tile_props,
+                path=path,
+                type=ts_type,
+                properties=props,
+                tile_properties=tile_props,
                 animation=animation,
                 tile_count=_coerce_int(ts_obj.get("tile_count", 0), f"{ctx}[{i}].tile_count"),
                 firstgid=_coerce_int(ts_obj.get("firstgid", 0), f"{ctx}[{i}].firstgid"),
@@ -521,7 +560,8 @@ def _expand_ongrid_to_layer(data_obj: JsonDict, ctx: str) -> List[ParsedLayer]:
         locked=False,
         opacity=1.0,
         z_index=0,
-        y_sort=False, y_sort_origin=0,
+        y_sort=False,
+        y_sort_origin=0,
         properties={},
     )
     for loc_str, tile_data in raw_ongrid.items():
@@ -543,11 +583,7 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
         default=f"{tile_size[0]};{tile_size[1]}",
     )
     init_raw = meta_obj.get("initial_map_size")
-    initial_map_size = (
-        map_size
-        if init_raw is None
-        else _parse_point_field(init_raw, "meta.initial_map_size")
-    )
+    initial_map_size = map_size if init_raw is None else _parse_point_field(init_raw, "meta.initial_map_size")
 
     meta = ParsedMeta(
         tile_size=tile_size,
@@ -565,9 +601,7 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
         layers: List[ParsedLayer] = []
     else:
         layers = [
-            _parse_layer(
-                _require_dict(layer, f"data.layers[{i}]"), i, f"data.layers[{i}]"
-            )
+            _parse_layer(_require_dict(layer, f"data.layers[{i}]"), i, f"data.layers[{i}]")
             for i, layer in enumerate(_require_list(layers_raw, "data.layers"))
         ]
     if not layers:
@@ -579,22 +613,16 @@ def parse_map_dict(root: JsonDict) -> ParsedMap:
             _require_dict(rule, f"project_state.rules[{i}]"),
             f"project_state.rules[{i}]",
         )
-        for i, rule in enumerate(
-            _require_list(project_obj.get("rules", []), "project_state.rules")
-        )
+        for i, rule in enumerate(_require_list(project_obj.get("rules", []), "project_state.rules"))
     ]
     groups = [
         _parse_group(
             _require_dict(group, f"project_state.groups[{i}]"),
             f"project_state.groups[{i}]",
         )
-        for i, group in enumerate(
-            _require_list(project_obj.get("groups", []), "project_state.groups")
-        )
+        for i, group in enumerate(_require_list(project_obj.get("groups", []), "project_state.groups"))
     ]
-    project_state = ParsedProjectState(
-        rules=rules, groups=groups, automap_rules=project_obj.get("automap_rules")
-    )
+    project_state = ParsedProjectState(rules=rules, groups=groups, automap_rules=project_obj.get("automap_rules"))
 
     tilesets = _parse_resources(root.get("resources", {}), "resources")
     return ParsedMap(

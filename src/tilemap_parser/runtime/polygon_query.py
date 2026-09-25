@@ -17,6 +17,7 @@ from ..parser.collision import (
     TilesetCollision,
 )
 from .protocols import ICollidable
+from .world import flipped_data, iter_cell_entries
 
 Point = Tuple[float, float]
 
@@ -440,22 +441,27 @@ def rect_vs_tilemap(
     top: float,
     right: float,
     bottom: float,
-    tile_map: Dict[Tuple[int, int], int],
+    tile_map: Dict[Tuple[int, int], object],
     tileset_collision: TilesetCollision,
     tile_size: Tuple[int, int],
     render_scale: float = 1.0,
+    collision_mask: int | None = None,
 ) -> bool:
     """Check if an AABB collides with any collision tile in a tile map.
 
-    Iterates overlapping tiles, transforms each tile's collision polygons to
-    world space, and tests for intersection with the given rectangle.
+    Union semantics: every ``(gid, flipbits)`` entry stacked in a cell is
+    tested with its flip transform applied (Godot-style).
 
     Args:
         left, top, right, bottom: World-space AABB of the query rect.
-        tile_map: Dict mapping (col, row) -> tile_variant_id.
+        tile_map: Dict mapping (col, row) -> tile entry/entries.
         tileset_collision: TilesetCollision with per-tile polygon shapes.
         tile_size: Raw tile size as (width, height) from map data.
         render_scale: Multiplier from tile-local to world pixels.
+        collision_mask: Optional querier mask — entries whose
+            ``collision_layer`` doesn't match are skipped (tile-side check
+            only; sprite-less query, so no mutual agreement).  ``None``
+            (default) tests everything, matching historic behaviour.
 
     Returns:
         True if the rect overlaps any tile collision polygon.
@@ -474,17 +480,26 @@ def rect_vs_tilemap(
 
     for ty in range(ty0, ty1 + 1):
         for tx in range(tx0, tx1 + 1):
-            tile_id = tile_map.get((tx, ty))
-            if tile_id is None:
+            cell = tile_map.get((tx, ty))
+            if cell is None:
                 continue
-            tile_data = tileset_collision.tiles.get(tile_id)
-            if tile_data is None:
-                continue
-            ox = tx * tw
-            oy = ty * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
+            for tile_data in _iter_cell_datas(tileset_collision, cell):
+                if collision_mask is not None and not (collision_mask & tile_data.collision_layer):
                     continue
-                if _rect_polygon_collision_offset(left, top, rw, rh, poly.vertices, ox, oy, render_scale):
-                    return True
+                ox = tx * tw
+                oy = ty * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if _rect_polygon_collision_offset(left, top, rw, rh, poly.vertices, ox, oy, render_scale):
+                        return True
     return False
+
+
+def _iter_cell_datas(tileset_collision: TilesetCollision, cell: object):
+    """Yield flip-aware datas for every entry in one cell (literal lookup)."""
+    for gid, flags in iter_cell_entries(cell):
+        base = tileset_collision.tiles.get(gid)
+        if base is None:
+            continue
+        yield base if not flags else flipped_data(base, flags, tileset_collision.tile_size)

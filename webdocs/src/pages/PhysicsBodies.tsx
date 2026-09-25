@@ -4,19 +4,19 @@ import Toc from "../components/Toc";
 import { Link } from "react-router-dom";
 
 const TOC = [
-  { id: "three-jobs", label: "Three jobs, three owners" },
-  { id: "wiring", label: "The two-minute wiring" },
-  { id: "contract", label: "The object contract" },
+  { id: "three-jobs", label: "Who does what" },
+  { id: "setup", label: "The two-minute setup" },
+  { id: "required-fields", label: "What your sprite needs" },
   { id: "five-methods", label: "The five move methods" },
-  { id: "velocity-contract", label: "The velocity contract" },
+  { id: "explicit-velocity", label: "How velocity= works" },
   { id: "sliding-box", label: "The sliding box" },
   { id: "result", label: "Reading CollisionResult" },
   { id: "layers", label: "Layers & masks" },
   { id: "coords", label: "Coordinate space" },
-  { id: "traps", label: "Traps, ranked" },
+  { id: "traps", label: "Common mistakes" },
 ];
 
-const WRING = `from tilemap_parser import (
+const SETUP = `from tilemap_parser import (
     CollisionRunner, PhysicsWorld, Body, RectangleShape,
     load_map, load_tileset_collision,
 )
@@ -29,7 +29,7 @@ runner = CollisionRunner.from_world(world, game_type="platformer")
 
 result = runner.move_platformer(player, None, None, dt, input_x=1.0, jump_pressed=False)`;
 
-const CONTRACT = `class Player:
+const PLAYER_FIELDS = `class Player:
     def __init__(self, x, y):
         self.x = float(x)
         self.y = float(y)
@@ -70,10 +70,10 @@ const PROBE = `def body_ahead(world, sprite, axis, probe=8.0):
 export default function PhysicsBodies() {
   return (
     <div className="content">
-      <h1>Collision, without the fog of war</h1>
+      <h1>Collision, explained directly</h1>
       <Toc items={TOC} />
 
-      <h2 id="three-jobs">THREE JOBS, THREE OWNERS</h2>
+      <h2 id="three-jobs">THREE JOBS, AND WHO DOES THEM</h2>
       <p>
         Collision is three jobs, and the library splits them on purpose. Learn
         the split and nothing else surprises you.
@@ -83,7 +83,7 @@ export default function PhysicsBodies() {
           <tr>
             <th>Job</th>
             <th>Who does it</th>
-            <th>Owns</th>
+            <th>Holds</th>
           </tr>
         </thead>
         <tbody>
@@ -113,19 +113,19 @@ export default function PhysicsBodies() {
             <td>your sprite</td>
             <td>
               <code>x</code>, <code>y</code>, <code>collision_shape</code>; that
-              is the whole contract
+              is all you need
             </td>
           </tr>
         </tbody>
       </table>
       <p>
-        Tiles and bodies are <em>both</em> just solids in the world. The runner
+        Tiles and bodies are <em>both</em> solids in the world. The runner
         never cares which one it hit; it resolves movement against the union of
         them. If you can draw it, you can collide with it.
       </p>
 
-      <h2 id="wiring">THE TWO-MINUTE WIRING</h2>
-      <CodeBlock title="wiring.py" code={WRING} />
+      <h2 id="setup">THE TWO-MINUTE SETUP</h2>
+      <CodeBlock title="setup.py" code={SETUP} />
       <p>
         Note the <code>from_world</code> constructor: it applies the game-type
         preset <em>and</em> attaches the world in one step. From then on every{" "}
@@ -151,8 +151,8 @@ export default function PhysicsBodies() {
         </li>
       </ul>
 
-      <h2 id="contract">THE OBJECT CONTRACT</h2>
-      <CodeBlock title="player.py" code={CONTRACT} />
+      <h2 id="required-fields">WHAT YOUR SPRITE NEEDS</h2>
+      <CodeBlock title="player.py" code={PLAYER_FIELDS} />
       <table>
         <thead>
           <tr>
@@ -210,7 +210,7 @@ export default function PhysicsBodies() {
         </tbody>
       </table>
       <p>
-        <code>Body</code> is the same contract plus a <code>mode</code> (
+        <code>Body</code> needs the same fields plus a <code>mode</code> (
         <code>"static"</code> / <code>"kinematic"</code>) and{" "}
         <code>game_id</code>. It is the authoring surface for <em>solids</em>,
         not sprites.
@@ -292,7 +292,7 @@ export default function PhysicsBodies() {
       <p>
         Rule of thumb: <strong>displacement methods for top-down games</strong>{" "}
         (you do the velocity math, the runner does the geometry),{" "}
-        <strong>physics methods for platformers</strong> (the runner owns
+        <strong>physics methods for platformers</strong> (the runner applies
         gravity and landing). <code>move_and_slide</code> never reads or writes{" "}
         <code>vx</code>/<code>vy</code>.
       </p>
@@ -307,7 +307,7 @@ export default function PhysicsBodies() {
         that points into the colliding edge's normal.
       </p>
 
-      <h2 id="velocity-contract">THE VELOCITY CONTRACT</h2>
+      <h2 id="explicit-velocity">HOW velocity= WORKS</h2>
       <p>
         In the three physics modes, when you pass <code>velocity=(vx, vy)</code>
         :
@@ -333,16 +333,51 @@ result = runner.move_grounded(crate, None, None, dt, velocity=(crate.vx, crate.v
 if result.hit_wall_x:
     crate.vx = 0.0                          # the runner zeroes vy on landing itself`}
       />
-      <Callout kind="warn" title="ONE OWNERSHIP MODEL PER OBJECT">
+      <Callout kind="warn" title="ONE MODEL PER OBJECT PER FRAME">
         Without <code>velocity=</code>, <code>move_grounded</code> and{" "}
         <code>move_platformer</code> apply their own gravity and read the
-        velocity off <code>sprite.vx/vy</code>. Double-applying gravity is a
-        classic bug; pick one model per object per frame.
+        velocity off <code>sprite.vx/vy</code>. Applying gravity twice is a
+        common mistake; pick one model per object per frame.
+      </Callout>
+
+      <h3>Walking off an edge while passing velocity=</h3>
+      <p>
+        Landing latches <code>on_ground</code>, but only downward travel or
+        the ledge probe can clear it — and <code>velocity=</code> skips the
+        probe. So a sprite driven by a constant{" "}
+        <code>velocity=(vx, 0)</code> keeps its first landing forever:
+        walking off an edge carries zero vertical travel, resting contact
+        is exclusive by design, and the airborne-clear requires downward
+        travel. The sprite floats past the edge.
+      </p>
+      <CodeBlock
+        title="patrol: own vx, let the mover own vy"
+        code={`self.vx = self.direction * 100
+runner.move_grounded(self, None, None, dt)`}
+      />
+      <p>
+        If you pass <code>velocity=</code>, gravity is yours — accumulate it
+        before every call — and noticing walk-off is yours too. This looks
+        correct but hovers after the first landing:
+      </p>
+      <CodeBlock
+        title="hovers: pinned vy, latched on_ground"
+        code={`if not self.on_ground:
+    self.vy = min(self.vy + gravity * dt, 2000)
+else:
+    self.vy = 0
+runner.move_grounded(self, None, None, dt, velocity=(self.vx, self.vy))`}
+      />
+      <Callout kind="warn" title="A FIXED VELOCITY HIDES WALK-OFF">
+        <code>velocity=</code> means &quot;use exactly this&quot;. A constant{" "}
+        <code>(vx, 0)</code> carries no information the mover could use to
+        observe walk-off — accumulate gravity before the call, or omit{" "}
+        <code>velocity=</code> and set <code>sprite.vx</code> directly.
       </Callout>
 
       <h2 id="sliding-box">OBJECTS IN THE PHYSICS WORLD: THE SLIDING BOX</h2>
       <p>
-        This is the centerpiece, straight from{" "}
+        This is the main example, from{" "}
         <code>examples/physics-crate/main.py</code> (tested, correct): a floor,
         a wall column, three crates, a player. Walk into a crate and watch it
         slide; push it into another crate and it stops; jump on top of a crate
@@ -362,7 +397,7 @@ for crate in crates:
     world.add_body(crate)          # <-- nothing collides until this happens`}
       />
       <p>
-        <code>mode</code> is a <em>promise</em>, not a physics flag.{" "}
+        <code>mode</code> is a <em>setting</em>, not simulated physics.{" "}
         <code>"static"</code> never moves (scenery);
         <code>"kinematic"</code> is moved explicitly by your code each frame.{" "}
         <strong>Nothing moves a kinematic body except you</strong>: the player
@@ -385,7 +420,7 @@ for crate in crates:
         <code>world.collides_with_body</code> exactly like it checks tiles.
       </p>
 
-      <h3>The push: where the velocity contract earns its keep</h3>
+      <h3>The push: where passing velocity= is most useful</h3>
       <CodeBlock title="the push loop" code={PUSH} />
       <p>Walk through what happens:</p>
       <ul>
@@ -554,7 +589,7 @@ for crate in crates:
 
       <h2 id="layers">LAYERS & MASKS: BOTH SIDES MUST AGREE</h2>
       <p>
-        Filtering is <em>mutual agreement</em>, not either-or. Two objects
+        Filtering needs both sides to agree, not just one. Two objects
         collide only if <strong>both</strong> pass:
       </p>
       <CodeBlock
@@ -565,8 +600,8 @@ for crate in crates:
         Defaults are <code>collision_layer=1</code>,{" "}
         <code>collision_mask=0xFFFFFFFF</code>. This gates{" "}
         <code>world.collides_with_body</code> and therefore every body
-        interaction inside every <code>move_*</code>. The AND is deliberate: it
-        makes "should these two interact" symmetric, so one object can't
+        interaction inside every <code>move_*</code>. The AND is on purpose:
+        it makes "should these two interact" symmetric, so one object can't
         silently filter a pair the other expected.
       </p>
 
@@ -590,12 +625,14 @@ for crate in crates:
           <strong>Bodies are never one-way.</strong>{" "}
           <code>Body.top_y_at(world_x)</code> samples the top surface, but
           bodies block from every direction. One-way is a tile-polygon feature (
-          <code>poly.one_way</code>), and only the platformer family honors it;{" "}
-          <code>move_grounded</code> treats one-way polygons as plain solid.
+          <code>poly.one_way</code>), and platformer movement only lands on it
+          from above; <code>move_grounded</code> treats one-way polygons
+          as plain solid unless <code>one_way=&quot;directional&quot;</code>{" "}
+          is passed.
         </li>
       </ul>
 
-      <h2 id="traps">TRAPS, RANKED BY HOW OFTEN THEY FIRE</h2>
+      <h2 id="traps">COMMON MISTAKES, MOST FREQUENT FIRST</h2>
       <ol>
         <li>
           <strong>Rectangle top-left vs circle center.</strong> Swap coordinate
@@ -640,7 +677,7 @@ for crate in crates:
 
       <p>
         Next: the <a href="/runner">CollisionRunner guide</a>: presets,
-        tunables, and per-mode wiring. Or the full{" "}
+        tunables, and per-mode setup. Or the full{" "}
         <a href="/pipeline">end-to-end pipeline</a>.
       </p>
     </div>

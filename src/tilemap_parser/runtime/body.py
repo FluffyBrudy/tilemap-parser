@@ -4,7 +4,7 @@ A :class:`Body` is the authoring surface for a solid in the world.  It owns
 a single primitive collision shape (rectangle, circle, or capsule — polygon
 shapes stay in the ``MapObject`` lane) plus its position and velocity, and
 participates in collision detection through the same
-``ICollidableObject`` contract as :class:`~.map_object.MapObject`
+``ICollidable`` contract as :class:`~.map_object.MapObject`
 (owner-local shape, ``obj.x + vertex`` applied once by the narrowphase).
 
 Bodies are NOT self-moving.  ``mode == "kinematic"`` marks a body the game
@@ -17,7 +17,6 @@ Neither mode implies physics-engine dynamics — velocity is scripted, Godot
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
 
 from ..parser.collision import (
     CapsuleShape,
@@ -110,7 +109,7 @@ class Body:
     # Geometry helpers used by the movement resolver
     # ------------------------------------------------------------------
 
-    def top_y_at(self, world_x: float) -> Optional[float]:
+    def top_y_at(self, world_x: float) -> float | None:
         """Return the top-surface world Y of this body at *world_x*, or None.
 
         Only the top surface is sampled — bodies are never one-way, but the
@@ -167,7 +166,7 @@ class Body:
         by = py + shape.height
         r = shape.radius
         steps = 4
-        verts: list[Tuple[float, float]] = []
+        verts: list[tuple[float, float]] = []
         # Top cap — left (pi) to right (0) through the top (3pi/2 = up)
         for k in range(steps + 1):
             a = math.pi + (math.pi * k / steps)
@@ -179,7 +178,7 @@ class Body:
         return CollisionPolygon(vertices=verts)
 
 
-def _circle_top_y(cx: float, cy: float, radius: float, world_x: float) -> Optional[float]:
+def _circle_top_y(cx: float, cy: float, radius: float, world_x: float) -> float | None:
     """Top-surface Y of a circle at *world_x* (upper semicircle), or None."""
     dx = world_x - cx
     if abs(dx) > radius:
@@ -187,7 +186,7 @@ def _circle_top_y(cx: float, cy: float, radius: float, world_x: float) -> Option
     return cy - math.sqrt(radius * radius - dx * dx)
 
 
-def _ngon(cx: float, cy: float, radius: float, edges: int) -> list[Tuple[float, float]]:
+def _ngon(cx: float, cy: float, radius: float, edges: int) -> list[tuple[float, float]]:
     """Vertices of a regular polygon approximating a circle."""
     return [
         (

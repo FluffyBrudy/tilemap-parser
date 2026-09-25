@@ -19,6 +19,7 @@ export const NAV: NavGroup[] = [
       { to: "/pipeline", label: "The Pipeline" },
       { to: "/map-parsing", label: "Map Parsing & Rendering" },
       { to: "/animations", label: "Animations" },
+      { to: "/animations/tile-clips", label: "Tile Clips" },
       { to: "/camera", label: "Camera" },
       { to: "/particles", label: "Particles" },
       { to: "/pathfinding", label: "Pathfinding" },

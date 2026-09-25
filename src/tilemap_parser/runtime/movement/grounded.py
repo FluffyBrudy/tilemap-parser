@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from ...parser.collision import TilesetCollision
+from ..polygon_query import get_shape_bounds
 from ..protocols import ICollidableSprite
 from ..world import PhysicsWorld
 from .types import CollisionResult, Vector2
@@ -12,10 +15,11 @@ def move_grounded(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict[tuple[int, int], object] | None,
     dt: float,
     velocity: Vector2 | None = None,
     world: PhysicsWorld | None = None,
+    one_way: Literal["solid", "directional"] = "solid",
 ) -> CollisionResult:
     """
     Move sprite with basic grounded physics for simple entities.
@@ -23,7 +27,7 @@ def move_grounded(
     A lightweight alternative to ``move_platformer()`` and
     ``move_platformer_with_slide()`` for enemies and other
     entities that need tilemap collision without platformer
-    features like jumping, one-way platforms, or slope walking.
+    features like jumping or slope walking.
 
     Key behaviours:
 
@@ -42,15 +46,21 @@ def move_grounded(
 
     All collision uses the tile polygon shapes through the same
     zero-allocation ``_collides_at`` machinery as the other
-    movement methods, so one-way platform polygons are treated
-    as solid geometry (they block both X and Y movement).
+    movement methods. With ``one_way="solid"`` (default) one-way
+    platform polygons are treated as solid geometry (they block
+    both X and Y movement). With ``one_way="directional"`` they
+    behave platformer-style: horizontal movement passes through
+    their sides, rising passes through from below, and falling
+    lands only when approaching from above.
 
     Args:
         sprite: Sprite to move. Must expose ``x``, ``y``, ``vx``,
             ``vy``, ``on_ground``, and ``collision_shape``.
         tileset_collision: Tileset collision data. Optional when a world is
             attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping ``(tile_x, tile_y)`` to tile id.
+        tile_map: Dictionary mapping ``(tile_x, tile_y)`` to stacked
+            ``((gid, flipbits), ...)`` entries (legacy integer and
+            flat-tuple cells are normalized on the way in).
             Optional when a world is attached (or passed as ``world=``).
         dt: Frame delta time in seconds.
         velocity: Optional explicit ``(vx, vy)``. When provided
@@ -58,6 +68,10 @@ def move_grounded(
             instead of reading from ``sprite.vx``/``sprite.vy``.
             Useful for custom controllers, knockback, or flying
             entities that should not receive gravity.
+        one_way: ``"solid"`` treats one-way polygons as solid walls
+            and floors. ``"directional"`` lets horizontal and upward
+            movement pass through them while falling still lands
+            when approaching from above.
 
     Returns:
         :class:`CollisionResult` with final position and flags.
@@ -66,6 +80,9 @@ def move_grounded(
     if world is not None:
         tileset_collision = world.tileset_collision
         tile_map = world.tile_map
+    if one_way not in ("solid", "directional"):
+        raise ValueError(f"one_way must be 'solid' or 'directional', got {one_way!r}")
+    directional = one_way == "directional"
 
     result = self._result
     result.collided = False
@@ -81,6 +98,7 @@ def move_grounded(
 
     old_x, old_y = sprite.x, sprite.y
     was_on_ground = getattr(sprite, "on_ground", False)
+    _, _, _, old_bottom = get_shape_bounds(sprite)
 
     # --- resolve velocity -----------------------------------------------
     if velocity is not None:
@@ -99,7 +117,7 @@ def move_grounded(
         sprite.x = old_x + delta_x
         sprite.y = old_y
 
-        if self._collides_at(sprite, tileset_collision, tile_map, world=world):
+        if self._collides_at(sprite, tileset_collision, tile_map, world=world, skip_one_way=directional):
             sprite.x = old_x
             sprite.vx = 0.0
             result.hit_wall_x = True
@@ -129,7 +147,18 @@ def move_grounded(
     # --- Y axis ---------------------------------------------------------
     sprite.y = sprite.y + delta_y
 
-    collided_y = self._collides_at(sprite, tileset_collision, tile_map, world=world)
+    if directional:
+        if delta_y >= 0.0:
+            collided_y = self._collides_at_platformer(
+                sprite, tileset_collision, tile_map,
+                include_one_way=True, previous_bottom=old_bottom, world=world,
+            )
+        else:
+            collided_y = self._collides_at_platformer(
+                sprite, tileset_collision, tile_map, include_one_way=False, world=world
+            )
+    else:
+        collided_y = self._collides_at(sprite, tileset_collision, tile_map, world=world)
 
     if collided_y:
         result.collided = True
@@ -143,7 +172,14 @@ def move_grounded(
                 mid = (lo + hi) * 0.5
                 sprite.y = mid
 
-                if self._collides_at(sprite, tileset_collision, tile_map, world=world):
+                if directional:
+                    hit = self._collides_at_platformer(
+                        sprite, tileset_collision, tile_map,
+                        include_one_way=True, previous_bottom=old_bottom, world=world,
+                    )
+                else:
+                    hit = self._collides_at(sprite, tileset_collision, tile_map, world=world)
+                if hit:
                     hi = mid
                 else:
                     lo = mid
@@ -163,7 +199,13 @@ def move_grounded(
                 mid = (lo + hi) * 0.5
                 sprite.y = mid
 
-                if self._collides_at(sprite, tileset_collision, tile_map, world=world):
+                if directional:
+                    hit = self._collides_at_platformer(
+                        sprite, tileset_collision, tile_map, include_one_way=False, world=world
+                    )
+                else:
+                    hit = self._collides_at(sprite, tileset_collision, tile_map, world=world)
+                if hit:
                     lo = mid
                 else:
                     hi = mid

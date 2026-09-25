@@ -8,7 +8,7 @@ from ...parser.collision import TilesetCollision
 from ..polygon_query import _check_sprite_polygon_offset, get_shape_bounds
 from ..protocols import ICollidableSprite
 from ..world import PhysicsWorld
-from .queries import _resolve_tile_data
+from .queries import _iter_tile_datas, _resolve_tile_data
 from .types import CollisionResult, Vector2
 
 
@@ -16,7 +16,7 @@ def move_platformer(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     dt: float,
     input_x: float = 0.0,
     jump_pressed: bool = False,
@@ -32,7 +32,7 @@ def move_platformer(
         sprite: Sprite to move (must have vx, vy, on_ground attributes)
         tileset_collision: Tileset collision data. Optional when a world is
             attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
+        tile_map: Dictionary mapping (tile_x, tile_y) to stacked ((gid, flipbits), ...) entries. Optional
             when a world is attached (or passed as ``world=``).
         dt: Delta time in seconds
         input_x: Horizontal input (-1 to 1) for built-in movement
@@ -120,29 +120,31 @@ def move_platformer(
 
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
-            tile_id = tile_map.get((tile_x, tile_y))
-            tile_data = _resolve_tile_data(world, tileset_collision, tile_id)
-            if tile_data is None:
+            cell = tile_map.get((tile_x, tile_y))
+            if cell is None:
                 continue
-            ox = tile_x * tw
-            oy = tile_y * th
-            for poly in tile_data.shapes:
-                if not poly.is_valid():
-                    continue
-                if not _check_sprite_polygon_offset(
-                    sprite, poly, ox, oy, self.render_scale
-                ):
-                    continue
-                if poly.one_way and sprite.vy > 0:
-                    # one-way: only block if sprite was above the platform top
-                    min_vy = (
-                        min(v[1] for v in poly.vertices) * self.render_scale + oy
-                    )
-                    if old_y + (bottom - sprite.y) <= min_vy:
+            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+                ox = tile_x * tw
+                oy = tile_y * th
+                for poly in tile_data.shapes:
+                    if not poly.is_valid():
+                        continue
+                    if not _check_sprite_polygon_offset(
+                        sprite, poly, ox, oy, self.render_scale
+                    ):
+                        continue
+                    if poly.one_way and sprite.vy > 0:
+                        # one-way: only block if sprite was above the platform top
+                        min_vy = (
+                            min(v[1] for v in poly.vertices) * self.render_scale + oy
+                        )
+                        if old_y + (bottom - sprite.y) <= min_vy:
+                            collided_y = True
+                            break
+                    elif not poly.one_way:
                         collided_y = True
                         break
-                elif not poly.one_way:
-                    collided_y = True
+                if collided_y:
                     break
             if collided_y:
                 break
@@ -278,7 +280,7 @@ def move_platformer_with_slide(
     self,
     sprite: ICollidableSprite,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     dt: float,
     input_x: float = 0.0,
     jump_pressed: bool = False,

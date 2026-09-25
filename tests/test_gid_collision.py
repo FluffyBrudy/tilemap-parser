@@ -214,10 +214,10 @@ class TestBuildTileMapWithGids:
         loader = TilemapData(parsed, [None, None], [Path("a.png"), Path("b.png")], [])
         tile_map = loader.build_tile_map(use_gids=True)
         assert tile_map == {
-            (0, 0): 5,      # ttype 0, variant 5  → firstgid[0]=0,  gid=0+5=5
-            (1, 0): 10,     # ttype 0, variant 10 → firstgid[0]=0,  gid=0+10=10
-            (0, 1): 100,    # ttype 1, variant 0  → firstgid[1]=100, gid=100+0=100
-            (1, 1): 152,    # ttype 1, variant 52 → firstgid[1]=100, gid=100+52=152
+            (0, 0): ((5, 0),),      # ttype 0, variant 5  → firstgid[0]=0,  gid=0+5=5
+            (1, 0): ((10, 0),),     # ttype 0, variant 10 → firstgid[0]=0,  gid=0+10=10
+            (0, 1): ((100, 0),),    # ttype 1, variant 0  → firstgid[1]=100, gid=100+0=100
+            (1, 1): ((152, 0),),    # ttype 1, variant 52 → firstgid[1]=100, gid=100+52=152
         }
 
     def test_build_tile_map_no_gids_backward_compat(self):
@@ -228,7 +228,7 @@ class TestBuildTileMapWithGids:
         parsed = parse_map_dict(payload)
         loader = TilemapData(parsed, [None], [Path("a.png")], [])
         tile_map = loader.build_tile_map(use_gids=False)
-        assert tile_map == {(0, 0): 5, (1, 0): 10}
+        assert tile_map == {(0, 0): ((5, 0),), (1, 0): ((10, 0),)}
 
     def test_build_tile_map_falls_back_when_no_firstgid(self):
         payload = self.make_payload(
@@ -238,7 +238,7 @@ class TestBuildTileMapWithGids:
         parsed = parse_map_dict(payload)
         loader = TilemapData(parsed, [None], [Path("a.png")], [])
         tile_map = loader.build_tile_map(use_gids=True)
-        assert tile_map == {(0, 0): 5}
+        assert tile_map == {(0, 0): ((5, 0),)}
 
     def test_build_tile_map_uses_gid_field_when_present(self):
         """When a tile has an explicit gid, it takes priority over firstgid+var."""
@@ -257,4 +257,4 @@ class TestBuildTileMapWithGids:
         parsed = parse_map_dict(payload)
         loader = TilemapData(parsed, [None], [Path("a.png")], [])
         tile_map = loader.build_tile_map(use_gids=True)
-        assert tile_map == {(0, 0): 999}
+        assert tile_map == {(0, 0): ((999, 0),)}

@@ -72,7 +72,7 @@ const CARDS: Card[] = [
     name: "comparison",
     path: "examples/comparison",
     blurb:
-      "Benchmarks and honest trade-offs: broadphase naive-vs-spatial, AABB-vs-SAT, movement modes, culled-vs-chunked rendering, particle caching, spatial cell-size tuning.",
+      "Benchmarks and measured trade-offs: broadphase naive-vs-spatial, AABB-vs-SAT, movement modes, culled-vs-chunked rendering, particle caching, spatial cell-size tuning.",
     files: [
       "collision-move-modes.py",
       "collision-aabb-vs-sat.py",
@@ -91,9 +91,9 @@ export default function Examples() {
     <div className="content">
       <h1>Examples</h1>
       <p>
-        Every directory under <code>examples/</code> runs standalone. All wiring
-        below is tested and correct; these are the source of truth for the
-        guide pages.
+        Every directory under <code>examples/</code> runs standalone. All
+        examples below are tested and correct; these are the source of truth
+        for the guide pages.
       </p>
 
       <CodeBlock

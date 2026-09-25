@@ -11,22 +11,88 @@ from .map_parse import (
     MapParseError,
     _coerce_float,
     _coerce_int,
+    _ctx,
     _optional_dict,
     _require_dict,
     _require_list,
     _require_str,
-    _ctx,
 )
-
 
 EmissionShape = Literal["point", "rect", "circle", "line"]
 ParticleShape = Literal["circle", "square", "diamond", "star", "sparkle", "smoke", "heart", "line", "fog"]
 AlphaFadeMode = Literal["none", "fade_out", "fade_in", "fade_both"]
 FieldQuality = Literal["low", "medium", "high"]
+EmitterMode = Literal["continuous", "burst", "field"]
 
 EMISSION_SHAPES = ["point", "rect", "circle", "line"]
 PARTICLE_SHAPES = list(get_args(ParticleShape))
 ALPHA_FADE_MODES = list(get_args(AlphaFadeMode))
+EMISSION_MODES = ["continuous", "burst", "field"]
+FIELD_QUALITIES = ["low", "medium", "high"]
+QUALITY_DENSITY = {"low": 0.72, "medium": 1.0, "high": 1.25}
+
+
+def _to_int(raw: Any, default: int) -> int:
+    """Best-effort int for forward-tolerant keys (never raises on data)."""
+    if isinstance(raw, bool):
+        return default
+    try:
+        return int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _to_float(raw: Any, default: float) -> float:
+    """Best-effort float for forward-tolerant keys (never raises on data)."""
+    try:
+        value = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    if isinstance(raw, bool) or not math.isfinite(value):
+        return default
+    return value
+
+
+@dataclass
+class EmitterTiming:
+    """Emitter clock block (mirrors the editor's ``timing`` dict).
+
+    ``emitter_duration`` ``0`` means infinite emission; ``loop`` restarts
+    the clock (clearing particles, re-filling field contracts) on expiry.
+    The clock gates *stream* spawning only — manual burst triggers and
+    fill calls always fire. Unknown sub-keys are dropped; absent or
+    malformed blocks fall back to defaults (today's behavior).
+    """
+
+    emitter_duration: float = 0.0
+    start_delay: float = 0.0
+    loop: bool = True
+    burst_interval: float = 0.0
+
+    @staticmethod
+    def _num(raw: Any, default: float) -> float:
+        return max(0.0, _to_float(raw, default))
+
+    @classmethod
+    def from_dict(cls, raw: Any) -> "EmitterTiming":
+        if not isinstance(raw, dict):
+            return cls()
+        loop_raw = raw.get("loop", True)
+        loop = loop_raw if isinstance(loop_raw, bool) else True
+        return cls(
+            emitter_duration=cls._num(raw.get("emitter_duration", 0.0), 0.0),
+            start_delay=cls._num(raw.get("start_delay", 0.0), 0.0),
+            loop=loop,
+            burst_interval=cls._num(raw.get("burst_interval", 0.0), 0.0),
+        )
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "emitter_duration": self.emitter_duration,
+            "start_delay": self.start_delay,
+            "loop": self.loop,
+            "burst_interval": self.burst_interval,
+        }
 
 
 @dataclass
@@ -60,6 +126,12 @@ class ParticleSystemConfig:
     alpha_fade: AlphaFadeMode = "fade_out"
     fade_peak_alpha: Optional[int] = None
     wrap: bool = False
+    mode: EmitterMode = "continuous"
+    burst_count: int = 30
+    coverage: float = 1.0
+    field_quality: FieldQuality = "medium"
+    ground_bias: bool = False
+    timing: EmitterTiming = field(default_factory=EmitterTiming)
 
     def apply_render_scale(self, scale: float) -> None:
         """Scale dimensionful fields by *scale* (typically ``render_scale``).
@@ -90,10 +162,7 @@ class ParticleSystemConfig:
             radius = min(w, h) / 2
             return math.pi * radius * radius
         if self.emission_shape == "point":
-            raise ValueError(
-                "emission_shape 'point' has no fill area; use rect/circle/line "
-                "or a wider emission rect"
-            )
+            raise ValueError("emission_shape 'point' has no fill area; use rect/circle/line or a wider emission rect")
         return w * h
 
     def count_for_coverage(self, coverage: float, w: float, h: float) -> int:
@@ -144,6 +213,12 @@ class ParticleSystemConfig:
             "rotation_speed": self.rotation_speed,
             "alpha_fade": self.alpha_fade,
             "wrap": self.wrap,
+            "mode": self.mode,
+            "burst_count": self.burst_count,
+            "coverage": self.coverage,
+            "field_quality": self.field_quality,
+            "ground_bias": self.ground_bias,
+            "timing": self.timing.to_dict(),
         }
         if self.fade_peak_alpha is not None:
             d["fade_peak_alpha"] = self.fade_peak_alpha
@@ -193,6 +268,16 @@ class ParticleSystemConfig:
             cfg.fade_peak_alpha = None
         else:
             cfg.fade_peak_alpha = max(0, min(255, int(raw_peak)))
+        raw_mode = str(g("mode", "continuous"))
+        cfg.mode = cast(EmitterMode, raw_mode if raw_mode in EMISSION_MODES else "continuous")
+        cfg.burst_count = max(0, _to_int(g("burst_count", 30), 30))
+        cfg.coverage = _to_float(g("coverage", 1.0), 1.0)
+        if cfg.coverage < 0.05:
+            cfg.coverage = 0.05
+        raw_quality = str(g("field_quality", "medium"))
+        cfg.field_quality = cast(FieldQuality, raw_quality if raw_quality in FIELD_QUALITIES else "medium")
+        cfg.ground_bias = bool(g("ground_bias", False))
+        cfg.timing = EmitterTiming.from_dict(d.get("timing"))
         return cfg
 
 
