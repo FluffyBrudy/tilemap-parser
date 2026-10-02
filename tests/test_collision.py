@@ -143,6 +143,28 @@ class TestParseTilesetCollision:
         result = parse_tileset_collision(data)
         assert len(result.tiles) == 0
 
+    def test_null_properties_raises(self):
+        import copy
+        bad = copy.deepcopy(TILESET_DATA)
+        bad["tiles"]["0"]["properties"] = None
+        with pytest.raises(CollisionParseError):
+            parse_tileset_collision(bad)
+
+    def test_array_properties_raises(self):
+        import copy
+        bad = copy.deepcopy(TILESET_DATA)
+        bad["tiles"]["0"]["properties"] = ["collision_layer"]
+        with pytest.raises(CollisionParseError):
+            parse_tileset_collision(bad)
+
+    def test_valid_properties_parse(self):
+        import copy
+        data = copy.deepcopy(TILESET_DATA)
+        data["tiles"]["0"]["properties"] = {"collision_layer": 2, "collision_mask": 4}
+        result = parse_tileset_collision(data)
+        assert result.tiles[0].collision_layer == 2
+        assert result.tiles[0].collision_mask == 4
+
 
 # ===========================================================================
 # parse_character_collision
@@ -822,3 +844,39 @@ class TestGlobalObjectCacheHelper:
         result = get_cached_object_collision(f)
         assert result is not None
         assert result.tileset_name == "Test"
+
+
+class TestShapeInflated:
+    def test_rect_grows_around_center(self):
+        r = RectangleShape(width=10, height=20, offset=(5, 7)).inflated(2.0)
+        assert (r.width, r.height) == (14.0, 24.0)
+        assert r.offset == (3.0, 5.0)
+
+    def test_rect_deflate_floors_at_zero(self):
+        r = RectangleShape(width=10, height=20, offset=(5, 7)).inflated(-100.0)
+        assert (r.width, r.height) == (0.0, 10.0)
+        before = RectangleShape(width=10, height=20, offset=(5, 7))
+        before.inflated(3.0)
+        assert (before.width, before.height, before.offset) == (10, 20, (5, 7))
+
+    def test_circle_capsule_radius(self):
+        assert CircleShape(radius=5).inflated(2.0).radius == 7.0
+        assert CircleShape(radius=5).inflated(-100.0).radius == 0.0
+        c = CapsuleShape(radius=4, height=10, offset=(1, 2)).inflated(3.0)
+        assert (c.radius, c.height, c.offset) == (7.0, 10, (1, 2))
+
+    def test_polygon_convex_grows_outward(self):
+        import math
+
+        p = CollisionPolygon(vertices=[(0, 0), (8, 0), (8, 8), (0, 8)], one_way=True)
+        out = p.inflated(2.0)
+        assert out.one_way is True
+        assert len(out.vertices) == 4
+        d = 2.0 / math.sqrt(2)
+        assert out.vertices[0] == pytest.approx((-d, -d))
+        assert out.vertices[2] == pytest.approx((8 + d, 8 + d))
+        assert p.vertices == [(0, 0), (8, 0), (8, 8), (0, 8)]
+
+    def test_polygon_zero_is_identity(self):
+        p = CollisionPolygon(vertices=[(0, 0), (8, 0), (8, 8)])
+        assert p.inflated(0).vertices == p.vertices

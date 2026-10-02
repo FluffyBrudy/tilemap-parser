@@ -189,12 +189,7 @@ class AnimationPlayer:
 
 
 def _scaled_library(library: AnimationLibrary, scale: float) -> AnimationLibrary:
-    """Return a copy of *library* whose grid geometry is scaled by *scale*.
-
-    Kept in lockstep with the scaled spritesheet surface so that
-    :meth:`SpriteAnimationSet.get_image` continues to address cells
-    correctly.
-    """
+    # Scaled copy keeps get_image cell math correct.
     return AnimationLibrary(
         animations=library.animations,
         spritesheet_path=library.spritesheet_path,

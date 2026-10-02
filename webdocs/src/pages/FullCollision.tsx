@@ -9,14 +9,14 @@ export default function FullCollision() {
     <div className="content">
       <h1>Full Collision</h1>
       <p>
-        A copy-and-fill template: one file that wires every collision lane
+        A copy-and-fill template: one file that connects every collision lane
         into one place, tiles, bodies, and a player moved by{" "}
         <code>move_platformer</code>. Replace the two FILL IN paths with your
         own map and collision data, then implement your movement in the two{" "}
         <code>implement your movement here</code> markers.
       </p>
       <p>
-        It runs as-is on a small procedural world, so you can watch the wiring
+        It runs as-is on a small procedural world, so you can watch the setup
         work before you replace anything. The bigger sibling is{" "}
         <Link to="/examples/full-physics-world" className="border-b-0 font-mono text-teal">
           Full Physics World

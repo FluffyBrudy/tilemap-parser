@@ -6,7 +6,7 @@ import FlowDiagram, {
 } from "../components/FlowDiagram";
 import Toc from "../components/Toc";
 
-const WIRING_NODES: FlowNode[] = [
+const SETUP_NODES: FlowNode[] = [
   {
     id: "runner",
     x: 260,
@@ -49,7 +49,7 @@ const WIRING_NODES: FlowNode[] = [
   },
 ];
 
-const WIRING_EDGES: FlowEdge[] = [
+const SETUP_EDGES: FlowEdge[] = [
   { from: "runner", to: "slide", fromOffset: 0.15 },
   { from: "runner", to: "platformer", fromOffset: 0.5 },
   { from: "runner", to: "grounded", fromOffset: 0.85 },
@@ -61,7 +61,7 @@ const TOC = [
   { id: "attach", label: "Attach / detach / from_world" },
   { id: "gid-routing", label: "GID routing (multi-tileset)" },
   { id: "result", label: "CollisionResult flags" },
-  { id: "wiring", label: "Per-mode wiring" },
+  { id: "setup", label: "Per-mode setup" },
   { id: "validate", label: "validate_config & strict" },
 ];
 
@@ -159,8 +159,8 @@ export default function RunnerGuide() {
         </tbody>
       </table>
       <p>
-        Unknown names raise <code>ValueError</code>. Everything the presets set
-        is just attributes; tweak after construction. The generic{" "}
+        Everything the presets set
+        is plain attributes; tweak after construction. The generic{" "}
         <code>CollisionRunner(tile_size, mode, render_scale)</code> constructor
         also exists;
         <code>
@@ -192,7 +192,7 @@ export default function RunnerGuide() {
             <td>
               px/s² applied to airborne sprites each frame (physics modes)
             </td>
-            <td>your jump arcs feel floaty or stiff</td>
+            <td>your jump arcs are too floaty or stiff</td>
           </tr>
           <tr>
             <td>
@@ -225,7 +225,7 @@ export default function RunnerGuide() {
               built-in <code>input_x * horizontal_speed</code> sets{" "}
               <code>vx</code>
             </td>
-            <td>walk/run speed feels wrong</td>
+            <td>walk/run speed is wrong</td>
           </tr>
           <tr>
             <td>
@@ -258,7 +258,7 @@ export default function RunnerGuide() {
               degrees from horizontal; steeper slopes are walls in{" "}
               <code>move_platformer_with_slide</code>
             </td>
-            <td>slopes feel too climbable / not climbable enough</td>
+            <td>slopes are too easy or too hard to climb</td>
           </tr>
           <tr>
             <td>
@@ -287,7 +287,7 @@ export default function RunnerGuide() {
       </table>
       <Callout kind="warn" title="READ THE DEFAULTS BEFORE YOU TUNE">
         The presets exist so you don't have to guess. Change one value at a time
-        and re-test the feeling; the runner validates ranges for you (see{" "}
+        and re-test; the runner validates ranges for you (see{" "}
         <code>validate_config</code> below).
       </Callout>
 
@@ -336,29 +336,46 @@ result = runner.move_platformer(player, None, None, dt, input_x=1.0, world=other
       <p>
         Since 5.0.5, <code>PhysicsWorld.from_map(..., use_gids=True)</code>{" "}
         fixes this automatically. It records every grid resource's{" "}
-        <code>[firstgid, firstgid + tile_count)</code> window and stem-matches{" "}
-        <code>tileset_collision.tileset_name</code> against them. Every tile
-        lookup is then <strong>range-routed</strong>:
+        <code>[firstgid, firstgid + tile_count)</code> window and routes
+        every tile lookup through the named collision owner
+        (<code>collision_tileset=</code>, or the only tile tileset when
+        there is exactly one):
       </p>
       <CodeBlock
         title="how a gid resolves"
         code={`1. find the grid resource whose window contains the gid
-2. owner != collision file's tileset  -> None   (decoration grids are never solid)
-3. owner == collision file's tileset  -> tiles[gid - firstgid]`}
+2. owner != named collision tileset  -> None   (decoration grids are never solid)
+3. owner == named collision tileset  -> tiles[gid - firstgid]`}
       />
       <CodeBlock
         title="nothing to configure"
         language="python"
         code={`col = load_tileset_collision("data/collision/tileset.collision.json")  # local keys ("2", "575", ...)
-world = PhysicsWorld.from_map(map_data, col, use_gids=True)            # map has N grid tilesets
+world = PhysicsWorld.from_map(map_data, col, use_gids=True,
+                              collision_tileset="tileset")   # map has N grid tilesets
 
-world.has_collision_gid(92)    # True  -> jungle local 2
+world.has_collision_gid(92)    # True  -> owner local 2
 world.has_collision_gid(1813)  # False -> belongs to another grid resource, never aliases`}
       />
+      <Callout kind="warn" title="NAME THE OWNER ON MULTI-TILESET MAPS">
+        Routing needs to know which map tileset owns collision: pass it
+        explicitly with <code>collision_tileset=&quot;stem&quot;</code> (the
+        map tileset stem, e.g. <code>tileset_night</code> for a
+        reskinned copy whose collision file keeps the original name), or use
+        a single tile tileset per map and it resolves automatically. A
+        reskinned path with no owner named falls back to literal ids, and
+        when nothing resolves at all, <code>from_map</code> warns — usually
+        a routing miss, though tiles whose entries carry no valid shape
+        also pass through silently by design. Duplicate stems across
+        directories share one collision file safely only when their tile
+        layouts are identical. A <code>collision_tileset</code> matching no
+        map tileset warns too (typo guard).
+      </Callout>
       <Callout kind="note" title="ONE GRID COLLISION FILE PER WORLD">
-        Routing enforces the Godot-style model: exactly one collidable grid
-        tileset per world; every other grid resource is inert decoration.
-        Object tilesets never participate in tile collision at all.
+        Routing keeps the Godot-style model: exactly one collidable grid
+        tileset per world; every other grid resource is ignored for
+        collision. Object tilesets never participate in tile collision at
+        all.
         Pre-merged GID-keyed collisions (<code>TilesetCollision.merge</code>)
         and literal <code>use_gids=False</code> lookups keep working unchanged.
       </Callout>
@@ -381,11 +398,11 @@ world.has_collision_gid(1813)  # False -> belongs to another grid resource, neve
         in the same frame.
       </Callout>
 
-      <h2 id="wiring">PER-MODE WIRING</h2>
+      <h2 id="setup">PER-MODE SETUP</h2>
       <FlowDiagram
         title="move modes"
-        nodes={WIRING_NODES}
-        edges={WIRING_EDGES}
+        nodes={SETUP_NODES}
+        edges={SETUP_EDGES}
       />
       <h3>Top-down (slide)</h3>
       <CodeBlock title="game loop" code={LOOP_TOP} />
@@ -393,7 +410,7 @@ world.has_collision_gid(1813)  # False -> belongs to another grid resource, neve
       <CodeBlock title="game loop" code={LOOP_PLATFORM} />
       <h3>Explicit velocity (knockback, crates, custom controllers)</h3>
       <CodeBlock
-        title="velocity contract"
+        title="how velocity= works"
         code={`# velocity= skips gravity, input and jump; adopts (vx, vy) onto the sprite
 result = runner.move_grounded(enemy, None, None, dt, velocity=(enemy.vx, enemy.vy))
 if result.hit_wall_x:
@@ -412,8 +429,8 @@ if result.hit_wall_x:
         </li>
         <li>
           <code>RPG</code> mode with <code>gravity &gt; 0</code> is a{" "}
-          <code>ValueError</code>; top-down with gravity just warns (it's
-          ignored in <code>move_and_slide</code>).
+          <code>ValueError</code>; top-down with gravity warns and stays
+          ignored in <code>move_and_slide</code>.
         </li>
         <li>
           <code>gravity &lt; 0</code> and <code>max_fall_speed &lt; 0</code> are

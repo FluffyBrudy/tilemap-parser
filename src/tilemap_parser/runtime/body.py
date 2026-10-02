@@ -1,23 +1,10 @@
-"""Physics bodies authored into a :class:`~.world.PhysicsWorld`.
-
-A :class:`Body` is the authoring surface for a solid in the world.  It owns
-a single primitive collision shape (rectangle, circle, or capsule — polygon
-shapes stay in the ``MapObject`` lane) plus its position and velocity, and
-participates in collision detection through the same
-``ICollidableObject`` contract as :class:`~.map_object.MapObject`
-(owner-local shape, ``obj.x + vertex`` applied once by the narrowphase).
-
-Bodies are NOT self-moving.  ``mode == "kinematic"`` marks a body the game
-moves explicitly each frame (e.g. a crate pushed with ``move_grounded``);
-``mode == "static"`` marks a body that never moves (e.g. scenery, furniture).
-Neither mode implies physics-engine dynamics — velocity is scripted, Godot
-``StaticBody2D`` / ``CharacterBody2D`` style.
+"""World solids: primitive shapes only (polygons stay in MapObject). Static
+never moves; kinematic is moved explicitly by the game; neither simulates.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
 
 from ..parser.collision import (
     CapsuleShape,
@@ -26,7 +13,7 @@ from ..parser.collision import (
     RectangleShape,
 )
 
-BodyMode = str  # "static" | "kinematic"
+BodyMode = str
 
 BODY_MODES = ("static", "kinematic")
 
@@ -63,22 +50,7 @@ class Body:
         game_id: str = "",
     ):
         """
-        Create a body.
-
-        Args:
-            collision_shape: Primitive shape (RectangleShape, CircleShape,
-                or CapsuleShape).  Polygon shapes are not supported on
-                bodies — use :class:`MapObject` for polygon solids.
-            x: World X position of the shape origin (top-left / center
-                per shape offset semantics).
-            y: World Y position.
-            vx: X velocity (for kinematic bodies).
-            vy: Y velocity (for kinematic bodies).
-            mode: ``"static"`` (never moves) or ``"kinematic"`` (moved
-                explicitly by the game).
-            collision_layer: Layer this body is on (default 1).
-            collision_mask: Layers this body collides with (default all).
-            game_id: Optional label for debugging.
+        Polygons rejected (use MapObject); mode static/kinematic only.
         """
         if not isinstance(collision_shape, (RectangleShape, CircleShape, CapsuleShape)):
             raise TypeError(
@@ -106,16 +78,8 @@ class Body:
             f"y={self.y}, mode={self.mode!r}, game_id={self.game_id!r})"
         )
 
-    # ------------------------------------------------------------------
-    # Geometry helpers used by the movement resolver
-    # ------------------------------------------------------------------
-
-    def top_y_at(self, world_x: float) -> Optional[float]:
-        """Return the top-surface world Y of this body at *world_x*, or None.
-
-        Only the top surface is sampled — bodies are never one-way, but the
-        resolver only needs the topmost surface for ground landing.
-        """
+    def top_y_at(self, world_x: float) -> float | None:
+        """Top surface only; bodies are never one-way."""
         shape = self.collision_shape
         if isinstance(shape, RectangleShape):
             left = self.x + shape.offset[0]
@@ -128,18 +92,12 @@ class Body:
             cy = self.y + shape.offset[1]
             return _circle_top_y(cx, cy, shape.radius, world_x)
 
-        # CapsuleShape — vertical segment (top cap center, radius, height)
         px = self.x + shape.offset[0]
         py = self.y + shape.offset[1]
         return _circle_top_y(px, py, shape.radius, world_x)
 
     def as_polygon(self) -> CollisionPolygon:
-        """World-space polygon approximation of this body's shape.
-
-        Used only by slide-mode normal computation (the tile resolver works
-        on polygon edges).  Circles/capsules are approximated with enough
-        edges that the closest-edge normal is visually exact.
-        """
+        """Slide-mode normals only; enough edges to read exact."""
         shape = self.collision_shape
         if isinstance(shape, RectangleShape):
             left = self.x + shape.offset[0]
@@ -167,28 +125,24 @@ class Body:
         by = py + shape.height
         r = shape.radius
         steps = 4
-        verts: list[Tuple[float, float]] = []
-        # Top cap — left (pi) to right (0) through the top (3pi/2 = up)
+        verts: list[tuple[float, float]] = []
         for k in range(steps + 1):
             a = math.pi + (math.pi * k / steps)
             verts.append((px + r * math.cos(a), py + r * math.sin(a)))
-        # Bottom cap — right (0) to left (pi) through the bottom (pi/2 = down)
         for k in range(steps + 1):
             a = math.pi * k / steps
             verts.append((bx + r * math.cos(a), by + r * math.sin(a)))
         return CollisionPolygon(vertices=verts)
 
 
-def _circle_top_y(cx: float, cy: float, radius: float, world_x: float) -> Optional[float]:
-    """Top-surface Y of a circle at *world_x* (upper semicircle), or None."""
+def _circle_top_y(cx: float, cy: float, radius: float, world_x: float) -> float | None:
     dx = world_x - cx
     if abs(dx) > radius:
         return None
     return cy - math.sqrt(radius * radius - dx * dx)
 
 
-def _ngon(cx: float, cy: float, radius: float, edges: int) -> list[Tuple[float, float]]:
-    """Vertices of a regular polygon approximating a circle."""
+def _ngon(cx: float, cy: float, radius: float, edges: int) -> list[tuple[float, float]]:
     return [
         (
             cx + radius * math.cos(2 * math.pi * i / edges),

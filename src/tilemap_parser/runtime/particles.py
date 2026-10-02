@@ -19,6 +19,10 @@ from ..parser.particle import FieldQuality, ParticleShape, ParticleSystemConfig
 PARTICLE_TEXTURE_SIZE = 24
 MAX_DT = 0.05
 
+CLOCK_EPS = 1e-9
+BURST_POPS = 10
+QUALITY_DENSITY = {"low": 0.72, "medium": 1.0, "high": 1.25}
+
 _SYMMETRIC_SHAPES = frozenset({"circle", "square", "diamond", "star", "sparkle", "smoke", "fog"})
 
 #: Field drift direction: compass degrees (0 = right, 90 = down, 180 = left,
@@ -136,14 +140,7 @@ def _make_smoke_texture() -> Surface:
 
 
 def _make_fog_texture() -> Surface:
-    """Flat soft-edged square with a uniform core.
-
-    Unlike the ``smoke`` disc (bright center, dark rim), this shape has
-    roughly constant alpha across most of its canvas and only fades at the
-    rim.  Densely overlapping fog particles therefore tile like stacked
-    translucent sheets, producing one continuous haze instead of a field
-    of individual circles.
-    """
+    """Uniform core with soft rim; overlapping particles tile into one haze."""
     s = Surface((PARTICLE_TEXTURE_SIZE, PARTICLE_TEXTURE_SIZE), pygame.SRCALPHA)
     half = PARTICLE_TEXTURE_SIZE / 2
     core = 0.55  # flat up to this normalized distance, then soft edge
@@ -178,13 +175,7 @@ def _make_heart_texture() -> Surface:
 
 
 def _make_line_texture() -> Surface:
-    # will be applied on next release not yet
-    """Vertical streak spanning the full canvas with a thin core.
-
-    Kept axis-aligned (not rotated): the renderer only rotates particles
-    when ``rotation_speed`` is non-zero, so a vertical line reads as a
-    falling streak for rain and stream effects.
-    """
+    """Axis-aligned vertical streak (renderer rotates only on demand)."""
     s = Surface((PARTICLE_TEXTURE_SIZE, PARTICLE_TEXTURE_SIZE), pygame.SRCALPHA)
     w = max(1, PARTICLE_TEXTURE_SIZE // 6)
     x = (PARTICLE_TEXTURE_SIZE - w) // 2
@@ -349,8 +340,7 @@ class Particle:
     def progress(self) -> float:
         if self.max_life <= 0:
             return 1.0
-        # Clamp to [0, 1]: in wrap mode life keeps ticking past zero (no
-        # death), so without the clamp size/color would extrapolate forever.
+        # Wrap mode ticks past zero without dying; clamp stops extrapolation.
         return min(1.0, max(0.0, 1.0 - self.life / self.max_life))
 
     @property
@@ -393,7 +383,17 @@ class ParticleEmitter:
             if p is not None:
                 self.particles.append(p)
 
-    def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
+    def update(
+        self,
+        dt: float,
+        area_x: float,
+        area_y: float,
+        area_w: float,
+        area_h: float,
+        *,
+        spawn_enabled: bool = True,
+    ) -> None:
+        """spawn_enabled gates stream spawns only; bursts always fire."""
         cfg = self.config
         if dt > MAX_DT:
             dt = MAX_DT
@@ -401,19 +401,18 @@ class ParticleEmitter:
             return
 
         max_p = cfg.max_particles
-        self.spawn_timer += dt * cfg.spawn_rate
-        while self.spawn_timer >= 1.0 and len(self.particles) < max_p:
-            self.spawn_timer -= 1.0
-            p = self._spawn(area_x, area_y, area_w, area_h)
-            if p is not None:
-                self.particles.append(p)
+        if spawn_enabled:
+            self.spawn_timer += dt * cfg.spawn_rate
+            while self.spawn_timer >= 1.0 and len(self.particles) < max_p:
+                self.spawn_timer -= 1.0
+                p = self._spawn(area_x, area_y, area_w, area_h)
+                if p is not None:
+                    self.particles.append(p)
 
         grav_x = cfg.gravity_x
         grav_y = cfg.gravity_y
 
         if cfg.wrap:
-            # Continuous media: particles never expire, they just move and
-            # wrap around the emission area (toroidal, exact offset preserved).
             for p in self.particles:
                 p.update(dt, grav_x, grav_y)
                 self._wrap_particle(p, area_x, area_y, area_w, area_h)
@@ -438,13 +437,7 @@ class ParticleEmitter:
 
     @staticmethod
     def _wrap_particle(p: Particle, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
-        """Toroidally fold ``p`` back into the emission area.
-
-        The particle disappears beyond the area edge by half its current
-        size, then re-enters on the opposite side at the exact same offset
-        (modulo), preserving velocity, alpha, and size.  Deterministic and
-        stateless — the same in-range particle is left untouched.
-        """
+        """Half-size offset fold; modulo preserves offset, deterministic."""
         half = p.current_size / 2
         span_x = area_w + 2 * half
         span_y = area_h + 2 * half
@@ -627,7 +620,7 @@ class SpriteBatchRenderer(ParticleRenderer):
                 draw_surf.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
                 if premul:
                     draw_surf = draw_surf.premul_alpha()
-            _TINTED_CACHE[cache_key] = draw_surf  # move to MRU position
+            _TINTED_CACHE[cache_key] = draw_surf
 
             if p.rotation_speed != 0 and needs_rotation:
                 rotated = pygame.transform.rotate(draw_surf, p.rotation)
@@ -645,19 +638,131 @@ class SpriteBatchRenderer(ParticleRenderer):
 
 
 class ParticleSystem:
+    """Clock gates stream spawning only; bursts and fills always fire."""
+
     def __init__(self, config: ParticleSystemConfig, renderer: Optional[ParticleRenderer] = None):
         self.config = config
         self.emitter = ParticleEmitter(config)
         self.renderer = renderer if renderer is not None else SpriteBatchRenderer()
         self.renderer.on_config_change(config)
+        self.clock: float = 0.0
+        self._burst_queue: list = []
+        self._burst_tick: float = 0.0
+        self._auto_filled: bool = False
+        self._last_area: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     def set_config(self, config: ParticleSystemConfig) -> None:
         self.config = config
         self.emitter.set_config(config)
         self.renderer.on_config_change(config)
+        self.clock = 0.0
+        self._burst_queue = []
+        self._burst_tick = 0.0
+        self._auto_filled = False
+
+    @property
+    def phase(self) -> str:
+        timing = self.config.timing
+        if self.clock + CLOCK_EPS < timing.start_delay:
+            return "delay"
+        if timing.emitter_duration > 0 and self.clock + CLOCK_EPS >= timing.start_delay + timing.emitter_duration:
+            return "expired"
+        return "active"
+
+    def is_field_contract(self) -> bool:
+        return bool(self.config.wrap) and self.config.spawn_rate == 0
 
     def update(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
-        self.emitter.update(dt, area_x, area_y, area_w, area_h)
+        if dt > MAX_DT:
+            dt = MAX_DT
+        if not self._auto_filled:
+            # Single attempt; a zero-yield fill must not retry per frame.
+            self._auto_filled = True
+            self.refill_if_field(area_x, area_y, area_w, area_h)
+        self.clock += dt
+        self._last_area = (area_x, area_y, area_w, area_h)
+        self._pump_clock()
+        spawn_open = self.phase == "active"
+        self._pump_burst_pops(dt, area_x, area_y, area_w, area_h)
+        self.emitter.update(dt, area_x, area_y, area_w, area_h, spawn_enabled=spawn_open)
+
+    def _pump_clock(self) -> None:
+        timing = self.config.timing
+        if timing.emitter_duration <= 0 or self.clock + CLOCK_EPS < timing.start_delay + timing.emitter_duration:
+            return
+        if timing.loop:
+            self.emitter.clear()
+            self.clock = 0.0
+            self._burst_queue = []
+            self._burst_tick = 0.0
+            self.refill_if_field(*self._last_area)
+
+    def _pump_burst_pops(self, dt: float, area_x: float, area_y: float, area_w: float, area_h: float) -> None:
+        """Interval-spread pops; manual triggers ignore phase."""
+        if not self._burst_queue:
+            return
+        interval = self.config.timing.burst_interval
+        if interval <= 0:
+            return
+        self._burst_tick += dt
+        while self._burst_tick >= interval and self._burst_queue:
+            self._burst_tick -= interval
+            head = self._burst_queue[0]
+            chunk = max(1, math.ceil(head[1] / BURST_POPS))
+            want = min(chunk, head[0])
+            before = len(self.emitter.particles)
+            self.emitter.emit_burst(want, *head[2])
+            fired = len(self.emitter.particles) - before
+            head[0] -= fired
+            if head[0] <= 0:
+                self._burst_queue.pop(0)
+            elif fired < want:
+                self._burst_queue.clear()
+
+    def trigger_burst(
+        self,
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        count: Optional[int] = None,
+    ) -> int:
+        """Fires outside the active window too; interval spreads pops with
+        first immediate, remainder queued in trigger order; else all at once."""
+        if count is None:
+            count = self.config.burst_count
+        count = max(0, int(count))
+        interval = self.config.timing.burst_interval
+        if interval > 0 and count > 0:
+            chunk = max(1, math.ceil(count / BURST_POPS))
+            before = len(self.emitter.particles)
+            self.emitter.emit_burst(min(chunk, count), x, y, w, h)
+            fired = len(self.emitter.particles) - before
+            self._burst_tick = 0.0
+            if fired < count:
+                self._burst_queue.append([count - fired, count, (x, y, w, h)])
+            return fired
+        self._burst_queue.clear()
+        before = len(self.emitter.particles)
+        self.emitter.emit_burst(count, x, y, w, h)
+        return len(self.emitter.particles) - before
+
+    def refill_if_field(self, x: float, y: float, w: float, h: float) -> int:
+        """Fill once under wrap + rate 0; count from coverage, capped."""
+        if not self.is_field_contract():
+            return 0
+        cfg = self.config
+        if cfg.ground_bias:
+            top = y + h * 0.35
+            y, h = top, h * 0.65
+        density = QUALITY_DENSITY.get(cfg.field_quality, 1.0)
+        try:
+            count = cfg.count_for_coverage(cfg.coverage * density, w, h)
+        except (ValueError, TypeError):
+            return 0
+        before = len(self.emitter.particles)
+        self.emitter.emit_burst(max(0, count), x, y, w, h)
+        return len(self.emitter.particles) - before
 
     def draw(
         self,
@@ -674,15 +779,7 @@ class ParticleSystem:
         self.emitter.emit_burst(count, x, y, w, h)
 
     def emit_field(self, coverage: float, x: float, y: float, w: float, h: float) -> None:
-        """Fill the ``w x h`` area once with a persistent field.
-
-        Sets the particle count from ``config.count_for_coverage``
-        (capped at ``max_particles``), so density is expressed as a
-        dimensionless coverage (0.5 = half the area) instead of a raw
-        count.  Requires the field contract: ``wrap=True`` and
-        ``spawn_rate=0`` — otherwise the field would die or spawn on top
-        of itself, and the error names exactly which fields to change.
-        """
+        """Fill once; requires wrap + rate 0, errors name the missing field."""
         cfg = self.config
         if not cfg.wrap:
             raise ValueError(
@@ -698,16 +795,14 @@ class ParticleSystem:
     def clear(self) -> None:
         self.emitter.clear()
         self.renderer.clear()
+        self._auto_filled = False
+        self._burst_queue = []
+        self._burst_tick = 0.0
 
 
 @dataclass(frozen=True)
 class FieldLayerSpec:
-    """One layer's tuning inside a :class:`FieldProfile`.
-
-    ``coverage`` is the fill density (see ``count_for_coverage``);
-    ``ground_layer`` marks layers that sit in the lower band of the area
-    when the field is built with ``ground_bias=True``.
-    """
+    """One layer tuning; ground_layer sits in the lower band when biased."""
 
     name: str
     size_min: int
@@ -721,25 +816,13 @@ class FieldLayerSpec:
 
 @dataclass(frozen=True)
 class FieldProfile:
-    """Named, inspectable set of layer specs for :class:`ParticleField`.
-
-    A profile is plain data: copy ``FOG_PROFILE`` and tweak the numbers to
-    build your own mood (dust, sandstorm, underwater shimmer...).  The
-    field machinery is generic; the tuning lives here.
-    """
+    """Named layer specs; copy and tweak numbers for your own mood."""
 
     name: str
     presets: Tuple[FieldLayerSpec, ...]
 
     def with_alpha(self, factor: float, name: Optional[str] = None) -> "FieldProfile":
-        """Return a copy with every layer alpha scaled by ``factor``.
-
-        Profiles are immutable data, so this never mutates the source profile.
-        ``name`` overrides the profile name on the returned copy (handy for
-        authoring named variants like ``fog.with_alpha(0.5, name="mist")``).
-        Use ``ParticleField.global_alpha`` for live fading; use this when you
-        want a named profile variant.
-        """
+        """Copy with scaled alphas; immutable, live fading uses global_alpha."""
         scale = max(0.0, float(factor))
         return FieldProfile(
             name if name is not None else self.name,
@@ -761,11 +844,6 @@ class FieldProfile:
 
 @dataclass
 class ParticleFieldLayer:
-    """One generated layer inside a :class:`ParticleField`.
-
-    Most games should not need to build these manually.  The public shape is
-    useful for inspection, testing, or drawing layers yourself.
-    """
 
     name: str
     system: ParticleSystem
@@ -773,15 +851,7 @@ class ParticleFieldLayer:
 
 
 class ParticleField:
-    """High-level persistent particle field helper.
-
-    ``ParticleField`` turns common continuous-effect dials (density,
-    strength, motion, color) into wrapped particle fields.  It owns the
-    field contract (``wrap=True`` and ``spawn_rate=0``), fills once, then
-    only moves existing particles.  Layer tuning comes from a
-    :class:`FieldProfile` (plain data) or from generic size/speed/alpha
-    dials when no profile is given.
-    """
+    """Persistent wrapped field from dials or a profile; fill once, then drift."""
 
     shape: ParticleShape
     quality: FieldQuality
@@ -857,12 +927,11 @@ class ParticleField:
 
     @property
     def global_alpha(self) -> float:
-        """Master strength scale (0.0-1.0) applied to every layer's alpha."""
         return self._global_alpha
 
     @global_alpha.setter
     def global_alpha(self, value: float) -> None:
-        """Live strength scale; restyles existing layer configs in place."""
+        """Restyles live layers in place (no rebuild)."""
         self._global_alpha = self._clamp_alpha(value)
         for layer, base in zip(self.layers, self._layer_base_alpha, strict=True):
             alpha = self._clamp_channel(base * self._global_alpha)
@@ -945,7 +1014,6 @@ class ParticleField:
         return cfg
 
     def refill(self) -> None:
-        """Rebuild and fill layers after changing density, area, or quality."""
         quality_density, max_particles = self._QUALITY[self.quality]
         presets = self.profile.presets if self.profile is not None else self._generic_presets()
         self._layer_base_alpha = [preset.alpha for preset in presets]
@@ -956,6 +1024,7 @@ class ParticleField:
             system = ParticleSystem(cfg)
             coverage = preset.coverage * self.density * quality_density
             system.emit_field(coverage, *area)
+            system._auto_filled = True
             layers.append(ParticleFieldLayer(preset.name, system, area))
         self.layers = layers
 
@@ -985,8 +1054,7 @@ class ParticleField:
         self.refill()
 
     def set_color(self, color: Tuple[int, int, int]) -> None:
-        """Recolor all layers in place; never rebuilds, never touches the
-        profile or per-layer alphas, and preserves current positions."""
+        """Recolors in place; keeps positions, profile, and alphas."""
         self.color = color
         r, g, b = (self._clamp_channel(c) for c in color)
         end_r, end_g, end_b = (self._clamp_channel(c - 10) for c in (r, g, b))
@@ -1018,8 +1086,7 @@ class ParticleField:
             layer.system.draw(screen, offset_x, offset_y, zoom, self.blend)
 
 
-# Known-good starting point: the validated layered fog look.  Copy it and
-# tweak the numbers to build your own moods — the machinery is generic.
+# Starting point: layered fog look. Copy it and tweak the numbers.
 FOG_PROFILE = FieldProfile(
     "fog",
     (

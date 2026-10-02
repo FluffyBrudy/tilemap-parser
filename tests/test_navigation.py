@@ -36,6 +36,9 @@ GOAL_TILE = (4, 4)
 
 
 class MockSprite:
+    collision_layer = 1
+    collision_mask = 0xFFFFFFFF
+
     def __init__(self, x: float, y: float) -> None:
         self.x = x
         self.y = y

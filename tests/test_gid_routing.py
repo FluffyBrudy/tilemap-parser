@@ -154,7 +154,7 @@ class TestFromMapCapture:
             },
         }
 
-    def test_from_map_auto_captures_owner_and_routes(self, tmp_path):
+    def test_from_map_explicit_owner_routes(self, tmp_path):
         from tilemap_parser.runtime.map_loader import load_map
 
         payload_path = tmp_path / "m.json"
@@ -163,7 +163,7 @@ class TestFromMapCapture:
         map_data = load_map(payload_path)
         col = make_col("b", {0: [solid()]})  # local-keyed file for resource b
 
-        world = PhysicsWorld.from_map(map_data, col, use_gids=True)
+        world = PhysicsWorld.from_map(map_data, col, use_gids=True, collision_tileset="b")
 
         # gid 4 -> owner b -> local 0 -> solid; gid 1 -> owner a -> decor
         assert world.has_collision_gid(4) is True

@@ -1,5 +1,3 @@
-"""Movement types shared by the collision runner."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,7 +7,6 @@ Vector2 = tuple[float, float]
 
 
 class MovementMode(Enum):
-    """Movement modes for collision runner"""
 
     SLIDE = "slide"
     GROUNDED = "grounded"
@@ -19,22 +16,11 @@ class MovementMode(Enum):
 
 @dataclass
 class GroundInfo:
-    """Walkable supporting surface selected by the ground query.
+    """Supporting-surface Y, outward normal, derived angle.
 
-    Single source of truth derived from the actual supporting polygon
-    edge (``edge -> normal -> angle``). The normal is authoritative;
-    ``angle`` is derived from it.
-
-    Attributes:
-        y: World Y of the supporting surface at the sampled foot X.
-        normal: Outward unit normal ``(nx, ny)`` of the supporting edge.
-            For tile edges this is the polygon outward normal; for
-            bodies the existing conservative ``(0.0, -1.0)`` is used
-            (no new circle/capsule slope semantics).
-        angle: Raw geometric angle in degrees. ``0.0`` = flat,
-            positive = surface rises toward ``+X``, negative = falls
-            toward ``+X`` (screen coords, ``+Y`` down). No flat
-            threshold is applied — consumers classify.
+    Normal wins; ``angle`` follows it: ``0.0`` = flat, positive rises
+    toward ``+X`` (screen coords, ``+Y`` down). Bodies read flat
+    ``(0.0, -1.0)`` / ``0.0``.
     """
 
     y: float = 0.0
@@ -44,7 +30,6 @@ class GroundInfo:
 
 @dataclass
 class CollisionResult:
-    """Result of collision detection and resolution"""
 
     collided: bool = False
     final_x: float = 0.0

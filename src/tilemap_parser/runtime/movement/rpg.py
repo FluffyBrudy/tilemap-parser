@@ -1,5 +1,3 @@
-"""RPG grid blocking movement (move_rpg)."""
-
 from __future__ import annotations
 
 from ...parser.collision import TilesetCollision
@@ -12,27 +10,13 @@ def move_rpg(
     self,
     sprite: ICollidable,
     tileset_collision: TilesetCollision | None,
-    tile_map: dict[tuple[int, int], int] | None,
+    tile_map: dict | None,
     delta_x: float,
     delta_y: float,
     world: PhysicsWorld | None = None,
 ) -> CollisionResult:
     """
-    Move sprite with RPG-style blocking (no sliding).
-
-    Best for grid-based RPG games where movement is blocked by walls.
-
-    Args:
-        sprite: Sprite to move
-        tileset_collision: Tileset collision data. Optional when a world is
-            attached (or passed as ``world=``) — resolved from it.
-        tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
-            when a world is attached (or passed as ``world=``).
-        delta_x: X movement amount
-        delta_y: Y movement amount
-
-    Returns:
-        CollisionResult with final position and collision info
+    Grid blocking without sliding: diagonal into a corner stops both axes.
     """
     world = self._resolve_world(world)
     if world is not None:

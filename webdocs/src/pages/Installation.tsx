@@ -37,7 +37,7 @@ export default function Installation() {
       />
 
       <h2 id="venv">USE A VIRTUAL ENV</h2>
-      <p>Game dev dependency roulette is real. Keep it isolated:</p>
+      <p>Dependencies can conflict. Keep them isolated:</p>
       <CodeBlock
         title="terminal"
         code={`python -m venv .venv

@@ -7,12 +7,7 @@ from ...parser.collision import TileCollisionData, TilesetCollision
 
 
 class NavGrid:
-    """Walkability grid derived from tile collision data.
-
-    The base grid is a pure representation of the world — no entity size
-    or clearance baked in.  Entity-specific clearance is layered on via
-    ``erode(margin)`` which returns a derived grid with walls inflated.
-    """
+    """World-pure walkability; entity clearance via erode() derivatives."""
 
     __slots__ = (
         "_eff_th",
@@ -21,6 +16,7 @@ class NavGrid:
         "_height",
         "_walkable",
         "_width",
+        "collision_mask",
         "tile_map",
         "tile_size",
         "tileset_collision",
@@ -28,19 +24,19 @@ class NavGrid:
 
     def __init__(
         self,
-        tile_map: Dict[Tuple[int, int], int],
+        tile_map: Dict[Tuple[int, int], object],
         tileset_collision: TilesetCollision,
         tile_size: Tuple[int, int],
         render_scale: float = 1.0,
         map_size: Optional[Tuple[int, int]] = None,
         gid_resolver=None,
+        collision_mask: int = 0xFFFFFFFF,
     ) -> None:
         self.tile_map = tile_map
         self.tileset_collision = tileset_collision
-        # Optional callable (int) -> TileCollisionData | None.  Pass
-        # ``physics_world.resolve_collision`` for GID-routed maps so ids from
-        # non-collidable grid tilesets resolve to None instead of aliasing.
+        # Pass world.resolve_collision to avoid decoration aliasing.
         self._gid_resolver = gid_resolver
+        self.collision_mask = collision_mask
         self.tile_size = tile_size
         self._eff_tw = tile_size[0] * render_scale
         self._eff_th = tile_size[1] * render_scale
@@ -65,13 +61,24 @@ class NavGrid:
             return self._gid_resolver(tile_id)
         return self.tileset_collision.tiles.get(tile_id)
 
+    def _iter_datas(self, cell: object):
+        from ..world import flipped_data, iter_cell_entries
+
+        for gid, flags in iter_cell_entries(cell):
+            data = self._resolve(gid)
+            if data is None:
+                continue
+            if flags:
+                data = flipped_data(data, flags, self.tileset_collision.tile_size)
+            if not (self.collision_mask & data.collision_layer):
+                continue
+            yield data
+
     def _is_tile_walkable(self, tx: int, ty: int) -> bool:
-        tile_data = self._resolve(self.tile_map.get((tx, ty)))
-        if tile_data is None:
-            return True
-        for poly in tile_data.shapes:
-            if poly.is_valid() and not poly.one_way:
-                return False
+        for tile_data in self._iter_datas(self.tile_map.get((tx, ty))):
+            for poly in tile_data.shapes:
+                if poly.is_valid() and not poly.one_way:
+                    return False
         return True
 
     def _in_bounds(self, tx: int, ty: int) -> bool:
@@ -88,17 +95,15 @@ class NavGrid:
         return self._walkable[ty][tx]
 
     def is_one_way(self, tx: int, ty: int) -> bool:
-        tile_data = self._resolve(self.tile_map.get((tx, ty)))
-        if tile_data is None:
-            return False
         has_one_way = False
-        for poly in tile_data.shapes:
-            if not poly.is_valid():
-                continue
-            if poly.one_way:
-                has_one_way = True
-            else:
-                return False
+        for tile_data in self._iter_datas(self.tile_map.get((tx, ty))):
+            for poly in tile_data.shapes:
+                if not poly.is_valid():
+                    continue
+                if poly.one_way:
+                    has_one_way = True
+                else:
+                    return False
         return has_one_way
 
     def copy(self) -> NavGrid:
@@ -111,10 +116,9 @@ class NavGrid:
         new._width = self._width
         new._height = self._height
         new._walkable = [row[:] for row in self._walkable]
-        # _gid_resolver lives in __slots__: dropping it here made every
-        # derived grid raise AttributeError once _resolve() ran (e.g. via
-        # is_one_way), and silently lost GID routing before that.
+        # Copy the resolver too, or derived grids lose GID routing.
         new._gid_resolver = self._gid_resolver
+        new.collision_mask = self.collision_mask
         return new
 
     def erode(self, margin: float) -> NavGrid:
@@ -159,26 +163,23 @@ class NavGrid:
     @classmethod
     def for_entity(
         cls,
-        tile_map: Dict[Tuple[int, int], int],
+        tile_map: Dict[Tuple[int, int], object],
         tileset_collision: TilesetCollision,
         tile_size: Tuple[int, int],
         sprite_width: float,
         sprite_height: Optional[float] = None,
         render_scale: float = 1.0,
         map_size: Optional[Tuple[int, int]] = None,
-        cache: Optional[dict[tuple[float, bool], NavGrid]] = None,
+        cache: Optional[dict[tuple, NavGrid]] = None,
         gid_resolver=None,
+        collision_mask: int = 0xFFFFFFFF,
     ) -> NavGrid:
-        """Build (or fetch from *cache*) an eroded grid for one entity size.
-
-        The cache is scoped to a single map/routing context and is keyed by
-        ``(margin, resolver_is_literal)`` so literal and GID-routed grids can
-        never cross-contaminate through a shared cache dict.
-        """
+        """Eroded grid per entity size. A supplied cache belongs to one tile
+        map and construction context; changing inputs needs a fresh cache."""
         tw = tile_size[0] * render_scale
         size = max(sprite_width, sprite_height if sprite_height is not None else sprite_width)
         margin = (size / 2.0) / tw
-        key = (margin, gid_resolver is None)
+        key = (margin, gid_resolver is None, collision_mask)
         if cache is not None and key in cache:
             return cache[key]
         nav = cls(
@@ -188,6 +189,7 @@ class NavGrid:
             render_scale,
             map_size,
             gid_resolver=gid_resolver,
+            collision_mask=collision_mask,
         ).erode(margin)
         if cache is not None:
             cache[key] = nav

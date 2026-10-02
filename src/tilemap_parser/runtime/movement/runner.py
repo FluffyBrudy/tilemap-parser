@@ -1,5 +1,3 @@
-"""CollisionRunner: configuration, dispatch, and movement composition."""
-
 from __future__ import annotations
 
 from ...parser.collision import CollisionPolygon, TilesetCollision
@@ -11,15 +9,8 @@ from .types import CollisionResult, MovementMode
 
 
 class CollisionRunner:
-    """
-    Ready-to-use collision runner with multiple movement modes.
+    """Collision runner with movement modes composed from sibling modules."""
 
-    Movement implementations are composed from the sibling modules
-    (slide, grounded, platformer, rpg, queries) — the runner is the
-    single public surface, call sites unchanged.
-    """
-
-    # --- composed movement implementations --------------------------
     move_and_slide = slide.move_and_slide
     _get_collision_normal_from_motion = slide._get_collision_normal_from_motion
     move_grounded = grounded.move_grounded
@@ -41,15 +32,7 @@ class CollisionRunner:
         render_scale: float = 1.0,
     ):
         """
-        Initialize collision runner.
-
-        For most use cases, prefer using CollisionRunner.from_game_type() instead,
-        which provides preset configurations for common game types.
-
-        Args:
-            tile_size: Size of tiles in pixels (width, height)
-            mode: Movement mode (slide, platformer, rpg)
-            render_scale: Visual scale factor for tile rendering (default 1.0)
+        Prefer CollisionRunner.from_game_type() for common game types.
         """
         self.tile_size = tile_size
         self.mode = MovementMode(mode) if isinstance(mode, str) else mode
@@ -80,16 +63,8 @@ class CollisionRunner:
         # Reusable result object — reset fields before each use
         self._result = CollisionResult()
 
-    # --- world attachment -------------------------------------------------
-
     def attach(self, world: PhysicsWorld | None) -> None:
-        """Attach a :class:`~.world.PhysicsWorld`.
-
-        The runner reads the world's tile layer and bodies
-        (``world.bodies``) and adopts the world's ``tile_size`` /
-        ``render_scale`` as the space's grid geometry.  Attaching
-        ``None`` detaches, falling back to per-call tile arguments.
-        """
+        """Adopts tile_size/render_scale; None detaches to per-call args."""
         self._world = world
         if world is not None:
             self.tile_size = tuple(world.tile_size)
@@ -98,11 +73,9 @@ class CollisionRunner:
             self._eff_th = max(1, int(self.tile_size[1] * self.render_scale))
 
     def detach(self) -> None:
-        """Detach any attached world; movement falls back to per-call args."""
         self._world = None
 
     def _resolve_world(self, world: PhysicsWorld | None) -> PhysicsWorld | None:
-        """Return the effective world: the attached one, or the per-call override."""
         return self._world if world is None else world
 
     @classmethod
@@ -113,19 +86,7 @@ class CollisionRunner:
         strict: bool = False,
     ) -> CollisionRunner:
         """
-        Create a collision runner bound to a :class:`~.world.PhysicsWorld`.
-
-        The runner adopts the world's grid geometry and movement resolves
-        against the world's tile layer and bodies (``world.bodies``).
-
-        Args:
-            world: The physics space to attach to.
-            game_type: Preset configuration (see :meth:`from_game_type`).
-            strict: Enforce game_type configuration rules (see
-                :meth:`validate_config`).
-
-        Returns:
-            A runner attached to *world*.
+        Bound to a world: movement resolves against its tiles and bodies.
         """
         runner = cls.from_game_type(
             game_type,
@@ -137,7 +98,6 @@ class CollisionRunner:
         return runner
 
     def get_tile_at(self, world_x: float, world_y: float) -> tuple[int, int]:
-        """Convert world position to tile coordinates"""
         tile_x = int(world_x // self._eff_tw)
         tile_y = int(world_y // self._eff_th)
         return (tile_x, tile_y)
@@ -149,23 +109,23 @@ class CollisionRunner:
         world_x: float,
         world_y: float,
     ) -> list[CollisionPolygon]:
-        """Get collision shapes at world position"""
+        """World-space shapes at a position; union of stacked entries."""
+        from .queries import _iter_tile_datas
+
         tile_x, tile_y = self.get_tile_at(world_x, world_y)
-        tile_id = tile_map.get((tile_x, tile_y))
+        cell = tile_map.get((tile_x, tile_y))
 
         world = self._resolve_world(None)
-        tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
-        if tile_data is None:
-            return []
-
-        tile_world_x = tile_x * self._eff_tw
-        tile_world_y = tile_y * self._eff_th
-
-        return [
-            shape.transform(tile_world_x, tile_world_y, self.render_scale)
-            for shape in tile_data.shapes
-            if shape.is_valid()
-        ]
+        shapes: list[CollisionPolygon] = []
+        for tile_data in _iter_tile_datas(world, tileset_collision, cell):
+            tile_world_x = tile_x * self._eff_tw
+            tile_world_y = tile_y * self._eff_th
+            shapes.extend(
+                shape.transform(tile_world_x, tile_world_y, self.render_scale)
+                for shape in tile_data.shapes
+                if shape.is_valid()
+            )
+        return shapes
 
     def get_nearby_tile_shapes(
         self,
@@ -175,11 +135,8 @@ class CollisionRunner:
         margin: int = 1,
     ) -> list[CollisionPolygon]:
         """
-        Get all world-space collision shapes near sprite.
-
-        Returns transformed CollisionPolygon objects (world space).
-        For internal movement use, the runner uses _collides_at() which avoids
-        this allocation entirely.
+        World-space shapes near a sprite. Internal movement uses
+        _collides_at(), which avoids this allocation.
         """
         left, top, right, bottom = get_shape_bounds(sprite)
         tw, th = self._eff_tw, self._eff_th
@@ -193,46 +150,29 @@ class CollisionRunner:
         world = self._resolve_world(None)
         for tile_y in range(min_tile_y, max_tile_y + 1):
             for tile_x in range(min_tile_x, max_tile_x + 1):
-                tile_id = tile_map.get((tile_x, tile_y))
-                tile_data = queries._resolve_tile_data(world, tileset_collision, tile_id)
-                if tile_data is None:
+                cell = tile_map.get((tile_x, tile_y))
+                if cell is None:
                     continue
-                tile_world_x = tile_x * tw
-                tile_world_y = tile_y * th
-                for poly in tile_data.shapes:
-                    if poly.is_valid():
-                        shapes.append(poly.transform(tile_world_x, tile_world_y, self.render_scale))
+                for tile_data in queries._iter_tile_datas(world, tileset_collision, cell):
+                    tile_world_x = tile_x * tw
+                    tile_world_y = tile_y * th
+                    for poly in tile_data.shapes:
+                        if poly.is_valid():
+                            shapes.append(poly.transform(tile_world_x, tile_world_y, self.render_scale))
         return shapes
 
     def move(
         self,
         sprite: ICollidable,
         tileset_collision: TilesetCollision | None,
-        tile_map: dict[tuple[int, int], int] | None,
+        tile_map: dict | None,
         delta_x: float = 0.0,
         delta_y: float = 0.0,
         dt: float = 0.016,
         **kwargs,
     ) -> CollisionResult:
         """
-        Move sprite using configured movement mode.
-
-        This is a convenience method that calls the appropriate movement function
-        based on the runner's mode.
-
-        Args:
-            sprite: Sprite to move
-            tileset_collision: Tileset collision data. Optional when a world is
-                attached — resolved from it.
-            tile_map: Dictionary mapping (tile_x, tile_y) to tile_id. Optional
-                when a world is attached — resolved from it.
-            delta_x: X movement amount (for slide/rpg modes)
-            delta_y: Y movement amount (for slide/rpg modes)
-            dt: Delta time in seconds (for platformer mode)
-            **kwargs: Additional mode-specific arguments
-
-        Returns:
-            CollisionResult with final position and collision info
+        Dispatches on mode; world-attached calls may pass None tile args.
         """
         if self.mode == MovementMode.SLIDE:
             return self.move_and_slide(
@@ -274,55 +214,8 @@ class CollisionRunner:
         render_scale: float = 1.0,
     ) -> CollisionRunner:
         """
-        Create a collision runner with preset configuration for a specific game type.
-
-        This is the recommended way to create a collision runner for common game types.
-        Provides sensible defaults that can be customized after creation.
-
-        Game Types:
-            'platformer': Side-scrolling platformer with gravity and jumping
-                - Gravity: 800 px/s²
-                - Max fall speed: 600 px/s
-                - Jump strength: -400 px/s (negative = upward)
-                - Mode: PLATFORMER
-                - Requires sprite attributes: x, y, vx, vy, on_ground, collision_shape
-
-            'topdown': Overhead view with free 8-directional movement
-                - No gravity (gravity = 0)
-                - Slides along walls smoothly
-                - Mode: SLIDE
-                - Requires sprite attributes: x, y, collision_shape
-
-            'rpg': Grid-based or free movement with full blocking
-                - No gravity (gravity = 0)
-                - Stops at walls (no sliding)
-                - Mode: RPG
-                - Requires sprite attributes: x, y, collision_shape
-
-        Args:
-            game_type: Type of game ('platformer', 'topdown', or 'rpg')
-            tile_size: Size of tiles in pixels (width, height)
-            strict: If True, raises exceptions on warnings. If False, only warns.
-
-        Returns:
-            CollisionRunner configured for the specified game type
-
-        Raises:
-            ValueError: If game_type is not recognized
-
-        Examples:
-            >>>
-            >>> runner = CollisionRunner.from_game_type('platformer', (32, 32))
-            >>> result = runner.move(player, tileset, tile_map, dt=0.016)
-
-            >>>
-            >>> runner = CollisionRunner.from_game_type('topdown', (16, 16))
-            >>> runner.slide_friction = 0.2
-            >>> result = runner.move(player, tileset, tile_map, delta_x=dx, delta_y=dy)
-
-            >>>
-            >>> runner = CollisionRunner.from_game_type('rpg', (32, 32), strict=True)
-            >>> runner.validate_config()
+        Presets: platformer (gravity+jump), topdown (slide, no gravity),
+        rpg (blocking, no gravity). Raises ValueError on unknown game_type.
         """
         game_type = game_type.lower()
 
@@ -364,34 +257,9 @@ class CollisionRunner:
 
     def validate_config(self, strict: bool | None = None) -> None:
         """
-        Validate the current configuration for consistency and correctness.
-
-        This method checks for common configuration mistakes and inconsistencies.
-        Called automatically when using from_game_type(), but can also be called
-        manually after changing configuration properties.
-
-        Validation Rules:
-            - Platformer mode requires gravity > 0
-            - Top-down and RPG modes should have gravity = 0
-            - Physics values must be in valid ranges
-            - Mode must match game_type expectations
-
-        Args:
-            strict: If True, raises exceptions on warnings. If False, only warns.
-                   If None, uses the strict setting from initialization.
-
-        Raises:
-            ValueError: If critical configuration errors are found
-            Warning: If suspicious but valid configurations are detected (strict=False)
-
-        Examples:
-            >>> runner = CollisionRunner.from_game_type('platformer', cache, (32, 32))
-            >>> runner.gravity = 0.0
-            >>> runner.validate_config()
-
-            >>> runner = CollisionRunner.from_game_type('topdown', cache, (32, 32))
-            >>> runner.gravity = 800.0
-            >>> runner.validate_config(strict=False)
+        Validation rules: platformer needs gravity > 0; slide/rpg need
+        gravity = 0; physics values must be in range; mode must match
+        game_type. Raises ValueError on errors (or warnings when strict).
         """
         import warnings
 
