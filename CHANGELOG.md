@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (BREAKING)
+## 6.0.0 — 2026-10-09 (BREAKING)
 
 ### Added
 
