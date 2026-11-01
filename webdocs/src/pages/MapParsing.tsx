@@ -12,7 +12,7 @@ export default function MapParsing() {
         with chunked culling.
       </p>
 
-      <h2 id="loading-maps">LOADING MAPS</h2>
+      <h2 id="loading-maps">Loading Maps & Tileset Data</h2>
       <CodeBlock
         title="load_map.py"
         code={`from tilemap_parser import load_map
@@ -36,11 +36,11 @@ for layer in game_data.get_layers(layer_type="tile"):
           {"{"}(col, row): ((gid, flipbits), ...){"}"}
         </code>
         , which is what <code>PhysicsWorld</code> holds. Overlapping layers
-        never overwrite each other — a deco tile on top can't erase solid
-        ground below, and each entry keeps its own flip flags.
+        never overwrite each other — a decoration tile on top cannot remove
+        solid ground below, and each entry keeps its own flip flags.
       </p>
 
-      <h2 id="rendering">TILE RENDERING</h2>
+      <h2 id="rendering">Tile Layer Rendering & Viewport Culling</h2>
       <p>
         <code>TileLayerRenderer</code> draws only the visible chunks, respects
         layer <code>z_index</code> and <code>y_sort</code>, and reports what it
@@ -80,7 +80,7 @@ stats = renderer.render(screen, camera.offset)
         the cached surfaces, then let the renderer re-bake on demand.
       </Callout>
 
-      <h2 id="overlays">RENDERING &amp; COLLISION OVERLAYS</h2>
+      <h2 id="overlays">Rendering &amp; Collision Overlays</h2>
       <p>
         The renderer is <strong>collision-blind</strong>: it draws tile{" "}
         <em>textures</em> from each layer's <code>ttype</code> /{" "}
@@ -122,14 +122,14 @@ for entry in iter_cell_entries(world.tile_map.get((tx, ty))):
           <code>world.resolve_stack_entry</code>, never through the renderer.
         </li>
         <li>
-          Tiles with no collision entry draw fine but collide as air; layers in{" "}
+          Tiles with no collision entry draw normally but collide as air; layers in{" "}
           <code>exclude_layers</code> or with{" "}
-          <code>collision_enabled=False</code> draw fine but don't exist for
-          physics.
+          <code>collision_enabled=False</code> draw normally but are absent
+          from physics.
         </li>
       </ul>
 
-      <h2 id="objects">EXTRACTING OBJECTS</h2>
+      <h2 id="objects">Extracting Objects &amp; Placements</h2>
       <p>
         Object layers become <code>MapObject</code>s: pre-scaled surfaces,
         positions and collision shapes, ready to feed an{" "}
@@ -169,7 +169,7 @@ if player_start is not None:
         </li>
       </ul>
 
-      <h2 id="background">BACKGROUND (IMAGE) LAYERS</h2>
+      <h2 id="background">Background &amp; Image Layers</h2>
       <p>
         Image layers hold a single external image — a parallax sky, backdrop, or
         full-screen art. They carry no tiles or objects, only{" "}

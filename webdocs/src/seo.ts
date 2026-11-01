@@ -47,9 +47,14 @@ export const SEO: Record<string, Seo> = {
       "Load tilemap-editor JSON into TilemapData, render with TileLayerRenderer, and how layers, tilesets and scrapers work.",
   },
   "/animations": {
-    title: "Animations — tilemap-parser docs",
+    title: "Animation Basics — tilemap-parser docs",
     description:
       "Frame-based sprites: SpriteAnimationSet loads JSON + spritesheet, AnimationPlayer is the per-frame clock.",
+  },
+  "/animations/objects": {
+    title: "Object Animations — tilemap-parser docs",
+    description:
+      "Animated map objects: ObjectAnimation data, get_object_animation playback, tileset fallback and start-time desync.",
   },
   "/animations/tile-clips": {
     title: "Tile Clips — tilemap-parser docs",
@@ -106,6 +111,11 @@ export const SEO: Record<string, Seo> = {
     description:
       "Edge conventions, scale rules and performance facts of tilemap-parser, stated precisely.",
   },
+  "/cookbook": {
+    title: "Cookbook: Common Access Patterns — tilemap-parser docs",
+    description:
+      "Verified one-liner answers for frequent tilemap-parser questions: object properties by id, placed tile properties, gid lookups, layer access, ground tile identity.",
+  },
 };
 
 export type SitemapRoute = { path: string; priority: string };
@@ -120,6 +130,7 @@ export const SITEMAP_ROUTES: SitemapRoute[] = [
   { path: "/pipeline", priority: "0.6" },
   { path: "/map-parsing", priority: "0.8" },
   { path: "/animations", priority: "0.7" },
+  { path: "/animations/objects", priority: "0.7" },
   { path: "/animations/tile-clips", priority: "0.7" },
   { path: "/camera", priority: "0.7" },
   { path: "/particles", priority: "0.8" },
@@ -131,4 +142,5 @@ export const SITEMAP_ROUTES: SitemapRoute[] = [
   { path: "/api", priority: "0.9" },
   { path: "/json", priority: "0.8" },
   { path: "/notes", priority: "0.6" },
+  { path: "/cookbook", priority: "0.8" },
 ];

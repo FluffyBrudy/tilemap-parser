@@ -57,7 +57,7 @@ def flipped_data(
     flags: int,
     tile_size: Tuple[float, float],
 ) -> TileCollisionData:
-    """Same object when flags == 0; preserves one_way/layer/mask."""
+    """Same object when flags == 0; preserves one_way/layer/mask/properties."""
     if not flags:
         return base
     return TileCollisionData(
@@ -71,6 +71,7 @@ def flipped_data(
         ],
         collision_layer=base.collision_layer,
         collision_mask=base.collision_mask,
+        properties=base.properties,
     )
 
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## 6.0.1 — 2026-11-01
+
+### Docs
+
+- Webdocs: technical prose restated in a consistent formal style (contractions, colloquialisms and slang removed); headings, UI labels and code behavior are unchanged.
+- Webdocs: full-text site search. The prerender script writes `dist/search-index.json` per section; a `SearchModal` (Ctrl+K or `/`, plus a header button) loads the index lazily and jumps to the matched section. The dev server serves the same endpoint, building the index in the background on first use, so search also works during development.
+- Webdocs: the animations material is split — "Animation Basics" (sprites), new "Object Animations" sub-page, and the existing Tile Clips page.
+- Webdocs: new Cookbook page with verified one-liner recipes (object properties by id, placed tile properties, layer lookup, object surfaces, collision tile properties, world tile lookups). Each recipe lives in `webdocs/src/snippets/cookbook.json` and is executed in `tests/test_docs_snippets.py` against a generated fixture, so stale examples fail tests.
+- API Reference: added the tile-identity fields on `CollisionResult`, `PhysicsWorld` tile queries (`tile_ids_at`, `resolve_collision`, ...), `Camera.set_bounds*`, `flip_character_shape`, and `describe_tile_layer`.
+
+### Added
+
+- `GroundInfo` records the tile that provides the winning support: `tile_x` / `tile_y` (cell coordinates) and `tile_id` (gid as stored in the cell). `move_platformer_with_slide()` mirrors these on `CollisionResult` as `ground_tile` / `ground_tile_id`; both remain `None` while the sprite is airborne or supported by a physics body, which keeps the conservative flat reading. Determining which tile the player stands on no longer requires manual cell lookups across layers.
+- `TileCollisionData.properties` preserves custom tile properties from the tileset collision file verbatim (retained through `TilesetCollision.merge()` and flipped copies), so per-tile behavior markers such as a `surface` value for gear or conveyor drift are readable directly at `resolve_collision(gid).properties`; map-side properties remain on `ParsedTileset.tile_properties`.
+
 ## 6.0.0 — 2026-10-09 (BREAKING)
 
 ### Added

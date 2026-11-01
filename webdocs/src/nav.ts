@@ -18,7 +18,8 @@ export const NAV: NavGroup[] = [
       { to: "/object-collision", label: "Object Collision" },
       { to: "/pipeline", label: "The Pipeline" },
       { to: "/map-parsing", label: "Map Parsing & Rendering" },
-      { to: "/animations", label: "Animations" },
+      { to: "/animations", label: "Animation Basics" },
+      { to: "/animations/objects", label: "Object Animations" },
       { to: "/animations/tile-clips", label: "Tile Clips" },
       { to: "/camera", label: "Camera" },
       { to: "/particles", label: "Particles" },
@@ -38,6 +39,7 @@ export const NAV: NavGroup[] = [
     title: "REFERENCE",
     items: [
       { to: "/api", label: "API Reference" },
+      { to: "/cookbook", label: "Cookbook" },
       { to: "/json", label: "JSON Formats" },
       { to: "/notes", label: "Technical Notes" },
     ],
@@ -45,5 +47,5 @@ export const NAV: NavGroup[] = [
 ];
 
 export const FLAT: NavItem[] = NAV.flatMap((g) => g.items);
-export const VERSION = "5.2.0";
+export const VERSION = "6.0.0";
 export const REPO = "https://github.com/FluffyBrudy/tilemap-parser";

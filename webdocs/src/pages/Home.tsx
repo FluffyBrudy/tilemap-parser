@@ -153,10 +153,11 @@ export default function Home() {
         <div className="hidden self-end pb-2 font-pixel text-[8px] text-mute sm:block"></div>
       </div>
 
-      <h2 id="what">WHAT YOU GET</h2>
+      <h2 id="what">Core Architecture & Capabilities</h2>
       <p>
-        Everything follows one flow: load data, build a world, resolve
-        movement through the runner. The sections below are the whole engine.
+        tilemap-parser provides a unified pipeline: load authored map data,
+        construct a physics world, and resolve kinematic and sprite movement
+        through a dedicated collision runner.
       </p>
       <FlowDiagram title="engine map" nodes={MAP_NODES} edges={MAP_EDGES} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -171,27 +172,22 @@ export default function Home() {
         ))}
       </div>
 
-      <h2 id="jump">WHERE TO START</h2>
+      <h2 id="jump">Documentation Roadmap</h2>
       <ul>
         <li>
-          <Link to="/install">Installation</Link>: two pip commands and you're
-          running.
+          <Link to="/install">Installation</Link>: package setup, dependency requirements, and environment verification.
         </li>
         <li>
-          <Link to="/quick-start">Quick Start</Link>: the smallest playable
-          program.
+          <Link to="/quick-start">Quick Start</Link>: a minimal standalone game loop loading a map with collision and camera tracking.
         </li>
         <li>
-          <Link to="/physics">Physics & Bodies</Link>: collision, explained
-          directly. Includes the sliding-box walkthrough.
+          <Link to="/physics">Physics & Bodies</Link>: comprehensive collision mechanics, PhysicsWorld architecture, and pushable crate implementation.
         </li>
         <li>
-          <Link to="/pipeline">The Pipeline</Link>: map → world → runner →
-          player → crate → screen, one script.
+          <Link to="/pipeline">The Pipeline</Link>: end-to-end integration walkthrough from raw JSON to rendered frame in a single script.
         </li>
         <li>
-          <Link to="/examples">Examples</Link>: nine working demos, from
-          pushable crates to RPG pathfinding.
+          <Link to="/examples">Examples</Link>: runnable standalone game demos including platformers, physics crates, and RPG navigation.
         </li>
       </ul>
 

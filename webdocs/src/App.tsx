@@ -11,7 +11,9 @@ import ObjectCollision from "./pages/ObjectCollision";
 import Pipeline from "./pages/Pipeline";
 import MapParsing from "./pages/MapParsing";
 import Animations from "./pages/Animations";
+import AnimationObjects from "./pages/AnimationObjects";
 import TileClips from "./pages/TileClips";
+import Cookbook from "./pages/Cookbook";
 import CameraGuide from "./pages/Camera";
 import Particles from "./pages/Particles";
 import Pathfinding from "./pages/Pathfinding";
@@ -70,6 +72,7 @@ export default function App() {
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/map-parsing" element={<MapParsing />} />
           <Route path="/animations" element={<Animations />} />
+          <Route path="/animations/objects" element={<AnimationObjects />} />
           <Route path="/animations/tile-clips" element={<TileClips />} />
           <Route path="/camera" element={<CameraGuide />} />
           <Route path="/particles" element={<Particles />} />
@@ -77,6 +80,7 @@ export default function App() {
           <Route path="/api" element={<ApiReference />} />
           <Route path="/json" element={<JsonFormats />} />
           <Route path="/notes" element={<TechnicalNotes />} />
+          <Route path="/cookbook" element={<Cookbook />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </Layout>

@@ -16,7 +16,7 @@ export default function Installation() {
         <code>pygame-ce {">="} 2.5</code> automatically, the only dependency.
       </p>
 
-      <h2 id="editor">THE EDITOR COMPANION</h2>
+      <h2 id="editor">Editor Companion (tilemap-editor)</h2>
       <p>
         Maps and collision files are authored in{" "}
         <a href="https://pypi.org/project/tilemap-editor/">tilemap-editor</a>;
@@ -24,19 +24,19 @@ export default function Installation() {
       </p>
       <CodeBlock title="terminal" code={`pip install tilemap-editor`} />
       <p>
-        You don't need the editor to <em>use</em> the parser. You can
+        The editor is not required to <em>use</em> the parser. You can
         hand-write a <code>map.json</code> and a <code>.collision.json</code>,
         but the editor is how the JSON formats stay consistent. See{" "}
         <Link to="/json">JSON Formats</Link>.
       </p>
 
-      <h2 id="verify">VERIFY IT WORKS</h2>
+      <h2 id="verify">Installation Verification</h2>
       <CodeBlock
         title="terminal"
         code={`python -c "import pygame; from tilemap_parser import load_map, PhysicsWorld, CollisionRunner; print('ok')"`}
       />
 
-      <h2 id="venv">USE A VIRTUAL ENV</h2>
+      <h2 id="venv">Virtual Environment Isolation</h2>
       <p>Dependencies can conflict. Keep them isolated:</p>
       <CodeBlock
         title="terminal"
@@ -45,7 +45,7 @@ source .venv/bin/activate      # Windows: .venv\\Scripts\\activate
 pip install tilemap-parser`}
       />
 
-      <h2 id="examples">RUN THE EXAMPLES</h2>
+      <h2 id="examples">Running Example Projects</h2>
       <p>
         The examples live in the repository and import the source directly.
         Clone, install editable, run:
@@ -56,10 +56,10 @@ pip install tilemap-parser`}
 cd tilemap-parser
 pip install -e .
 cd examples/physics-crate
-python main.py          # push some crates`}
+python main.py          # crates physics demo`}
       />
 
-      <Callout kind="tip" title="PYGAME INIT">
+      <Callout kind="tip" title="Pygame Initialization Requirements">
         Runtime features that touch pygame surfaces (sprites, rendering,{" "}
         <code>SpriteAnimationSet.load</code>) need pygame initialized. Some
         entry points init it for you; when in doubt call{" "}

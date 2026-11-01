@@ -84,7 +84,7 @@ if arrived:
 export default function Pathfinding() {
   return (
     <div className="content">
-      <h1>Pathfinding: tile-grid A*</h1>
+      <h1>Pathfinding: Tile-Grid Navigation &amp; A*</h1>
       <p>
         Three classes, one flow: <code>NavGrid</code> turns the collision
         layer into a walkability grid, <code>Pathfinder</code> runs A* over
@@ -95,7 +95,7 @@ export default function Pathfinding() {
 
       <FlowDiagram title="the chain" nodes={CHAIN_NODES} edges={CHAIN_EDGES} />
 
-      <h2 id="grid">THE GRID</h2>
+      <h2 id="grid">NavGrid Generation &amp; Cost Calculation</h2>
       <p>
         A <code>NavGrid</code> is built from the same data the physics world
         uses: the flat tile map and its <code>TilesetCollision</code>. Tiles
@@ -122,7 +122,7 @@ export default function Pathfinding() {
         </li>
       </ul>
 
-      <h2 id="follower">FOLLOWING THE PATH</h2>
+      <h2 id="follower">PathFollower Steering &amp; Navigation</h2>
       <p>
         <code>PathFollower</code> walks the waypoints; each{" "}
         <code>update_rpg()</code> call moves the sprite toward the current
@@ -150,7 +150,7 @@ export default function Pathfinding() {
         and re-run <code>find_path</code>; stale grids lead into walls.
       </Callout>
 
-      <h2 id="when">WHEN NOT TO USE IT</h2>
+      <h2 id="when">Usage Guidelines &amp; Alternative Approaches</h2>
       <p>
         This is tile-grid pathfinding: good for rooms, mazes and dungeon
         layouts. It does not reason about height differences, slopes, or
