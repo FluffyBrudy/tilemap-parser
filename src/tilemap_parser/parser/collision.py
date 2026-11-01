@@ -63,9 +63,9 @@ class CollisionPolygon:
 class TileCollisionData:
     tile_id: int
     shapes: list[CollisionPolygon] = field(default_factory=list)
-    # Mutual layer/mask agreement required; defaults collide with everything.
     collision_layer: int = 1
     collision_mask: int = 0xFFFFFFFF
+    properties: dict[str, Any] = field(default_factory=dict)
 
     def has_collision(self) -> bool:
         return any(shape.is_valid() for shape in self.shapes)
@@ -111,6 +111,7 @@ class TilesetCollision:
                     shapes=data.shapes[:],
                     collision_layer=data.collision_layer,
                     collision_mask=data.collision_mask,
+                    properties=dict(data.properties),
                 )
         return cls(
             tileset_name="merged",
@@ -276,9 +277,7 @@ class ObjectCollisionRegionData:
     def has_collision(self) -> bool:
         return any(shape.is_valid() for shape in self.shapes)
 
-    def get_world_shapes(
-        self, world_x: float, world_y: float
-    ) -> list[CollisionPolygon]:
+    def get_world_shapes(self, world_x: float, world_y: float) -> list[CollisionPolygon]:
         ox = world_x + self.region_rect[0]
         oy = world_y + self.region_rect[1]
         return [shape.transform(ox, oy) for shape in self.shapes]
@@ -298,6 +297,7 @@ class ObjectCollisionData:
 
 
 def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
+    """Parse tileset collision JSON data into a TilesetCollision model."""
     try:
         tileset_name = data["tileset_name"]
         tile_size_raw = data["tile_size"]
@@ -323,10 +323,13 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
                 shapes=shapes,
                 collision_layer=int(props.get("collision_layer", 1)),
                 collision_mask=int(props.get("collision_mask", 0xFFFFFFFF)),
+                properties=dict(props),
             )
 
         return TilesetCollision(
-            tileset_name=tileset_name, tile_size=tile_size, tiles=tiles,
+            tileset_name=tileset_name,
+            tile_size=tile_size,
+            tiles=tiles,
         )
     except (KeyError, ValueError, TypeError) as e:
         raise CollisionParseError(f"Invalid tileset collision data: {e}") from e
@@ -334,11 +337,7 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
 
 def parse_character_collision(data: JsonDict, render_scale: float = 1.0) -> CharacterCollision:
     """Non-finite/non-positive scale raises; shape scaled unless 1.0."""
-    if (
-        not isinstance(render_scale, (int, float))
-        or not math.isfinite(render_scale)
-        or render_scale <= 0
-    ):
+    if not isinstance(render_scale, (int, float)) or not math.isfinite(render_scale) or render_scale <= 0:
         raise CollisionParseError(f"render_scale must be finite and > 0, got {render_scale!r}")
     try:
         name = data["name"]
@@ -366,9 +365,7 @@ def parse_character_collision(data: JsonDict, render_scale: float = 1.0) -> Char
                 raise CollisionParseError("Polygon shape missing 'vertices' field")
             vertices = [tuple(v) for v in vertices_raw]
             if len(vertices) < 3:
-                raise CollisionParseError(
-                    f"Polygon must have at least 3 vertices, got {len(vertices)}"
-                )
+                raise CollisionParseError(f"Polygon must have at least 3 vertices, got {len(vertices)}")
             one_way = shape_data.get("one_way", False)
             shape = CollisionPolygon(vertices=vertices, one_way=one_way)
         else:

@@ -4,7 +4,7 @@ import Callout from "../components/Callout";
 export default function TileClips() {
   return (
     <div className="content">
-      <h1>Tile Clips: sidecar animations for tiles</h1>
+      <h1>Tile Clips: Sidecar Animations for Tiles</h1>
       <p>
         Stride animation moves a whole tileset (<code>variant + frame × stride</code>).
         Tile clips animate <em>individual cells</em>: the editor authors named,
@@ -13,7 +13,7 @@ export default function TileClips() {
         <code>TileLayerRenderer</code> plays them. Stride behavior is unchanged.
       </p>
 
-      <h2 id="sidecar">SIDECAR FORMAT</h2>
+      <h2 id="sidecar">Sidecar Format Specification</h2>
       <CodeBlock
         title="water.tanim.json"
         code={`{"version": 1, "tileset": "tiles/water.png",
@@ -37,7 +37,7 @@ export default function TileClips() {
         </li>
       </ul>
 
-      <h2 id="loading">LOADING</h2>
+      <h2 id="loading">Loading &amp; Registering Tile Clips</h2>
       <CodeBlock
         title="clips.py"
         code={`from tilemap_parser import TileLayerRenderer, load_tile_anim_file, find_tileanims
@@ -58,14 +58,14 @@ auto = find_tileanims("data/tileanims")  # sorted sidecar paths`}
         <code>renderer.warnings</code>.
       </p>
 
-      <h2 id="precedence">PRECEDENCE PER CELL</h2>
+      <h2 id="precedence">Per-Cell Precedence Rules</h2>
       <p>
         <strong>clip &gt; flagged stride &gt; tileset stride &gt; static.</strong>{" "}
         An explicit clip assignment always beats the blanket; nothing assigned
         behaves exactly as before.
       </p>
 
-      <h2 id="fallback">FALLBACK BEHAVIOR</h2>
+      <h2 id="fallback">Default Tile Fallback Behavior</h2>
       <p>
         Animation only ever replaces the blit. Whatever was plotted always renders:
       </p>
@@ -74,18 +74,18 @@ auto = find_tileanims("data/tileanims")  # sorted sidecar paths`}
         <li>Out-of-range frame → base variant for that frame, never a hole.</li>
         <li>Non-looping clip past its end → holds the last frame.</li>
       </ul>
-      <Callout kind="warn" title="PLOTTED TILE ALWAYS RENDERS">
+      <Callout kind="warn" title="Plotted Tile Fallback Guarantee">
         A broken clip degrades to the static base variant — not to stride. The
         assignment opts the tile out of the blanket.
       </Callout>
 
-      <h2 id="timing">TIMING AND PHASE</h2>
+      <h2 id="timing">Timing, Loops &amp; Phase Desynchronization</h2>
       <p>
         Frame lookup walks cumulative durations (same rule as the editor's{" "}
         <code>clip_frame_at</code>). <code>mode: "random_start_times"</code>{" "}
         rotates the frame order per cell with the standard hash (
         <code>(x * 73856093 ^ y * 19349663 ^ ttype * 83492791) % len(frames)</code>
-        ), so identical cells don't tick in sync.
+        ), so identical cells do not tick in sync.
       </p>
       <CodeBlock
         title="timing.py"

@@ -4,13 +4,13 @@ import Callout from "../components/Callout";
 export default function CameraGuide() {
   return (
     <div className="content">
-      <h1>Camera: following the action</h1>
+      <h1>Camera: Viewport Following &amp; Screen Effects</h1>
       <p>
         The <code>Camera</code> class handles viewport offsetting. It tracks a target
         with options for deadzones, smoothing (lerp), bounding boxes, and screen shake.
       </p>
 
-      <h2 id="setup">SETUP AND MODES</h2>
+      <h2 id="setup">Camera Initialization &amp; Modes</h2>
       <p>
         Create a camera by passing the screen dimensions. You can choose between
         different tracking modes like <code>"centered"</code> or <code>"deadzone"</code>.
@@ -31,7 +31,7 @@ camera.deadzone = pygame.Rect(300, 200, 200, 200)
 # camera.set_bounds(0, 0, map_width_px, map_height_px)`}
       />
 
-      <h2 id="update">UPDATE AND DRAW</h2>
+      <h2 id="update">Viewport Updates &amp; World Clamping</h2>
       <p>
         Tell the camera who to follow, update it every frame with <code>dt</code>,
         and then use its <code>offset</code> property when drawing.
@@ -56,7 +56,7 @@ draw_y = player.y - oy
 screen.blit(player_img, (draw_x, draw_y))`}
       />
 
-      <h2 id="shake">SCREEN SHAKE</h2>
+      <h2 id="shake">Screen Shake &amp; Transient FX</h2>
       <p>
         The camera includes a built-in screen shake effect, useful for impacts and explosions.
       </p>

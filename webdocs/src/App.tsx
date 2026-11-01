@@ -11,7 +11,9 @@ import ObjectCollision from "./pages/ObjectCollision";
 import Pipeline from "./pages/Pipeline";
 import MapParsing from "./pages/MapParsing";
 import Animations from "./pages/Animations";
+import AnimationObjects from "./pages/AnimationObjects";
 import TileClips from "./pages/TileClips";
+import Cookbook from "./pages/Cookbook";
 import CameraGuide from "./pages/Camera";
 import Particles from "./pages/Particles";
 import Pathfinding from "./pages/Pathfinding";
@@ -50,11 +52,20 @@ export default function App() {
     <>
       <ScrollManager />
       <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/install" element={<Installation />} />
-          <Route path="/quick-start" element={<QuickStart />} />
-          <Route path="/examples" element={<Examples />} />
+        <PageRoutes />
+      </Layout>
+    </>
+  );
+}
+
+/** Route tree only, without the shared layout shell. */
+export function PageRoutes() {
+  return (
+    <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/install" element={<Installation />} />
+        <Route path="/quick-start" element={<QuickStart />} />
+        <Route path="/examples" element={<Examples />} />
           <Route
             path="/examples/full-physics-world"
             element={<FullPhysicsWorld />}
@@ -64,22 +75,22 @@ export default function App() {
             path="/examples/full-pathfinding"
             element={<FullPathfinding />}
           />
-          <Route path="/physics" element={<PhysicsBodies />} />
-          <Route path="/runner" element={<RunnerGuide />} />
-          <Route path="/object-collision" element={<ObjectCollision />} />
-          <Route path="/pipeline" element={<Pipeline />} />
-          <Route path="/map-parsing" element={<MapParsing />} />
-          <Route path="/animations" element={<Animations />} />
-          <Route path="/animations/tile-clips" element={<TileClips />} />
-          <Route path="/camera" element={<CameraGuide />} />
-          <Route path="/particles" element={<Particles />} />
-          <Route path="/pathfinding" element={<Pathfinding />} />
-          <Route path="/api" element={<ApiReference />} />
-          <Route path="/json" element={<JsonFormats />} />
-          <Route path="/notes" element={<TechnicalNotes />} />
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </Layout>
-    </>
+        <Route path="/physics" element={<PhysicsBodies />} />
+        <Route path="/runner" element={<RunnerGuide />} />
+        <Route path="/object-collision" element={<ObjectCollision />} />
+        <Route path="/pipeline" element={<Pipeline />} />
+        <Route path="/map-parsing" element={<MapParsing />} />
+        <Route path="/animations" element={<Animations />} />
+        <Route path="/animations/objects" element={<AnimationObjects />} />
+        <Route path="/animations/tile-clips" element={<TileClips />} />
+        <Route path="/camera" element={<CameraGuide />} />
+        <Route path="/particles" element={<Particles />} />
+        <Route path="/pathfinding" element={<Pathfinding />} />
+        <Route path="/api" element={<ApiReference />} />
+        <Route path="/json" element={<JsonFormats />} />
+        <Route path="/notes" element={<TechnicalNotes />} />
+        <Route path="/cookbook" element={<Cookbook />} />
+        <Route path="*" element={<Home />} />
+    </Routes>
   );
 }

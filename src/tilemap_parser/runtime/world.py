@@ -57,7 +57,7 @@ def flipped_data(
     flags: int,
     tile_size: Tuple[float, float],
 ) -> TileCollisionData:
-    """Same object when flags == 0; preserves one_way/layer/mask."""
+    """Same object when flags == 0; preserves one_way/layer/mask/properties."""
     if not flags:
         return base
     return TileCollisionData(
@@ -71,6 +71,7 @@ def flipped_data(
         ],
         collision_layer=base.collision_layer,
         collision_mask=base.collision_mask,
+        properties=base.properties,
     )
 
 
@@ -245,13 +246,16 @@ class PhysicsWorld:
         return self.tileset_collision.tiles.get(tile_id)
 
     def has_collision_gid(self, tile_id: int) -> bool:
+        """Return True if the resolved collision data for tile_id defines solid collision shapes."""
         data = self.resolve_collision(tile_id)
         return data is not None and data.has_collision()
 
     def tile_ids_at(self, pos: Tuple[int, int]) -> Tuple[int, ...]:
+        """Return a tuple of all tile IDs stacked at the given cell coordinates."""
         return tuple(gid for gid, _flags in iter_cell_entries(self.tile_map.get(tuple(pos))))
 
     def tile_entries_at(self, pos: Tuple[int, int]) -> TileCell:
+        """Return stacked (tile_id, flags) entries at the given cell coordinates."""
         return iter_cell_entries(self.tile_map.get(tuple(pos)))
 
     def resolve_stack_entry(self, entry: StackEntry) -> Optional[TileCollisionData]:

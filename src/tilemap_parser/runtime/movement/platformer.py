@@ -39,6 +39,8 @@ def move_platformer(
     result.slide_vector = None
     result.ground_angle = None
     result.ground_normal = None
+    result.ground_tile = None
+    result.ground_tile_id = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 
@@ -284,6 +286,8 @@ def move_platformer_with_slide(
     result.slide_vector = None
     result.ground_angle = None
     result.ground_normal = None
+    result.ground_tile = None
+    result.ground_tile_id = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 
@@ -484,8 +488,16 @@ def move_platformer_with_slide(
     if result.on_ground and support_info is not None:
         result.ground_angle = support_info.angle
         result.ground_normal = support_info.normal
+        result.ground_tile = (
+            (support_info.tile_x, support_info.tile_y)
+            if support_info.tile_x is not None
+            else None
+        )
+        result.ground_tile_id = support_info.tile_id
     else:
         result.ground_angle = None
         result.ground_normal = None
+        result.ground_tile = None
+        result.ground_tile_id = None
     return result
 
