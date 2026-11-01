@@ -14,17 +14,17 @@ const KINDS = {
   warn: {
     border: "border-l-amber",
     text: "text-amber",
-    label: "WATCH OUT",
+    label: "WARNING",
   },
   danger: {
     border: "border-l-red",
     text: "text-red",
-    label: "TRAP",
+    label: "CAUTION",
   },
   tip: {
     border: "border-l-teal",
     text: "text-teal",
-    label: "WHY",
+    label: "TIP",
   },
 } as const;
 

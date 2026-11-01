@@ -144,16 +144,14 @@ const NODE = `{
 export default function JsonFormats() {
   return (
     <div className="content">
-      <h1>JSON Formats</h1>
+      <h1>JSON Format Specifications</h1>
       <p>
-        Everything below is real data from the examples and fixtures, nothing
-        invented. Each format shows the file and what the parser exposes from
-        it. Files are authored in{" "}
-        <a href="https://pypi.org/project/tilemap-editor/">tilemap-editor</a>;
-        hand-writing them is possible but the editor keeps them consistent.
+        Reference schemas and example payloads matching the files authored by{" "}
+        <a href="https://pypi.org/project/tilemap-editor/">tilemap-editor</a>.
+        Each section details the JSON structure and corresponding parsed runtime attributes.
       </p>
 
-      <h2 id="map">TILEMAP MAP</h2>
+      <h2 id="map">Tilemap Map Schema (.json)</h2>
       <CodeBlock title="map.json" language="json" code={MAP} />
       <ul>
         <li>
@@ -215,7 +213,7 @@ export default function JsonFormats() {
         </li>
       </ul>
 
-      <h2 id="tileset">TILESET COLLISION</h2>
+      <h2 id="tileset">Tileset Collision Schema (.collision.json)</h2>
       <CodeBlock
         title="terrain.collision.json"
         language="json"
@@ -250,7 +248,7 @@ export default function JsonFormats() {
         </li>
       </ul>
 
-      <h2 id="character">CHARACTER COLLISION</h2>
+      <h2 id="character">Character Collision Schema (.char_collision.json)</h2>
       <CodeBlock title="hero.collision.json" language="json" code={CHARACTER} />
       <ul>
         <li>
@@ -282,7 +280,7 @@ export default function JsonFormats() {
         double work.
       </Callout>
 
-      <h2 id="object">OBJECT COLLISION</h2>
+      <h2 id="object">Object Collision Schema (.object_collision.json)</h2>
       <p>
         Region-based polygon paint:{" "}
         <code>{`tileset_name, regions: { id: { name, region_rect, shapes[], properties } }`}</code>
@@ -291,7 +289,7 @@ export default function JsonFormats() {
         . Each region carries its own layer/mask.
       </p>
 
-      <h2 id="animation">ANIMATION</h2>
+      <h2 id="animation">Animation Schema (.anim.json)</h2>
       <CodeBlock title="player.anim.json" language="json" code={ANIM} />
       <ul>
         <li>
@@ -311,7 +309,7 @@ export default function JsonFormats() {
         </li>
       </ul>
 
-      <h2 id="particles">PARTICLE CONFIGS</h2>
+      <h2 id="particles">Particle Configuration Schema (.particle.json)</h2>
       <p>
         Emitters placed in the editor land as nodes. The parser exposes them via{" "}
         <code>parse_nodes_file</code> (<code>ParsedNode</code>);{" "}

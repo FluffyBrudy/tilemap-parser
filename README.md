@@ -10,6 +10,7 @@ Standalone parser/loader for tilemap-editor JSON maps, sprite animations, and co
 - **Animation**: Frame-based sprite animation with `AnimationPlayer`
 - **Particle system**: Configurable particle emitters with shapes, color transitions, alpha fades, gravity, and batch rendering with `ParticleSystem` + `SpriteBatchRenderer`
 - **Collision (tile-based)**: Polygon collision detection for tilemaps with slide, platformer, and RPG movement modes via `CollisionRunner`
+- **Ground tile identity**: `CollisionResult.ground_tile` and `ground_tile_id` report the tile supporting a grounded sprite, with custom tile properties preserved on `TileCollisionData.properties`
 - **Collision (object-to-object)**: Spatial-grid mixed-shape collision detection (rect, circle, capsule, polygon) with layer filtering via `ObjectCollisionManager`
 - **Capsule support**: Full capsule collision against all shape types
 - **Hit helpers**: `CollisionHit.resolve()`, `involves()`, `other()` for ergonomic separation

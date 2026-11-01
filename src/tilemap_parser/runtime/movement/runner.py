@@ -60,7 +60,7 @@ class CollisionRunner:
         self._strict: bool = False
         self._world: PhysicsWorld | None = None
 
-        # Reusable result object — reset fields before each use
+        # Reusable result object, must reset fields before each use
         self._result = CollisionResult()
 
     def attach(self, world: PhysicsWorld | None) -> None:
@@ -73,6 +73,7 @@ class CollisionRunner:
             self._eff_th = max(1, int(self.tile_size[1] * self.render_scale))
 
     def detach(self) -> None:
+        """Detach the current PhysicsWorld reference."""
         self._world = None
 
     def _resolve_world(self, world: PhysicsWorld | None) -> PhysicsWorld | None:
@@ -98,6 +99,7 @@ class CollisionRunner:
         return runner
 
     def get_tile_at(self, world_x: float, world_y: float) -> tuple[int, int]:
+        """Convert world coordinates into integer tile cell coordinates (col, row)."""
         tile_x = int(world_x // self._eff_tw)
         tile_y = int(world_y // self._eff_th)
         return (tile_x, tile_y)
@@ -176,7 +178,11 @@ class CollisionRunner:
         """
         if self.mode == MovementMode.SLIDE:
             return self.move_and_slide(
-                sprite, tileset_collision, tile_map, delta_x, delta_y,
+                sprite,
+                tileset_collision,
+                tile_map,
+                delta_x,
+                delta_y,
                 slope_slide=kwargs.get("slope_slide", False),
                 world=kwargs.get("world"),
             )
@@ -193,14 +199,21 @@ class CollisionRunner:
             )
         elif self.mode == MovementMode.GROUNDED:
             return self.move_grounded(
-                sprite, tileset_collision, tile_map, dt,
+                sprite,
+                tileset_collision,
+                tile_map,
+                dt,
                 velocity=kwargs.get("velocity"),
                 world=kwargs.get("world"),
                 one_way=kwargs.get("one_way", "solid"),
             )
         elif self.mode == MovementMode.RPG:
             return self.move_rpg(
-                sprite, tileset_collision, tile_map, delta_x, delta_y,
+                sprite,
+                tileset_collision,
+                tile_map,
+                delta_x,
+                delta_y,
                 world=kwargs.get("world"),
             )
 

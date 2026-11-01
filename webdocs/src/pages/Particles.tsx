@@ -4,7 +4,7 @@ import Callout from "../components/Callout";
 export default function Particles() {
   return (
     <div className="content">
-      <h1>Particles: visual effects</h1>
+      <h1>Particle System: Configurable Visual Effects</h1>
       <p>
         One config per effect, one <code>ParticleSystem</code> per emitter. A
         system has exactly one emitter; for two effects you build two
@@ -12,7 +12,7 @@ export default function Particles() {
         built by hand with <code>ParticleSystemConfig</code>.
       </p>
 
-      <h2 id="quickstart">QUICK START: ONE EFFECT, FIVE LINES</h2>
+      <h2 id="quickstart">Quick Start: Basic Emitter</h2>
       <p>
         A particle effect has three pieces: a <strong>config</strong> (everything the
         effect looks like), a <strong>system</strong> (the runtime object), and a
@@ -54,7 +54,7 @@ snow.draw(screen, camera_x, camera_y, 1.0)`}
         you supply the area rect yourself.
       </p>
 
-      <h2 id="kinds">TWO WAYS TO SPEND THE AREA RECT</h2>
+      <h2 id="kinds">Emission Geometry &amp; Area Bounds</h2>
       <p>
         The area rect is the rect where <em>new particles spawn</em>.
         What it should be depends on the effect you want.
@@ -108,7 +108,7 @@ spark.draw(screen, cam.x, cam.y, 1.0)`}
         a zero rect means "no new particles, finish the ones alive".
       </p>
 
-      <h2 id="setup">LOADING AND BUILDING</h2>
+      <h2 id="setup">Configuration &amp; System Initialization</h2>
       <p>
         <code>parse_particle_file()</code> returns a list of{" "}
         <code>ParticleSystemConfig</code>s (one per effect in the file). Pick
@@ -136,7 +136,7 @@ configs[0].apply_render_scale(render_scale)`}
         <code>ALPHA_FADE_MODES</code>.
       </p>
 
-      <h2 id="update-render">UPDATE AND DRAW: THE AREA RECT</h2>
+      <h2 id="update-render">Update Lifecycle &amp; Viewport Culling</h2>
       <p>
         <code>update()</code> needs the emitter's <em>emission area</em>: the
         rect where particles spawn — the two patterns above. Config{" "}
@@ -154,9 +154,9 @@ ox, oy = camera.offset
 explosion.draw(screen, ox, oy, zoom)`}
       />
 
-      <h2 id="burst">BURSTS AND CONTINUOUS EMISSION</h2>
+      <h2 id="burst">Emission Modes: Bursts vs Continuous</h2>
       <p>
-        A burst fires a fixed count immediately; that's the explosion pattern.
+        A burst fires a fixed count immediately; this is the explosion pattern.
         Continuous emission comes from the config's <code>spawn_rate</code>{" "}
         (particles per second, capped by <code>max_particles</code>) fed by{" "}
         <code>update()</code>, the torch pattern. Nothing to toggle at
@@ -170,7 +170,7 @@ explosion.emit_burst(120, x, y, 32.0, 32.0)
 # torch: config.spawn_rate > 0 and update() every frame emits steadily`}
       />
 
-      <h2 id="renderers">RENDERERS</h2>
+      <h2 id="renderers">Rendering Backends &amp; Batching</h2>
       <p>
         <code>ParticleSystem.draw()</code> internally calls{" "}
         <code>SpriteBatchRenderer</code>, the concrete renderer that caches
@@ -183,7 +183,7 @@ explosion.emit_burst(120, x, y, 32.0, 32.0)
         when you're done.
       </p>
 
-      <h2 id="editor">EDITOR-PLACED EMITTERS (NODES)</h2>
+      <h2 id="editor">Map Node Emitters</h2>
       <p>
         Emitters placed in the tilemap-editor come back as parsed nodes. Wrap
         each node in a <code>ParticleEmitterNode</code> to get its config and
@@ -223,12 +223,12 @@ for parsed in parse_nodes_file("data/map.nodes.json"):
         spawners.
       </Callout>
 
-      <h2 id="field">ADVANCED: PARTICLE FIELDS — FOG, HAZE, DUST</h2>
+      <h2 id="field">Atmospheric Particle Fields</h2>
       <p>
         The three modes above are for one-off or streaming particles. Fog,
-        haze, and dust are different: they should <em>already be there</em> and
-        only drift. That's what <code>ParticleField</code> is for — it creates
-        the sheets once, then moves them. Nothing is ever created or
+        haze, and dust are different: they should <em>already be present</em>{" "}
+        and only drift. <code>ParticleField</code> exists for that purpose — it
+        creates the sheets once, then moves them. Nothing is ever created or
         destroyed, so the fog never flickers and costs almost nothing per
         frame.
       </p>
@@ -418,8 +418,8 @@ fog.draw(screen)`}
               <code>int</code> &ge; 1
             </td>
             <td>
-              Depth layers for generic fields (no profile) — more = more depth,
-              more work. Profile overrides.
+              Depth layers for generic fields (no profile) — more layers give
+              more depth and more work. Profile overrides.
             </td>
           </tr>
           <tr>
@@ -569,10 +569,11 @@ fog.update(dt)
 fog.draw(screen, 0, 0, 1)`}
       />
       <Callout kind="tip" title="FOG_PROFILE IS A STARTING POINT">
-        <code>FOG_PROFILE</code> is data. Copy it, edit the numbers, and
-        you have your own mood — dust, ash, underwater shimmer. Starting
+        <code>FOG_PROFILE</code> is data. Copy it, edit the values, and it
+        becomes a custom mood — dust, ash, underwater shimmer. Starting
         points: light mist — halve <code>global_alpha</code>; heavy fog — raise{" "}
-        <code>density</code>; dust — watch the wind and use a generic field.
+        <code>density</code>; dust — let the wind drive motion and use a
+        generic field.
       </Callout>
 
       <h3 id="generic-field">GENERIC CONTINUOUS FIELDS</h3>

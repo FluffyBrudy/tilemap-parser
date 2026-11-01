@@ -160,17 +160,17 @@ export default function FullPhysicsWorld() {
         ]}
       />
 
-      <h2 id="features">FEATURES</h2>
+      <h2 id="features">Key Features &amp; Mechanics</h2>
       <ul>
         {FEATURES.map((f) => (
           <li key={f}>{f}</li>
         ))}
       </ul>
 
-      <h2 id="structure">PROJECT STRUCTURE</h2>
+      <h2 id="structure">Project Structure</h2>
       <CodeBlock language="text" title="tree" code={TREE} />
 
-      <h2 id="running">RUNNING</h2>
+      <h2 id="running">Running the Demo</h2>
       <CodeBlock
         title="terminal"
         language="bash"
@@ -179,7 +179,7 @@ cd examples/full-physics-world
 python main.py`}
       />
 
-      <h2 id="architecture">ARCHITECTURE</h2>
+      <h2 id="architecture">System Architecture</h2>
       <p>
         Everything flows through the world. The runner is attached to it with{" "}
         <code>CollisionRunner.from_world(world)</code>, so tiles and bodies
@@ -191,7 +191,7 @@ python main.py`}
         edges={DIAGRAM_EDGES}
       />
 
-      <h2 id="source">SOURCE</h2>
+      <h2 id="source">Source Code</h2>
 
       <h3 id="main">main.py: the game loop</h3>
       <p>
@@ -222,7 +222,7 @@ python main.py`}
       </p>
       <CodeBlock title="crate.py" code={cratePy} />
 
-      <h2 id="order">READING ORDER</h2>
+      <h2 id="order">Recommended Code Reading Order</h2>
       <ol>
         {READING_ORDER.map((r) => (
           <li key={r.label}>

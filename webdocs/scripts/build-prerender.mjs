@@ -18,7 +18,10 @@ await build({
   },
 });
 
-execFileSync(process.execPath, [path.join(outDir, "prerender.js")], {
+execFileSync(process.execPath, [
+  path.join(outDir, "prerender.js"),
+  ...process.argv.slice(2),
+], {
   stdio: "inherit",
   cwd: root,
 });

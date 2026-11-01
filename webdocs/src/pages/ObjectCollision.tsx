@@ -20,22 +20,22 @@ for hit in manager.check_object(enemy1):
 export default function ObjectCollision() {
   return (
     <div className="content">
-      <h1>Object Collision: the sprite-vs-sprite lane</h1>
+      <h1>Object Collision: Sprite-to-Sprite Contact Detection</h1>
       <p>
         The physics world resolves sprites against tiles and bodies. It does{" "}
-        <strong>not</strong> resolve sprite against sprite; that's a separate
-        lane, on purpose. Two characters touching is{" "}
-        <code>ObjectCollisionManager</code>'s job.
+        <strong>not</strong> resolve sprite against sprite; that is a separate
+        lane, by design. The contact of two characters is{" "}
+        <code>ObjectCollisionManager</code>'s responsibility.
       </p>
 
-      <h2 id="why">WHY IT'S SEPARATE</h2>
+      <h2 id="why">Architectural Separation</h2>
       <ul>
         <li>
           The world's job is keeping sprites out of solids.
         </li>
         <li>
-          The manager's job is finding touches between moving things
-          (who touched who, how deep).
+          The manager's job is detecting contact between moving objects
+          (which touched which, and by how much).
         </li>
         <li>
           Different queries, different cadence: the world runs every{" "}
@@ -51,7 +51,7 @@ export default function ObjectCollision() {
         <code>collision_shapes</code> attribute).
       </p>
 
-      <h2 id="api">THE API</h2>
+      <h2 id="api">ObjectCollisionManager API</h2>
       <table>
         <thead>
           <tr>
@@ -145,18 +145,18 @@ export default function ObjectCollision() {
         </tbody>
       </table>
 
-      <h2 id="setup">CONNECTING IT</h2>
+      <h2 id="setup">Game Loop Integration</h2>
       <CodeBlock title="the sprite-vs-sprite lane" code={LOOP} />
       <Callout
         kind="warn"
-        title="LAYER FILTERING IS MUTUAL: SAME RULE AS THE WORLD"
+        title="Symmetric Layer Filtering Rule"
       >
         <code>should_collide</code> requires both sides to agree:{" "}
         <code>(a_mask &amp; b_layer) != 0 and (b_mask &amp; a_layer) != 0</code>
         . Filter on both objects or not at all.
       </Callout>
 
-      <h2 id="tuning">CELL SIZE TUNING</h2>
+      <h2 id="tuning">Spatial Grid Cell Tuning</h2>
       <p>
         <code>cell_size</code> is a cost trade-off. Too small: many empty cells,
         grid rebuild overhead. Too big: every object ends up in the same cell
