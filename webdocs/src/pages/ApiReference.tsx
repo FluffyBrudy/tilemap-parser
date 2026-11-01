@@ -40,7 +40,7 @@ export default function ApiReference() {
         exists.
       </p>
 
-      <h2 id="map-data">MAP DATA & LOADING</h2>
+      <h2 id="map-data">Map Data &amp; Loading</h2>
       <Group title="Loading">
         <Entry name="load_map(path) → TilemapData">
           <p>
@@ -76,7 +76,7 @@ export default function ApiReference() {
         <Entry name="TilemapData.get_tile_surface(ttype, variant, copy_surface=True) → Surface | None">
           <p>
             Gets one tile texture from the tileset, scaled by{" "}
-            <code>render_scale</code>. Handy when you want a tile's art outside
+            <code>render_scale</code>. Useful when tile art is needed outside
             the renderer (icons, minimaps).
           </p>
         </Entry>
@@ -175,7 +175,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="shapes">SHAPES & COLLISION DATA</h2>
+      <h2 id="shapes">Shapes &amp; Collision Data</h2>
       <Group title="Primitive shapes">
         <Entry name="RectangleShape(width, height, offset=(0,0))">
           <p>
@@ -249,7 +249,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="movement">MOVEMENT: COLLISIONRUNNER</h2>
+      <h2 id="movement">Movement: CollisionRunner</h2>
       <p>
         Full treatment on the <a href="/runner">CollisionRunner guide</a>.
         Here's the surface:
@@ -304,11 +304,19 @@ export default function ApiReference() {
             Slope-aware: walks polygon floor surfaces within{" "}
             <code>max_walk_angle</code>.
           </p>
+          <p>
+            When the result is grounded, <code>ground_tile</code> holds the cell
+            coords and <code>ground_tile_id</code> the gid of the winning
+            support tile (<code>None</code> when airborne or standing on a
+            physics body). Tileset-collision custom properties survive parse on{" "}
+            <code>resolve_collision(gid).properties</code>, e.g. a per-tile{" "}
+            <code>surface</code> marker for gear/conveyor drift.
+          </p>
         </Entry>
         <Entry name="move(sprite, tileset, tiles, delta_x, delta_y, dt, **kwargs)">
           <p>
             Dispatches on <code>self.mode</code>{" "}
-            (SLIDE/PLATFORMER/RPG/GROUNDED), handy for one generic call.
+            (SLIDE/PLATFORMER/RPG/GROUNDED), convenient for one generic call.
           </p>
         </Entry>
       </Group>
@@ -326,9 +334,13 @@ export default function ApiReference() {
           <p>
             <code>
               collided, final_x, final_y, hit_wall_x, hit_wall_y, hit_ceiling,
-              on_ground, slide_vector
+              on_ground, slide_vector, ground_angle, ground_normal, ground_tile,
+              ground_tile_id
             </code>
-            .
+            . On <code>move_platformer_with_slide</code>,{" "}
+            <code>ground_angle</code>/<code>ground_normal</code> report the
+            supporting surface, and <code>ground_tile</code>/{" "}
+            <code>ground_tile_id</code> name the winning support cell and gid.
           </p>
         </Entry>
         <Entry name="MovementMode">
@@ -342,7 +354,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="world">PHYSICS WORLD & BODIES</h2>
+      <h2 id="world">Physics World &amp; Bodies</h2>
       <Group title="PhysicsWorld">
         <Entry name="PhysicsWorld(tile_map, tileset_collision, tile_size=(32,32), render_scale=1.0)">
           <p>
@@ -376,6 +388,21 @@ export default function ApiReference() {
             <code>body in world</code>, <code>len(world)</code>.
           </p>
         </Entry>
+        <Entry name="tile_ids_at(cell) / tile_entries_at(cell) / resolve_collision(gid) / resolve_stack_entry(entry)">
+          <p>
+            Tile queries over the world's stacked tiles: stored gids for one
+            cell, full (gid, flip) entries, and resolved collision data per
+            gid or entry. Reverse lookup of a <code>CollisionResult
+            .ground_tile_id</code>, returning <code>TileCollisionData</code>{" "}
+            with its custom <code>properties</code>.
+          </p>
+        </Entry>
+        <Entry name="iter_cell_ids(cell) / iter_cell_entries(cell) / flipped_data(base, flags, tile_size)">
+          <p>
+            Module-level helpers behind cell access and flip handling; shared
+            by the runner and available for custom queries.
+          </p>
+        </Entry>
       </Group>
       <Group title="Body">
         <Entry name="Body(collision_shape, x=0, y=0, *, vx=0, vy=0, mode='static', collision_layer=1, collision_mask=0xFFFFFFFF, game_id='')">
@@ -402,7 +429,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="render">RENDERING & CAMERA</h2>
+      <h2 id="render">Rendering &amp; Camera</h2>
       <Group title="TileLayerRenderer">
         <Entry name="TileLayerRenderer(data, *, include_hidden_layers=False)">
           <p>
@@ -444,9 +471,15 @@ export default function ApiReference() {
             <code>bounds</code>.
           </p>
         </Entry>
+        <Entry name="Camera.set_bounds(min_x, min_y, max_x, max_y) / set_bounds_from_map(tilemap_data)">
+          <p>
+            Clamp the camera to a world rectangle; four world-space
+            coordinates, or a map-sized rect derived from the tilemap data.
+          </p>
+        </Entry>
       </Group>
 
-      <h2 id="animation">ANIMATION</h2>
+      <h2 id="animation">Animation System</h2>
       <Group title="AnimationPlayer">
         <Entry name="SpriteAnimationSet.load(json_path, *, spritesheet_path=None, extra_search_base=None, render_scale=1.0)">
           <p>
@@ -475,7 +508,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="particles">PARTICLES</h2>
+      <h2 id="particles">Particle System</h2>
       <Group title="Fields & systems">
         <Entry name="ParticleField(area, *, profile=None, shape='fog', color=(200,205,215), alpha=14, global_alpha=1.0, density=1.0, direction=0 | 'random', speed=(6,14), size=(70,120), spread=30, layers=1, quality='medium'|'low'|'high', ground_bias=True, render_scale=1.0, blend=0) / FOG_PROFILE">
           <p>
@@ -484,8 +517,8 @@ export default function ApiReference() {
             <code>global_alpha</code>), color, motion and quality instead of
             particle internals. Layer tuning comes from a{" "}
             <code>FieldProfile</code> — plain data, e.g. the shipped{" "}
-            <code>FOG_PROFILE</code>, which you can copy and tweak for your own
-            moods. Profiles are immutable;{" "}
+            <code>FOG_PROFILE</code>, which can be copied and adjusted for a
+            custom mood. Profiles are immutable;{" "}
             <code>FOG_PROFILE.with_alpha(factor, name=None)</code> returns a
             scaled copy without touching the source. <code>blend</code> passes a
             pygame blend flag (e.g. <code>pygame.BLEND_RGBA_ADD</code> for
@@ -518,7 +551,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="nav">NAVIGATION</h2>
+      <h2 id="nav">Navigation &amp; Pathfinding</h2>
       <Group title="Pathfinding">
         <Entry name="NavGrid / Pathfinder / PathFollower">
           <p>
@@ -537,7 +570,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="utils">UTILITIES & QUERIES</h2>
+      <h2 id="utils">Utilities &amp; Geometric Queries</h2>
       <Group title="Detection">
         <Entry name="check_collision(a, b) → CollisionHit | None">
           <p>
@@ -563,6 +596,21 @@ export default function ApiReference() {
             runner.
           </p>
         </Entry>
+        <Entry name="flip_character_shape(shape, sprite_size, *, flip_h=True, flip_v=False)">
+          <p>
+            Mirror a rect, circle, capsule or polygon character shape
+            sprite-locally; the input is never mutated. Re-anchor the owner
+            after flipping to keep it planted.
+          </p>
+        </Entry>
+        <Entry name="describe_tile_layer(tile_map, *, world=None, tileset=None, scale=None) → list[dict]">
+          <p>
+            Every placed tile shape of one stacked cell map, world-positioned
+            with per-shape metadata, directly usable with{" "}
+            <code>pygame.draw.polygon</code>. Needs{" "}
+            <code>world=</code> or <code>tileset=</code> to resolve shapes.
+          </p>
+        </Entry>
         <Entry name="CollisionHit">
           <p>
             <code>resolve()</code>, <code>slide_velocity()</code>,{" "}
@@ -572,7 +620,7 @@ export default function ApiReference() {
         </Entry>
       </Group>
 
-      <h2 id="errors">ERRORS</h2>
+      <h2 id="errors">Exceptions &amp; Error Handling</h2>
       <Group title="Raised by parsers and validators">
         <Entry name="MapParseError / CollisionParseError / AnimationParseError / TmxParseError">
           <p>

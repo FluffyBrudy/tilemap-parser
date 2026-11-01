@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { FLAT, NAV, REPO, VERSION } from "../nav";
 import { PixelMark } from "./PixelSprite";
 import FooterNav from "./FooterNav";
+import SearchModal from "./SearchModal";
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -35,6 +36,8 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span className="hidden flex-1 text-right font-retro text-[22px] leading-none text-mute md:block">
             {current ? current.label : "collision for game devs"}
           </span>
+          <span className="flex-1" />
+          <SearchModal />
           <a href={REPO} className="btn-pixel">
             GITHUB
           </a>

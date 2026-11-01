@@ -89,7 +89,7 @@ const CARDS: Card[] = [
 export default function Examples() {
   return (
     <div className="content">
-      <h1>Examples</h1>
+      <h1>Example Demonstrations</h1>
       <p>
         Every directory under <code>examples/</code> runs standalone. All
         examples below are tested and correct; these are the source of truth
@@ -106,7 +106,7 @@ cd examples/physics-crate
 python main.py`}
       />
 
-      <h2 id="full">FULL USE CASES</h2>
+      <h2 id="full">Featured End-to-End Use Cases</h2>
       <p>
         Three read-the-source examples that wire whole lanes end to end. Their
         pages show every file inline, so they double as the docs.
@@ -169,7 +169,7 @@ python main.py`}
         </Link>
       </div>
 
-      <h2 id="grid">THE CARDS</h2>
+      <h2 id="grid">Demonstration Catalog</h2>
       <div className="grid gap-4 md:grid-cols-2">
         {CARDS.map((c) => (
           <div key={c.name} className="panel flex flex-col p-4">
@@ -198,7 +198,7 @@ python main.py`}
         ))}
       </div>
 
-      <h2 id="order">A SENSIBLE READING ORDER</h2>
+      <h2 id="order">Recommended Learning Sequence</h2>
       <ol>
         <li>
           <strong>physics-crate</strong>: bodies, attach, the push loop, the

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "object-properties",
+    "title": "Object properties by id",
+    "introduction": "An object layer stores objects as a dict keyed by the object ids placed in the editor, so the id is the lookup. The parsed entry carries position (area), the tileset reference (ttype, variant), and the authoring properties.",
+    "code": "from tilemap_parser import load_map\n\ndata = load_map(\"data/map.json\")\nlayer = data.get_layer(\"Objects\")\nobj = layer.objects[7]          # dict[int, ParsedObject]; the key is the oid\n\nassert obj.ttype == 0\nassert obj.properties[\"pickup\"] == \"coin\"\nassert (obj.area.x, obj.area.y, obj.area.w, obj.area.h) == (8, 24, 16, 16)\n\n# iterate all objects together with their ids\nfor oid, entry in layer.objects.items():\n    assert entry.area.w >= 0"
+  },
+  {
+    "id": "placed-tile-properties",
+    "title": "Properties of a placed tile",
+    "introduction": "Tiles placed on a tile layer can carry properties. Access is by cell coordinates; the returned ParsedTile can be None outside the layer's placement.",
+    "code": "from tilemap_parser import load_map\n\ndata = load_map(\"data/map.json\")\ntile = data.get_tile_at(\"Terrain\", 1, 0)   # (name or id, cell_x, cell_y)\nassert tile is not None\nassert tile.properties[\"surface\"] == \"ice\"\nassert tile.ttype == 0 and tile.variant == 0"
+  },
+  {
+    "id": "layer-lookup",
+    "title": "Layer lookup by name or id",
+    "introduction": "Layers are addressable by name (str) and by id (int). The list helpers filter by layer type and visibility.",
+    "code": "from tilemap_parser import load_map\n\ndata = load_map(\"data/map.json\")\n\nnamed = data.get_layer(\"Terrain\")            # by name\nlisted = data.get_layers(layer_type=\"tile\")  # only tile layers\nassert named is not None\nassert named in listed\n\nvisible_only = data.get_layers(include_hidden=False)"
+  },
+  {
+    "id": "object-surface-by-id",
+    "title": "Surface for one placed object",
+    "introduction": "The loader cuts each object's surface from its tileset sheet. The result is a (surface, screen_x, screen_y) tuple, already positioned in world pixels.",
+    "code": "from tilemap_parser import load_map\n\ndata = load_map(\"data/map.json\")\nresult = data.get_object_surface_by_id(\"Objects\", 7)\nassert result is not None\n\nsurface, screen_x, screen_y = result\nassert surface.get_size() == (16, 16)\nassert (screen_x, screen_y) == (8, 24)"
+  },
+  {
+    "id": "collision-file-properties",
+    "title": "Custom properties on a collision tile",
+    "introduction": "The tileset collision file may carry custom properties per tile beyond layer and mask. Parsing keeps them verbatim on TileCollisionData; they are the natural home for per-tile behavior markers.",
+    "code": "from tilemap_parser import CollisionCache\n\ncache = CollisionCache()\nts = cache.get_tileset_collision(\"data/collision/ground.collision.json\")\n\ntile = ts.tiles[0]                  # keyed by the collision file's tile id\nassert tile.properties[\"surface\"] == \"gear\"\nassert tile.collision_layer == 1\nassert len(tile.shapes) == 1"
+  },
+  {
+    "id": "world-tile-lookup",
+    "title": "Tile data at a cell in a PhysicsWorld",
+    "introduction": "A world stores stacked (gid, flip) entries per cell. tile_ids_at lists the stored gids, resolve_collision resolves the collision data for one gid, and the collision data follows any movement result through ground_tile_id.",
+    "code": "from tilemap_parser import CollisionCache, PhysicsWorld, load_map\n\ncache = CollisionCache()\nts = cache.get_tileset_collision(\"data/collision/ground.collision.json\")\ndata = load_map(\"data/map.json\")\n\ncell_map = data.build_tile_map()            # {(col, row): ((gid, flags), ...)}\nworld = PhysicsWorld(cell_map, ts, tile_size=(16, 16))\n\nassert 0 in world.tile_ids_at((1, 0))       # gids stored at that cell\ntile = world.resolve_collision(0)           # TileCollisionData | None\nassert tile is not None\nassert tile.properties[\"surface\"] == \"gear\""
+  }
+]

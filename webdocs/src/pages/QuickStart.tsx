@@ -7,10 +7,10 @@ export default function QuickStart() {
     <div className="content">
       <h1>Quick Start</h1>
       <p>
-        The smallest thing that loads a map, moves a sprite against tiles, and
-        draws. Top-down slide movement: swap the runner preset and add{" "}
-        <code>vx</code>, <code>vy</code>, <code>on_ground</code> for a
-        platformer (see <Link to="/physics">Physics &amp; Bodies</Link>).
+        A minimal standalone program demonstrating map loading, tile collision resolution, and camera rendering in pygame-ce.
+        This example demonstrates top-down slide movement; platformer mechanics with gravity and jumping require setting{" "}
+        <code>vx</code>, <code>vy</code>, and <code>on_ground</code> (detailed in{" "}
+        <Link to="/physics">Physics &amp; Bodies</Link>).
       </p>
 
       <CodeBlock
@@ -66,66 +66,64 @@ while running:
 pygame.quit()`}
       />
 
-      <h2 id="pieces">WHAT JUST HAPPENED</h2>
+      <h2 id="pieces">Runtime Execution Flow</h2>
       <ul>
         <li>
           <code>load_map</code> parses the tilemap-editor JSON into a{" "}
-          <code>TilemapData</code>. The renderer draws it;
-          <code>build_tile_map()</code> turns the tile layers into a{" "}
-          <code>
-            {"{"} (col, row): tile_id {"}"}
-          </code>{" "}
-          dict the runner iterates.
+          <code>TilemapData</code> instance. <code>TileLayerRenderer</code> culls
+          and renders visible chunks; <code>build_tile_map()</code> compiles tile
+          layers into a <code>{"{"} (col, row): tile_id {"}"}</code> spatial map.
         </li>
         <li>
-          <code>CollisionCache.get_tileset_collision</code> loads the per-tile
-          polygons. Tiles with no entry are walkable.
+          <code>CollisionCache.get_tileset_collision</code> parses polygon
+          boundaries and custom properties per tile. Tiles without collision
+          definitions remain walkable.
         </li>
         <li>
-          <code>CollisionRunner.from_game_type("topdown")</code> = slide mode,
-          gravity off. Each frame you hand it a displacement (
-          <code>velocity × dt</code>) and it slides the sprite along walls.
+          <code>CollisionRunner.from_game_type("topdown")</code> applies slide
+          mode without gravity. Each frame, movement displacement (
+          <code>velocity × dt</code>) is resolved with wall sliding.
         </li>
         <li>
-          <code>camera.update(dt)</code> then{" "}
-          <code>renderer.render(screen, camera.offset)</code>: the camera
-          offsets the world, the renderer culls to the viewport.
+          <code>camera.update(dt)</code> updates target tracking, followed by{" "}
+          <code>renderer.render(screen, camera.offset)</code> to draw the
+          viewport with camera offsets.
         </li>
       </ul>
 
-      <h2 id="platformer">WANT GRAVITY INSTEAD?</h2>
+      <h2 id="platformer">Platformer Configuration & Gravity</h2>
       <p>
-        Give the player <code>vx</code>, <code>vy</code>, <code>on_ground</code>
-        , build a <code>PhysicsWorld</code> from the map, attach the runner
-        once, and call{" "}
+        To enable gravity, jumping, and step-up mechanics, provide the sprite with{" "}
+        <code>vx</code>, <code>vy</code>, and <code>on_ground</code> attributes.
+        Construct a <code>PhysicsWorld</code> from the map, attach the runner,
+        and call{" "}
         <code>
           runner.move_platformer(player, None, None, dt, input_x=...,
           jump_pressed=...)
         </code>
-        . That path, and the crate-pushing it enables, is the whole{" "}
-        <Link to="/physics">Physics &amp; Bodies</Link> guide.
+        . See the <Link to="/physics">Physics &amp; Bodies</Link> guide for full
+        details on pushable bodies and platform dynamics.
       </p>
 
-      <Callout kind="warn" title="TOPLEFT VS CENTER" id="top-left-vs-center">
+      <Callout kind="warn" title="Coordinate Anchoring & Shape Sizing" id="top-left-vs-center">
         <code>RectangleShape</code> anchors <code>(x, y)</code> at its top-left.
         <code>CircleShape</code> anchors <code>(x, y)</code> at its center;{" "}
         <code>CapsuleShape</code> anchors <code>(x, y)</code> at its <em>top
         cap's</em> center. Widths are always full sizes:{" "}
         <code>RectangleShape(width, height)</code> uses your values as-is,
         while <code>CircleShape(radius)</code> and{" "}
-        <code>CapsuleShape(radius, height)</code> are half-widths. So when you
-        draw (or check bounds):
+        <code>CapsuleShape(radius, height)</code> are half-widths. When rendering
+        or checking bounding boxes:
         <ul>
-          <li>rectangle → draw the box at <code>(x, y)</code>, size{" "}
+          <li>rectangle → draw at <code>(x, y)</code> with dimensions{" "}
             <code>w × h</code>;</li>
-          <li>circle → draw the box at <code>(x - radius, y - radius)</code>,
-            size <code>2r × 2r</code>;</li>
-          <li>capsule → draw the box at <code>(x - radius, y - radius)</code>,
-            size <code>2r × (2r + height)</code>.</li>
+          <li>circle → draw at <code>(x - radius, y - radius)</code> with
+            dimensions <code>2r × 2r</code>;</li>
+          <li>capsule → draw at <code>(x - radius, y - radius)</code> with
+            dimensions <code>2r × (2r + height)</code>.</li>
         </ul>
-        Never halve a rectangle's width, and never draw a circle/capsule at{" "}
-        <code>(x, y)</code> — that shifts it up and left by one radius. Swap
-        conventions and your sprite teleports half its size into the floor.
+        Do not halve a rectangle's dimensions or offset a circle/capsule origin
+        incorrectly, as coordinate mismatches cause sprites to clip into surfaces.
       </Callout>
     </div>
   );

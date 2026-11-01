@@ -32,6 +32,8 @@ def move_rpg(
     result.slide_vector = None
     result.ground_angle = None
     result.ground_normal = None
+    result.ground_tile = None
+    result.ground_tile_id = None
     result.final_x = sprite.x
     result.final_y = sprite.y
 

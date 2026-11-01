@@ -66,6 +66,9 @@ class TileCollisionData:
     # Mutual layer/mask agreement required; defaults collide with everything.
     collision_layer: int = 1
     collision_mask: int = 0xFFFFFFFF
+    # Custom tile properties from the tileset collision file, kept
+    # verbatim; layer/mask settings additionally fill the sibling fields.
+    properties: dict[str, Any] = field(default_factory=dict)
 
     def has_collision(self) -> bool:
         return any(shape.is_valid() for shape in self.shapes)
@@ -111,6 +114,7 @@ class TilesetCollision:
                     shapes=data.shapes[:],
                     collision_layer=data.collision_layer,
                     collision_mask=data.collision_mask,
+                    properties=dict(data.properties),
                 )
         return cls(
             tileset_name="merged",
@@ -323,6 +327,7 @@ def parse_tileset_collision(data: JsonDict) -> TilesetCollision:
                 shapes=shapes,
                 collision_layer=int(props.get("collision_layer", 1)),
                 collision_mask=int(props.get("collision_mask", 0xFFFFFFFF)),
+                properties=dict(props),
             )
 
         return TilesetCollision(

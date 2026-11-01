@@ -3,14 +3,13 @@ import CodeBlock from "../components/CodeBlock";
 export default function TechnicalNotes() {
   return (
     <div className="content">
-      <h1>Technical Notes</h1>
+      <h1>Technical Notes &amp; Implementation Specifications</h1>
       <p>
-        Edge conventions, scale rules and performance facts that the guides
-        assume. All of these are the library's actual behavior, stated
-        precisely.
+        Architectural edge conventions, precision rules, and performance characteristics
+        defining the runtime behavior of <code>tilemap-parser</code>.
       </p>
 
-      <h2 id="edges">EDGE CONVENTIONS</h2>
+      <h2 id="edges">Edge Conventions &amp; Precision Semantics</h2>
       <ul>
         <li>
           <strong>
@@ -27,7 +26,7 @@ export default function TechnicalNotes() {
         </li>
       </ul>
 
-      <h2 id="scale">RENDER_SCALE</h2>
+      <h2 id="scale">Render Scale &amp; Coordinate Mapping</h2>
       <ul>
         <li>
           <code>TilemapData.render_scale</code> is adopted by{" "}
@@ -48,7 +47,7 @@ export default function TechnicalNotes() {
         </li>
       </ul>
 
-      <h2 id="modes">BODY MODES ARE SETTINGS</h2>
+      <h2 id="modes">Body Modes &amp; Dynamics Semantics</h2>
       <p>
         <code>"static"</code> and <code>"kinematic"</code> do not imply
         physics-engine dynamics. Velocity is scripted, Godot{" "}
@@ -57,7 +56,7 @@ export default function TechnicalNotes() {
         <code>move_*</code> call with explicit velocity.
       </p>
 
-      <h2 id="oneway">ONE-WAY, PRECISELY</h2>
+      <h2 id="oneway">One-Way Platform Precision Mechanics</h2>
       <ul>
         <li>
           <code>move_platformer</code> and{" "}
@@ -76,12 +75,12 @@ export default function TechnicalNotes() {
         <li>
           How one-way blocking works: a one-way polygon blocks only when the
           sprite is <em>falling</em> (<code>vy &gt; 0</code>) and its previous
-          bottom was above the platform top — fast falls can't tunnel, and
+          bottom was above the platform top — fast falls cannot tunnel, and
           jumping up through always passes.
         </li>
         <li>
-          The horizontal phase never sees one-way polygons (they can't wall
-          you); the landing snap re-includes them with from-above gating.
+          The horizontal phase never sees one-way polygons (they cannot act as
+          walls); the landing snap re-includes them with from-above gating.
         </li>
         <li>
           <code>move_grounded</code> treats one-way polygons as plain solid
@@ -89,14 +88,14 @@ export default function TechnicalNotes() {
         </li>
         <li>Bodies are never one-way; they block from every direction.</li>
         <li>
-          The renderer doesn't know the flag exists: one-way tiles draw like
+          The renderer does not handle the flag: one-way tiles draw like
           any other tile. For dashed-edge overlays, query{" "}
           <code>world.tile_map</code> + the collision tileset at runtime (see
           the Map Parsing page).
         </li>
       </ul>
 
-      <h2 id="velocity">EXPLICIT VELOCITY, RECAP</h2>
+      <h2 id="velocity">Explicit Velocity Dynamics</h2>
       <p>
         Physics modes with <code>velocity=(vx, vy)</code>: skip
         gravity/input/jump, adopt the velocity onto the sprite, zero{" "}
@@ -105,7 +104,7 @@ export default function TechnicalNotes() {
         <code>move_rpg</code>) never read or write <code>vx/vy</code>.
       </p>
 
-      <h2 id="perf">PERFORMANCE NOTES</h2>
+      <h2 id="perf">Performance Characteristics &amp; Benchmarking</h2>
       <ul>
         <li>
           <strong>Movement queries are zero-allocation on the hot path.</strong>{" "}
@@ -139,7 +138,7 @@ export default function TechnicalNotes() {
         </li>
       </ul>
 
-      <h2 id="camera">CAMERA FACTS</h2>
+      <h2 id="camera">Camera System Specifications</h2>
       <ul>
         <li>
           <code>mode="centered"</code>: target always at viewport center (lerp
@@ -161,9 +160,9 @@ export default function TechnicalNotes() {
       <p>
         One space, one runner. Tiles and bodies are solids in the same space;
         the runner resolves movement against the union. The world does not
-        simulate sprite-vs-sprite contact; that's{" "}
-        <code>ObjectCollisionManager</code>. If you can draw it, you can move
-        it; if you can move it, it can be pushed.
+        simulate sprite-versus-sprite contact; that is{" "}
+        <code>ObjectCollisionManager</code>. Anything renderable is movable,
+        and anything movable can be pushed.
       </p>
 
       <h2 id="gid">GID LOOKUP IS A RANGE TEST, NOT A SUBTRACTION</h2>

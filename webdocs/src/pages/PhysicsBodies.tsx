@@ -4,16 +4,16 @@ import Toc from "../components/Toc";
 import { Link } from "react-router-dom";
 
 const TOC = [
-  { id: "three-jobs", label: "Who does what" },
-  { id: "setup", label: "The two-minute setup" },
-  { id: "required-fields", label: "What your sprite needs" },
-  { id: "five-methods", label: "The five move methods" },
-  { id: "explicit-velocity", label: "How velocity= works" },
-  { id: "sliding-box", label: "The sliding box" },
-  { id: "result", label: "Reading CollisionResult" },
-  { id: "layers", label: "Layers & masks" },
-  { id: "coords", label: "Coordinate space" },
-  { id: "traps", label: "Common mistakes" },
+  { id: "three-jobs", label: "Architecture & Component Roles" },
+  { id: "setup", label: "Quick Initialization" },
+  { id: "required-fields", label: "Sprite Interface Requirements" },
+  { id: "five-methods", label: "Movement Resolution Methods" },
+  { id: "explicit-velocity", label: "Explicit Velocity Mechanics" },
+  { id: "sliding-box", label: "Kinematic Bodies: Sliding Box" },
+  { id: "result", label: "CollisionResult Flags" },
+  { id: "layers", label: "Layers & Masks Filtering" },
+  { id: "coords", label: "Coordinate Space & Alignment" },
+  { id: "traps", label: "Common Pitfalls & Troubleshooting" },
 ];
 
 const SETUP = `from tilemap_parser import (
@@ -70,13 +70,12 @@ const PROBE = `def body_ahead(world, sprite, axis, probe=8.0):
 export default function PhysicsBodies() {
   return (
     <div className="content">
-      <h1>Collision, explained directly</h1>
+      <h1>Physics & Bodies: Core Collision Architecture</h1>
       <Toc items={TOC} />
 
-      <h2 id="three-jobs">THREE JOBS, AND WHO DOES THEM</h2>
+      <h2 id="three-jobs">Architecture & Component Roles</h2>
       <p>
-        Collision is three jobs, and the library splits them on purpose. Learn
-        the split and nothing else surprises you.
+        The collision runtime divides responsibilities into three distinct architectural components:
       </p>
       <table>
         <thead>
@@ -99,7 +98,7 @@ export default function PhysicsBodies() {
             </td>
           </tr>
           <tr>
-            <td>How things move</td>
+            <td>Sprite movement</td>
             <td>
               <code>CollisionRunner</code>
             </td>
@@ -124,7 +123,7 @@ export default function PhysicsBodies() {
         them. If you can draw it, you can collide with it.
       </p>
 
-      <h2 id="setup">THE TWO-MINUTE SETUP</h2>
+      <h2 id="setup">Quick Initialization</h2>
       <CodeBlock title="setup.py" code={SETUP} />
       <p>
         Note the <code>from_world</code> constructor: it applies the game-type
@@ -151,7 +150,7 @@ export default function PhysicsBodies() {
         </li>
       </ul>
 
-      <h2 id="required-fields">WHAT YOUR SPRITE NEEDS</h2>
+      <h2 id="required-fields">Sprite Interface Requirements</h2>
       <CodeBlock title="player.py" code={PLAYER_FIELDS} />
       <table>
         <thead>
@@ -221,7 +220,7 @@ export default function PhysicsBodies() {
         nothing <em>resolves</em> it until a <code>move_*</code> call runs.
       </Callout>
 
-      <h2 id="five-methods">THE FIVE MOVE METHODS: PICK BY INPUT MODEL</h2>
+      <h2 id="five-methods">Movement Resolution Methods</h2>
       <table>
         <thead>
           <tr>
@@ -307,7 +306,7 @@ export default function PhysicsBodies() {
         that points into the colliding edge's normal.
       </p>
 
-      <h2 id="explicit-velocity">HOW velocity= WORKS</h2>
+      <h2 id="explicit-velocity">Explicit Velocity Mechanics (velocity=)</h2>
       <p>
         In the three physics modes, when you pass <code>velocity=(vx, vy)</code>
         :
@@ -375,7 +374,7 @@ runner.move_grounded(self, None, None, dt, velocity=(self.vx, self.vy))`}
         <code>velocity=</code> and set <code>sprite.vx</code> directly.
       </Callout>
 
-      <h2 id="sliding-box">OBJECTS IN THE PHYSICS WORLD: THE SLIDING BOX</h2>
+      <h2 id="sliding-box">Kinematic Bodies: Pushable Crate Implementation</h2>
       <p>
         This is the main example, from{" "}
         <code>examples/physics-crate/main.py</code> (tested, correct): a floor,
@@ -401,14 +400,15 @@ for crate in crates:
         <code>"static"</code> never moves (scenery);
         <code>"kinematic"</code> is moved explicitly by your code each frame.{" "}
         <strong>Nothing moves a kinematic body except you</strong>: the player
-        walking into it does not shove it; that's the push loop below. Bodies
-        take primitive shapes only (anything else raises <code>TypeError</code>
-        ), and a body never blocks itself.
+        walking into it does not push it; the push loop below demonstrates
+        this. Bodies take primitive shapes only (anything else raises{" "}
+        <code>TypeError</code>), and a body never blocks itself.
       </p>
-      <Callout kind="danger" title="THE RULE YOU CAN'T SKIP">
+      <Callout kind="danger" title="THE RULE YOU CANNOT SKIP">
         A body participates in movement resolution <em>only because</em> it is
-        in <code>world.bodies</code> and a runner is attached to that world. Add
-        a body but forget the attach, and the player walks straight through it.
+        in <code>world.bodies</code> and a runner is attached to that world. If
+        a body is added but the runner is never attached, the player walks
+        straight through it.
       </Callout>
 
       <h3>Bodies already block and support: no extra code</h3>
@@ -425,7 +425,7 @@ for crate in crates:
       <p>Walk through what happens:</p>
       <ul>
         <li>
-          The player is stopped by the crate's side (it's a solid), so{" "}
+          The player is stopped by the crate's side (the crate is solid), so{" "}
           <code>hit_wall_x</code> is true.
         </li>
         <li>
@@ -447,13 +447,13 @@ for crate in crates:
         </li>
       </ul>
       <p>
-        That's the entire loop:{" "}
+        The complete loop is:
         <strong>
           read the result, assign velocity, drive bodies through the runner,
           read the result again.
         </strong>{" "}
-        The runner never simulates pushing on its own, but give it a velocity
-        per frame and it behaves exactly like one.
+        The runner never simulates pushing on its own, but provided a velocity
+        per frame it behaves exactly like one.
       </p>
 
       <h3>The sub-pixel gap: why the probe exists</h3>
@@ -467,8 +467,8 @@ for crate in crates:
       <CodeBlock title="probe.py" code={PROBE} />
       <Callout kind="tip" title="STATIC QUERIES AND RESTING SPRITES">
         Static overlap queries are only reliable away from the surface the
-        runner already resolved. If you need to know what's <em>in front of</em>{" "}
-        a resting sprite, probe into the movement direction; don't trust the
+        runner already resolved. If you need to know what is <em>in front of</em>{" "}
+        a resting sprite, probe into the movement direction; do not rely on the
         exact resting position.
       </Callout>
 
@@ -515,11 +515,11 @@ for crate in crates:
       </table>
       <p>
         The world is not a physics engine. It resolves movement against tiles
-        and bodies; it does not simulate sprite-vs-sprite contact. That's{" "}
+        and bodies; it does not simulate sprite-versus-sprite contact. That is{" "}
         <a href="/object-collision">ObjectCollisionManager's lane</a>.
       </p>
 
-      <h2 id="result">READING COLLISIONRESULT</h2>
+      <h2 id="result">CollisionResult Flags & State Evaluation</h2>
       <table>
         <thead>
           <tr>
@@ -580,35 +580,35 @@ for crate in crates:
       </table>
       <p>
         The runner mutates <code>sprite.x/y</code> in place; after the call the
-        sprite is wherever it ended up; <code>final_*</code> is for when you
-        want to know <em>where</em> without inspecting it. And{" "}
+        sprite is wherever it ended up; <code>final_*</code> is available when
+        the final position is needed without inspecting the sprite.{" "}
         <code>hit_wall_x</code> vs <code>collided</code>: in the crate loop we
-        branch on <code>hit_wall_x</code> precisely so a landing doesn't zero
-        the crate's push velocity.
+        branch on <code>hit_wall_x</code> specifically so that a landing does
+        not zero the crate's push velocity.
       </p>
 
-      <h2 id="layers">LAYERS & MASKS: BOTH SIDES MUST AGREE</h2>
+      <h2 id="layers">Collision Filtering: Layers and Masks</h2>
       <p>
-        Filtering needs both sides to agree, not just one. Two objects
-        collide only if <strong>both</strong> pass:
+        Filtering requires symmetric agreement between colliding objects. Two objects
+        interact only if <strong>both</strong> bitmasks allow the pair:
       </p>
       <CodeBlock
-        title="hit.py: the actual rule"
+        title="hit.py: collision filter condition"
         code={`(a_mask & b_layer) != 0 and (b_mask & a_layer) != 0`}
       />
       <p>
         Defaults are <code>collision_layer=1</code>,{" "}
         <code>collision_mask=0xFFFFFFFF</code>. This gates{" "}
         <code>world.collides_with_body</code> and therefore every body
-        interaction inside every <code>move_*</code>. The AND is on purpose:
-        it makes "should these two interact" symmetric, so one object can't
-        silently filter a pair the other expected.
+        interaction inside every <code>move_*</code> call. The AND is intentional:
+        it ensures mutual consent for collision pairs so neither object can
+        silently ignore an expected physical interaction.
       </p>
 
-      <h2 id="coords">COORDINATE SPACE</h2>
+      <h2 id="coords">Coordinate Space & Geometry Conventions</h2>
       <ul>
         <li>
-          <strong>One coordinate system.</strong> Tiles and sprites live in the
+          <strong>Unified coordinate system.</strong> Tiles, bodies, and sprites all exist in the
           same pixel space. Tile <code>(col, row)</code> occupies{" "}
           <code>(col * tile_w, row * tile_h)</code>.
         </li>
@@ -622,21 +622,21 @@ for crate in crates:
           (there is no horizontal capsule).
         </li>
         <li>
-          <strong>Bodies are never one-way.</strong>{" "}
+          <strong>Bodies are solid obstacles.</strong>{" "}
           <code>Body.top_y_at(world_x)</code> samples the top surface, but
-          bodies block from every direction. One-way is a tile-polygon feature (
+          bodies block movement from all directions. One-way behavior is a tile-polygon feature (
           <code>poly.one_way</code>), and platformer movement only lands on it
           from above; <code>move_grounded</code> treats one-way polygons
-          as plain solid unless <code>one_way=&quot;directional&quot;</code>{" "}
+          as solid unless <code>one_way=&quot;directional&quot;</code>{" "}
           is passed.
         </li>
       </ul>
 
-      <h2 id="traps">COMMON MISTAKES, MOST FREQUENT FIRST</h2>
+      <h2 id="traps">Common Pitfalls & Troubleshooting</h2>
       <ol>
         <li>
           <strong>Rectangle top-left vs circle center.</strong> Swap coordinate
-          conventions and your sprite teleports half its size into the floor.{" "}
+          conventions and the sprite sinks half its size into the floor.{" "}
           <Link to="/quick-start#top-left-vs-center">
             The Quick Start warning covers anchoring and width in full
           </Link>
@@ -652,7 +652,7 @@ for crate in crates:
           <strong>
             <code>velocity=</code> skips gravity.
           </strong>{" "}
-          Every frame you forget to apply it, the crate hovers.
+          Each frame it is not applied, the crate hovers.
         </li>
         <li>
           <strong>Pushing the wrong mode.</strong> Only{" "}
@@ -665,8 +665,8 @@ for crate in crates:
         <li>
           <strong>Tiles with no collision data.</strong> A <code>tile_map</code>{" "}
           without a matching <code>tileset_collision</code> raises{" "}
-          <code>ValueError</code> at world construction, by design, so you can't
-          ship an empty world.
+          <code>ValueError</code> at world construction, by design, so an empty{" "}
+          collision-backed world cannot be shipped.
         </li>
         <li>
           <strong>One-way layer filtering.</strong> Collision requires both

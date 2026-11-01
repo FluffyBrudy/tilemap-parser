@@ -56,13 +56,14 @@ const SETUP_EDGES: FlowEdge[] = [
 ];
 
 const TOC = [
-  { id: "presets", label: "Game-type presets" },
-  { id: "tunables", label: "Tunables" },
-  { id: "attach", label: "Attach / detach / from_world" },
-  { id: "gid-routing", label: "GID routing (multi-tileset)" },
-  { id: "result", label: "CollisionResult flags" },
-  { id: "setup", label: "Per-mode setup" },
-  { id: "validate", label: "validate_config & strict" },
+  { id: "presets", label: "Game Type Presets" },
+  { id: "tunables", label: "Configuration Tunables" },
+  { id: "attach", label: "World Attachment & Detachment" },
+  { id: "gid-routing", label: "GID Routing (Multi-Tileset Maps)" },
+  { id: "result", label: "CollisionResult Flags" },
+  { id: "ground-tile", label: "Ground Tile Identity & Properties" },
+  { id: "setup", label: "Per-Mode Setup & Usage" },
+  { id: "validate", label: "Config Validation & Strict Mode" },
 ];
 
 const LOOP_TOP = `runner = CollisionRunner.from_game_type("topdown", tile_size=(32, 32))
@@ -89,7 +90,7 @@ if result.on_ground:
 export default function RunnerGuide() {
   return (
     <div className="content">
-      <h1>CollisionRunner guide</h1>
+      <h1>CollisionRunner Guide</h1>
       <p>
         The runner is the single public surface for movement. It composes five
         movement implementations behind one object: configure it once, call a{" "}
@@ -98,7 +99,7 @@ export default function RunnerGuide() {
       </p>
       <Toc items={TOC} />
 
-      <h2 id="presets">GAME-TYPE PRESETS</h2>
+      <h2 id="presets">Game Type Presets</h2>
       <p>
         <code>
           CollisionRunner.from_game_type(name, tile_size=(32, 32), strict=False,
@@ -160,7 +161,7 @@ export default function RunnerGuide() {
       </table>
       <p>
         Everything the presets set
-        is plain attributes; tweak after construction. The generic{" "}
+        is plain attributes; adjust them after construction. The generic{" "}
         <code>CollisionRunner(tile_size, mode, render_scale)</code> constructor
         also exists;
         <code>
@@ -171,7 +172,7 @@ export default function RunnerGuide() {
         rpg → <code>move_rpg</code>, grounded → <code>move_grounded</code>).
       </p>
 
-      <h2 id="tunables">TUNABLES</h2>
+      <h2 id="tunables">Configuration Tunables</h2>
       <table>
         <thead>
           <tr>
@@ -286,12 +287,12 @@ export default function RunnerGuide() {
         </tbody>
       </table>
       <Callout kind="warn" title="READ THE DEFAULTS BEFORE YOU TUNE">
-        The presets exist so you don't have to guess. Change one value at a time
+        The presets exist so that guesswork is unnecessary. Change one value at a time
         and re-test; the runner validates ranges for you (see{" "}
         <code>validate_config</code> below).
       </Callout>
 
-      <h2 id="attach">ATTACH / DETACH / FROM_WORLD</h2>
+      <h2 id="attach">World Attachment & Detachment</h2>
       <p>
         Without an attached world the runner resolves against whatever{" "}
         <code>(tileset_collision, tile_map)</code> you pass per call. Attach a{" "}
@@ -324,14 +325,14 @@ result = runner.move_platformer(player, None, None, dt, input_x=1.0, world=other
         </li>
       </ul>
 
-      <h2 id="gid-routing">GID ROUTING — MULTI-TILESET MAPS</h2>
+      <h2 id="gid-routing">GID Routing for Multi-Tileset Maps</h2>
       <p>
         Maps with several <code>type:"tile"</code> resources encode cells as{" "}
         <strong>global ids</strong>: <code>gid = firstgid + local_variant</code>,
         stacked in resource order. Collision files, however, are keyed by the{" "}
         <em>local</em> variant of their own tileset. Feeding a plain
-        local-keyed file into a GID world used to miss every lookup — floors
-        silently stopped being solid.
+        local-keyed file into a GID world previously missed every lookup —
+        floors stopped being solid without any error reported.
       </p>
       <p>
         Since 5.0.5, <code>PhysicsWorld.from_map(..., use_gids=True)</code>{" "}
@@ -366,7 +367,7 @@ world.has_collision_gid(1813)  # False -> belongs to another grid resource, neve
         reskinned path with no owner named falls back to literal ids, and
         when nothing resolves at all, <code>from_map</code> warns — usually
         a routing miss, though tiles whose entries carry no valid shape
-        also pass through silently by design. Duplicate stems across
+        also pass through by design. Duplicate stems across
         directories share one collision file safely only when their tile
         layouts are identical. A <code>collision_tileset</code> matching no
         map tileset warns too (typo guard).
@@ -380,7 +381,7 @@ world.has_collision_gid(1813)  # False -> belongs to another grid resource, neve
         and literal <code>use_gids=False</code> lookups keep working unchanged.
       </Callout>
 
-      <h2 id="result">COLLISIONRESULT FLAGS</h2>
+      <h2 id="result">CollisionResult Flags</h2>
       <p>
         One dataclass, reset before each call: <code>collided</code>,{" "}
         <code>final_x</code>, <code>final_y</code>, <code>hit_wall_x</code>,{" "}
@@ -393,12 +394,89 @@ world.has_collision_gid(1813)  # False -> belongs to another grid resource, neve
       </p>
       <Callout kind="note" title="ONE RESULT OBJECT, REUSED">
         The runner keeps a single reusable <code>CollisionResult</code> and
-        resets its fields before each call. Don't stash a reference across{" "}
-        <code>move_*</code> calls; read what you need from the returned object
-        in the same frame.
+        resets its fields before each call. Do not store a reference across{" "}
+        <code>move_*</code> calls; read the returned object in the same frame.
       </Callout>
 
-      <h2 id="setup">PER-MODE SETUP</h2>
+      <h2 id="ground-tile">Ground Tile Identity & Properties</h2>
+      <p>
+        When <code>move_platformer_with_slide()</code> reports{" "}
+        <code>on_ground</code>, the result also names the tile that supports
+        the sprite: <code>ground_tile</code> holds the cell coordinates{" "}
+        <code>(tile_x, tile_y)</code> of the winning support, and{" "}
+        <code>ground_tile_id</code> holds its gid exactly as stored in that
+        cell. Both fields are <code>None</code> while the sprite is airborne
+        or supported by a physics body.
+      </p>
+      <Callout kind="note" title="HOW THE SUPPORT IS SELECTED">
+        Selection is geometric. Across the sprite's foot samples, the tile
+        whose walkable edge yields the lowest <code>ground_y</code> wins. On
+        cells that stack several tiles, the reported tile is the one that owns
+        the winning edge. When a physics body provides the support, identity
+        is not reported because bodies are not tiles.
+      </Callout>
+      <p>
+        Tile properties exist in two places, and each answers a different
+        question.
+      </p>
+      <ul>
+        <li>
+          <strong>Map-side properties</strong> are authored in the map file:{" "}
+          per tileset on <code>ParsedTileset.tile_properties</code>, per
+          placed tile on <code>ParsedTile.properties</code>. Read them through{" "}
+          <code>game_data.get_tile_at(layer, cell_x, cell_y).properties</code>.
+          Use them for authoring data and decoration markers, including unique
+          non-colliding gids placed on separate layers.
+        </li>
+        <li>
+          <strong>Collision-side properties</strong> are authored in the
+          tileset collision file and are kept verbatim on{" "}
+          <code>TileCollisionData.properties</code>. Read them through{" "}
+          <code>world.resolve_collision(gid).properties</code>. Use them for
+          behavior decisions made at the collision site during movement; no
+          reference to the map is required.
+        </li>
+      </ul>
+      <p>
+        A common use is a rotating gear platform. The gear tiles carry{" "}
+        <code>surface</code> behavior in the collision file, and the sprite
+        drifts along the tangent of the reported floor normal while standing
+        on one:
+      </p>
+      <CodeBlock
+        title="gear platform drift"
+        code={`# gear collision entries carry: {"surface": "gear", "surface_speed": 60.0}
+
+world = PhysicsWorld.from_map(..., use_gids=True)
+runner = CollisionRunner.from_world(world, game_type="platformer")
+
+result = runner.move_platformer_with_slide(player, None, None, dt, input_x=axis)
+
+if result.on_ground and result.ground_tile_id is not None:
+    tile = world.resolve_collision(result.ground_tile_id)
+    if tile is not None and tile.properties.get("surface") == "gear":
+        speed = tile.properties.get("surface_speed", 0.0)
+        nx, ny = result.ground_normal          # outward floor normal
+        player.x += -ny * speed * dt           # tangent along the drive direction
+        player.y +=  nx * speed * dt
+# the drift stops on the frame ground_tile_id changes to a non-gear tile`}
+      />
+      <p>
+        For a coarse check, the cell beneath a world position and the gids
+        stored there are available without a move call:
+      </p>
+      <CodeBlock
+        title="coarse underfoot check"
+        code={`cell = runner.get_tile_at(player.x, player.y)
+gids_at_cell = world.tile_ids_at(cell)   # every gid stacked at the cell
+
+# map-side properties for a decoration or marker layer
+tile = game_data.get_tile_at("markers", cell_x, cell_y)
+if tile is not None:
+    value = tile.properties.get("surface")`}
+      />
+
+      <h2 id="setup">Per-Mode Setup & Usage</h2>
       <FlowDiagram
         title="move modes"
         nodes={SETUP_NODES}
@@ -417,7 +495,7 @@ if result.hit_wall_x:
     enemy.vx = 0.0      # runner zeroed vy on landing for you`}
       />
 
-      <h2 id="validate">VALIDATE_CONFIG & STRICT</h2>
+      <h2 id="validate">Config Validation & Strict Mode</h2>
       <p>
         Presets call <code>validate_config()</code> automatically. Manual rules
         worth knowing:

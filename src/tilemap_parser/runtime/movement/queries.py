@@ -49,6 +49,13 @@ def _literal_entry_data(
 
 def _iter_tile_datas(world, tileset_collision: TilesetCollision, cell: object, sprite=None):
     """Flip-aware datas for every stacked entry; unioned, layer/mask-filtered."""
+    for data, _gid in _iter_tile_entries(world, tileset_collision, cell, sprite):
+        yield data
+
+
+def _iter_tile_entries(world, tileset_collision: TilesetCollision, cell: object, sprite=None):
+    """Flip-aware ``(data, gid)`` for every stacked entry; gid is as stored
+    in the cell; layer/mask-filtered."""
     from ..world import iter_cell_entries
 
     if world is not None:
@@ -58,7 +65,7 @@ def _iter_tile_datas(world, tileset_collision: TilesetCollision, cell: object, s
                 continue
             if sprite is not None and not should_collide(sprite, data):
                 continue
-            yield data
+            yield data, entry[0]
     else:
         for entry in iter_cell_entries(cell):
             data = _literal_entry_data(tileset_collision, entry)
@@ -66,7 +73,7 @@ def _iter_tile_datas(world, tileset_collision: TilesetCollision, cell: object, s
                 continue
             if sprite is not None and not should_collide(sprite, data):
                 continue
-            yield data
+            yield data, entry[0]
 
 
 def _collides_at(
@@ -296,12 +303,15 @@ def _find_walkable_ground_info(
     min_upness = math.cos(math.radians(self.max_walk_angle))
 
     best: GroundInfo | None = None
+    best_tile_x: int | None = None
+    best_tile_y: int | None = None
+    best_tile_id: int | None = None
     for tile_y in range(min_tile_y, max_tile_y + 1):
         for tile_x in range(min_tile_x, max_tile_x + 1):
             cell = tile_map.get((tile_x, tile_y))
             if cell is None:
                 continue
-            for tile_data in _iter_tile_datas(world, tileset_collision, cell, sprite):
+            for tile_data, tile_gid in _iter_tile_entries(world, tileset_collision, cell, sprite):
                 ox = tile_x * tw
                 oy = tile_y * th
                 for poly in tile_data.shapes:
@@ -342,6 +352,9 @@ def _find_walkable_ground_info(
                                     normal=(nx, ny),
                                     angle=_angle_from_normal(nx, ny),
                                 )
+                                best_tile_x = tile_x
+                                best_tile_y = tile_y
+                                best_tile_id = tile_gid
     if world is not None:
         for body in world.bodies:
             if body is sprite:
@@ -356,6 +369,13 @@ def _find_walkable_ground_info(
                     continue
                 if best is None or ground_y < best.y:
                     best = GroundInfo(y=ground_y, normal=(0.0, -1.0), angle=0.0)
+                    best_tile_x = None
+                    best_tile_y = None
+                    best_tile_id = None
+    if best is not None:
+        best.tile_x = best_tile_x
+        best.tile_y = best_tile_y
+        best.tile_id = best_tile_id
     return best
 
 

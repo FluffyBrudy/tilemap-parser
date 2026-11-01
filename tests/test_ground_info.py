@@ -5,6 +5,8 @@ Covers the conservative contract:
   (edge -> normal -> angle), not tile identity / bounding box.
 - CollisionResult.ground_angle / ground_normal are post-move state.
 - World-X velocity preserved: no cos() scaling.
+- Tile identity of the winning support: cell coords + gid (tile-based
+  supports only; bodies / airborne read None).
 """
 
 import math
@@ -20,6 +22,7 @@ from tilemap_parser.parser.collision import (
     RectangleShape,
     TileCollisionData,
     TilesetCollision,
+    parse_tileset_collision,
 )
 from tilemap_parser.runtime.body import Body
 from tilemap_parser.runtime.movement import CollisionRunner
@@ -247,3 +250,148 @@ def test_y_query_delegates_to_info_query():
     info = r._find_walkable_ground_info(s, ts, {(5, 5): 0}, max_up=10.0, max_down=10.0)
     assert y is not None and info is not None
     assert y == info.y
+
+
+# --- Tile identity underfoot -------------------------------------------
+
+
+def test_flat_reports_winning_cell_and_gid():
+    r = CollisionRunner.from_game_type("platformer", (32, 32))
+    ts = make_tileset()
+    s = MockSprite(x=160, y=160 - 32 - 0.01)
+    s.on_ground = True
+    res = r.move_platformer_with_slide(s, ts, {(5, 5): 0}, dt=0.016, input_x=0)
+    assert res.on_ground is True
+    assert res.ground_tile == (5, 5)
+    assert res.ground_tile_id == 0
+
+
+def test_winning_cell_is_lowest_ground_across_foot_span():
+    # Feet span cols 5 (tilted, top edge starts at y=+3) and 6 (flat low-y):
+    # the flat tile in col 6 supports lowest -> identity is (6, 5).
+    r = CollisionRunner.from_game_type("platformer", (32, 32))
+    ts = make_tileset()
+    s = MockSprite(x=170, y=160 - 32 - 0.01)
+    s.on_ground = True
+    res = r.move_platformer_with_slide(s, ts, {(5, 5): 4, (6, 5): 0}, dt=0.016, input_x=0)
+    assert res.on_ground is True
+    assert res.ground_tile == (6, 5)
+    assert res.ground_tile_id == 0
+
+
+def test_airborne_gives_identity_none():
+    r = CollisionRunner.from_game_type("platformer", (32, 32))
+    ts = make_tileset()
+    s = MockSprite(x=100, y=100)
+    res = r.move_platformer_with_slide(s, ts, {}, dt=0.016, input_x=0)
+    assert res.on_ground is False
+    assert res.ground_tile is None
+    assert res.ground_tile_id is None
+
+
+def test_jump_clears_identity():
+    r = CollisionRunner.from_game_type("platformer", (32, 32))
+    ts = make_tileset()
+    s = MockSprite(x=160, y=160 - 32 - 0.01)
+    s.on_ground = True
+    res = r.move_platformer_with_slide(s, ts, {(5, 5): 0}, dt=0.016, input_x=0, jump_pressed=True)
+    assert res.ground_tile is None
+    assert res.ground_tile_id is None
+
+
+def test_world_path_reports_gid_as_stored():
+    # World path: cell entries are (gid, flags) stacks; gid must come
+    # through unmodified, including flipped entries.
+    world = PhysicsWorld(tile_size=(32, 32))
+    world.tileset_collision = make_tileset()
+    world.tile_map = {(5, 5): ((0, 0),)}
+    runner = CollisionRunner.from_world(world, game_type="platformer")
+    s = MockSprite(x=160, y=160 - 32 - 0.01)
+    s.on_ground = True
+    res = runner.move_platformer_with_slide(s, None, None, dt=0.016, input_x=0)
+    assert res.on_ground is True
+    assert res.ground_tile == (5, 5)
+    assert res.ground_tile_id == 0
+    assert res.ground_angle == 0.0
+
+
+def test_world_path_body_support_has_no_identity():
+    world = PhysicsWorld(tile_map={}, tileset_collision=None, tile_size=(32, 32))
+    world.add_body(
+        Body(collision_shape=RectangleShape(width=200, height=16), x=0, y=80)
+    )
+    runner = CollisionRunner.from_world(world, game_type="platformer")
+    s = MockSprite(x=50, y=80 - 32 - 0.01)
+    s.on_ground = True
+    res = runner.move_platformer_with_slide(s, None, None, dt=0.016, input_x=0)
+    assert res.on_ground is True
+    assert res.ground_angle == 0.0
+    assert res.ground_tile is None
+    assert res.ground_tile_id is None
+
+
+def test_result_identity_does_not_leak_from_reused_result():
+    # Reused _result object: a slide-mode call after a platformer call
+    # must not carry stale ground tile identity.
+    from tilemap_parser.runtime.movement.types import MovementMode
+
+    r = CollisionRunner.from_game_type("platformer", (32, 32))
+    ts = make_tileset()
+    s = MockSprite(x=160, y=160 - 32 - 0.01)
+    s.on_ground = True
+    res = r.move_platformer_with_slide(s, ts, {(5, 5): 0}, dt=0.016, input_x=0)
+    assert res.ground_tile_id == 0
+    r.mode = MovementMode.SLIDE
+    res2 = r.move(s, ts, {(5, 5): 0}, delta_x=8.0)
+    assert res2.ground_tile is None
+    assert res2.ground_tile_id is None
+
+
+# --- Properties passthrough ---------------------------------------------
+
+
+def test_tile_properties_survive_parse():
+    import json
+
+    payload = {
+        "tileset_name": "props_ts",
+        "tile_size": [32, 32],
+        "tiles": {
+            "7": {
+                "shapes": [
+                    {"vertices": FULL, "one_way": False}
+                ],
+                "properties": {
+                    "collision_layer": 2,
+                    "collision_mask": 3,
+                    "surface": "gear",
+                    "surface_speed": 120,
+                },
+            }
+        },
+    }
+    ts = parse_tileset_collision(json.loads(json.dumps(payload)))
+    data = ts.tiles[7]
+    assert data.has_collision()
+    assert data.properties["surface"] == "gear"
+    assert data.properties["surface_speed"] == 120
+    assert data.collision_layer == 2
+    assert data.collision_mask == 3
+
+
+def test_merge_preserves_properties():
+    ts = make_tileset()
+    ts.tiles[2].properties = {"surface": "ice"}
+    merged = TilesetCollision.merge([ts], [100])
+    assert merged.tiles[102].properties == {"surface": "ice"}
+    assert merged.tiles[100 + 0].properties == {}
+
+
+def test_flipped_copy_preserves_properties():
+    from tilemap_parser.runtime.world import flipped_data
+
+    ts = make_tileset()
+    ts.tiles[0].properties = {"surface": "gear"}
+    out = flipped_data(ts.tiles[0], 0x80000000, (32, 32))
+    assert out is not ts.tiles[0]  # flipped copy
+    assert out.properties == {"surface": "gear"}

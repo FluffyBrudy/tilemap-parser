@@ -5,9 +5,13 @@ import { renderToString } from "react-dom/server";
 import { StaticRouter } from "react-router-dom";
 import App from "../src/App";
 import { SEO, SITE_DESCRIPTION, SITE_URL, SITEMAP_ROUTES } from "../src/seo";
+import { buildPage, type IndexPage } from "./index-builder";
 
 const OUT = path.resolve(process.cwd(), "dist");
-const TEMPLATE = readFileSync(path.join(OUT, "index.html"), "utf8");
+const OUTPUT_HTML = !process.argv.includes("--index-only");
+const TEMPLATE = OUTPUT_HTML
+  ? readFileSync(path.join(OUT, "index.html"), "utf8")
+  : null;
 
 function pageUrl(route: string): string {
   return route === "/" ? SITE_URL : `${SITE_URL}${route}/`;
@@ -25,7 +29,7 @@ function renderBody(route: string): string {
 function renderPage(route: string): string {
   const seo = SEO[route] ?? { title: "tilemap-parser — docs", description: SITE_DESCRIPTION };
   const url = pageUrl(route);
-  let html = TEMPLATE.replace(
+  let html = TEMPLATE!.replace(
     '<div id="root"></div>',
     `<div id="root">${renderBody(route)}</div>`,
   );
@@ -68,14 +72,26 @@ function sitemapXml(): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
+
+const indexPages: IndexPage[] = [];
 for (const route of SITEMAP_ROUTES.map((r) => r.path)) {
-  const dest =
-    route === "/"
-      ? path.join(OUT, "index.html")
-      : path.join(OUT, route, "index.html");
-  mkdirSync(path.dirname(dest), { recursive: true });
-  writeFileSync(dest, renderPage(route));
+  if (OUTPUT_HTML) {
+    const dest =
+      route === "/"
+        ? path.join(OUT, "index.html")
+        : path.join(OUT, route, "index.html");
+    mkdirSync(path.dirname(dest), { recursive: true });
+    writeFileSync(dest, renderPage(route));
+  }
+  indexPages.push(buildPage(route, renderBody(route)));
   process.stdout.write(`prerendered ${route}\n`);
 }
-writeFileSync(path.join(OUT, "sitemap.xml"), sitemapXml());
-process.stdout.write("sitemap.xml written\n");
+if (OUTPUT_HTML) {
+  writeFileSync(path.join(OUT, "sitemap.xml"), sitemapXml());
+  process.stdout.write("sitemap.xml written\n");
+}
+writeFileSync(path.join(OUT, "search-index.json"), JSON.stringify(indexPages));
+try {
+  writeFileSync(path.resolve(process.cwd(), "public", "search-index.json"), JSON.stringify(indexPages));
+} catch {}
+process.stdout.write("search-index.json written\n");

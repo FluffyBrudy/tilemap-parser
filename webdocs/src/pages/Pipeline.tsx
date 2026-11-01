@@ -194,18 +194,17 @@ if __name__ == "__main__":
 export default function Pipeline() {
   return (
     <div className="content">
-      <h1>The Pipeline: one world, one runner</h1>
+      <h1>The Pipeline: End-to-End Execution Flow</h1>
       <p>
-        The entire flow in one clear script: load map → build the world →
-        attach the runner → move the player → push a kinematic crate → draw
-        everything. This is the update loop from{" "}
-        <code>docs/physics-world.md</code>, assembled exactly as the examples
-        run it.
+        The complete runtime pipeline in a unified script: load authored map data,
+        construct a <code>PhysicsWorld</code>, attach a <code>CollisionRunner</code>,
+        resolve player motion, simulate pushable kinematic crates, and render.
+        This represents the standard game loop pattern established across all package examples.
       </p>
 
       <CodeBlock title="pipeline.py" code={SCRIPT} />
 
-      <h2 id="blocks">WHAT EACH BLOCK DOES</h2>
+      <h2 id="blocks">Pipeline Stage Architecture</h2>
       <FlowDiagram title="pipeline" nodes={BLOCK_NODES} edges={BLOCK_EDGES} />
       <table>
         <thead>
@@ -271,7 +270,7 @@ export default function Pipeline() {
         </tbody>
       </table>
 
-      <h2 id="skip">WHAT BREAKS IF YOU SKIP A STEP</h2>
+      <h2 id="skip">Dependency Graph & Failure Modes</h2>
       <ul>
         <li>
           <strong>

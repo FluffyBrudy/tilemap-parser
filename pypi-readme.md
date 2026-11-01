@@ -32,6 +32,7 @@ mist = ParticleField(
 
 - **Map parsing** — tilemaps, layers, objects, and autotile data from JSON
 - **Collision** — tile-based (`CollisionRunner`) and object-to-object (`ObjectCollisionManager`) with rect, circle, capsule, and polygon shapes
+- **Ground tile identity** — `CollisionResult.ground_tile` / `ground_tile_id` report which tile supports a grounded sprite; custom tile properties are preserved on `TileCollisionData.properties`
 - **Physics** — `PhysicsWorld` with static/kinematic `Body` solids and one-way platforms
 - **Particles** — wrapped continuous fields (`ParticleField`, `FOG_PROFILE`), burst emitters, alpha fades, and batch rendering (`SpriteBatchRenderer`)
 - **Pathfinding** — A* `Pathfinder` over eroded `NavGrid`s
